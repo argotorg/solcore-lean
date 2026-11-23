@@ -721,7 +721,7 @@ theorem PayloadOrigins.closure_member
       | global related => intro function impossible; cases impossible
       | builtin related => intro function impossible; cases impossible
   | compatible _ _ ih => exact ih
-  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue =>
+  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue | arrayRef | arraySlice =>
       intro function impossible
       cases impossible
   | nil | cons | empty | entry | absent | present => trivial
@@ -748,7 +748,7 @@ theorem PayloadOrigins.named_member
       intro function selected
       obtain ⟨originalType, member, rawType⟩ := ih function selected
       exact ⟨originalType, member, same.trans rawType⟩
-  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue =>
+  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue | arrayRef | arraySlice =>
       intro function impossible; cases impossible
   | nil | cons | empty | entry | absent | present => trivial
 

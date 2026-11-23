@@ -906,6 +906,16 @@ theorem inputs_and_result (selected : RootSelection headers root header) :
   simp only [List.map_map]
   rfl
 
+/-- The session keeps each root's result view-free (`Root.publicTypes`), so the selected row's
+source result holds no memory array, slice or memref (the memory arrays note, decision 5). -/
+theorem result_viewFree (selected : RootSelection headers root header) :
+    SourceCoreRootTypes.ViewFree compiled.compatible.checked.signatures header.function.resultType := by
+  have signatures : compiled.compatible.checked.signatures = compiled.sourceProgram.signatures :=
+    compiled.compatible.prepared.signatureOwnership.trans (congrArg CheckedProgram.signatures
+      (SourceCoreUnifiedPreparationCertificates.automatic_fields compiled.compatiblePrepared).1)
+  rw [signatures, ← (inputs_and_result selected).2]
+  exact root.publicTypes root.result (.head _)
+
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicRootSourceSignature
 end
 

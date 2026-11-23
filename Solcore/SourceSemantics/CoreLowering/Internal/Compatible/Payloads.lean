@@ -4,6 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Data.Patterns
 import Solcore.SourceSemantics.Dynamic.Typing
 import Solcore.Frontend.Internal.RuntimeValues
 import Solcore.Core.Internal.Renaming
+import Solcore.Frontend.SourceCore.RootTypes
 
 /-!
 # Compatible profile: payloads
@@ -185,6 +186,12 @@ theorem MetadataRep.word_equality_iff {registry : SourceCoreRawMetadata.Registry
     (first : MetadataRep registry left a) (second : MetadataRep registry right b) :
     (a == b) = decide (left = right) := SourceCoreRawMetadata.Registry.word_equality_iff first.lookup second.lookup
 
+/-- The Core type of a view: a memory array's cell, or a slice's product of a view with the words of its
+start and its length. No comparison takes one. -/
+inductive ViewCarrier : Ty → Prop where
+  | cell (contents : Ty) : ViewCarrier (.cell contents)
+  | slice {base : Ty} (inner : ViewCarrier base) : ViewCarrier (.product base (.product .word .word))
+
 mutual
   inductive ValueRep (checked : SourceCoreCompatibleCatalog.Checked) (registry : SourceCoreRawMetadata.Registry)
       {ambient : AmbientDefinitions checked.catalog.definitions}
@@ -238,6 +245,27 @@ mutual
         (same : SourceCoreRawMetadata.runtimeType expected = SourceCoreRawMetadata.runtimeType actual)
         (related : ValueRep checked registry functions mapping world actual source value type) :
         ValueRep checked registry functions mapping world expected source value type
+    /-- A memory array's reference is its Core cell: the map takes the Source location to it, and the
+    world types it as the array's contents, the length, the element's payload and the entries' mapping. -/
+    | arrayRef {element : TypeSystem.Ty} {location : Dynamic.Location} {target : Location}
+        {payload : Ty} {identity : DataTypeId}
+        (elementProjection : checked.catalog.project element = .ok payload)
+        (identityEq : checked.catalog.identity? (.mapping (.constructor (.builtin .word)) element) = some identity)
+        (mapped : mapping[location.index]? = some target)
+        (typed : world[target]? = some (.product .word (.product payload (.namedData identity)))) :
+        ValueRep checked registry functions mapping world (TypeSystem.Ty.array element)
+          (.arrayRef element location) (.cellRef (.product .word (.product payload (.namedData identity))) target)
+          (.cell (.product .word (.product payload (.namedData identity))))
+    /-- A slice is its base's representation, a view's, with the words of its start and its length, which
+    stay within a word together. -/
+    | arraySlice {baseType : TypeSystem.Ty} {base : Dynamic.Value} {start length : Nat}
+        {value : Value} {type : Ty}
+        (baseRep : ValueRep checked registry functions mapping world baseType base value type)
+        (bounded : start + length < wordModulus) (baseView : ViewCarrier type) :
+        ValueRep checked registry functions mapping world (TypeSystem.Ty.arraySlice baseType)
+          (.arraySlice base start length)
+          (.pair value (.pair (.word (Word.ofNatModulo start)) (.word (Word.ofNatModulo length))))
+          (.product type (.product .word .word))
   inductive ValuesRep (checked : SourceCoreCompatibleCatalog.Checked) (registry : SourceCoreRawMetadata.Registry)
       {ambient : AmbientDefinitions checked.catalog.definitions}
       (functions : FunctionModel checked.catalog ambient) (mapping : LocationMap) (world : StoreTyping) :
@@ -287,6 +315,12 @@ theorem ValueRep.projection {sourceType : TypeSystem.Ty} {source : Dynamic.Value
   | unit | bool | word | integer | fixed => rfl
   | product _ _ first second => simp [SourceCoreCompatibleCatalog.Catalog.project, first, second, bind, Except.bind, pure, Except.pure]
   | function related => exact functions.projection related
+  | arrayRef elementProjection identityEq _ _ =>
+    simp [TypeSystem.Ty.array, SourceCoreCompatibleCatalog.Catalog.project, SourceCoreRawMetadata.runtimeType,
+      elementProjection, identityEq, bind, Except.bind, pure, Except.pure]
+  | arraySlice _ _ _ ih =>
+    simp [TypeSystem.Ty.arraySlice, SourceCoreCompatibleCatalog.Catalog.project, SourceCoreRawMetadata.runtimeType,
+      ih, bind, Except.bind, pure, Except.pure]
   | proxy _ identity _ => simp [SourceCoreCompatibleCatalog.Catalog.project, identity]
   | constructed _ _ _ projected => exact projected
   | compatible same _ ih =>
@@ -323,6 +357,8 @@ theorem ValueRep.runtime_hasType {sourceType : TypeSystem.Ty} {source : Dynamic.
   | proxy _ _ registered => exact .constructed (ambient.basePrefix.constructor_lookup registered) .word
   | constructed _ _ _ _ registered _ ih => exact .constructed (ambient.basePrefix.constructor_lookup registered) (.pair .word (pack_typed ih))
   | compatible _ _ ih => exact ih
+  | arrayRef _ _ _ typed => exact .cellRef typed
+  | arraySlice _ _ _ ih => exact .pair ih (.pair .word .word)
   | mappingValue _ _ _ _ registered _ _ entries fallback =>
     exact .pair .word (.pair fallback (OrderedMapping.encode_hasType (registered.extend_definitions ambient.basePrefix) _ entries))
   | nil => exact .nil
@@ -359,6 +395,9 @@ theorem ValueRep.extend {futureRegistry : SourceCoreRawMetadata.Registry} {futur
   | constructed header owner selected projected registered _ ih =>
     exact .constructed (header.extend metadata) (metadata.signatures.trans owner) selected projected registered ih
   | compatible same _ ih => exact .compatible same ih
+  | arrayRef elementProjection identityEq mapped typed =>
+    exact .arrayRef elementProjection identityEq (maps.lookup mapped) (worlds.lookup typed)
+  | arraySlice _ bounded view ih => exact .arraySlice ih bounded view
   | mappingValue header identity key value registered _ _ entries fallback =>
     exact .mappingValue (header.extend metadata) identity key value registered entries fallback
   | nil => exact .nil
@@ -367,6 +406,70 @@ theorem ValueRep.extend {futureRegistry : SourceCoreRawMetadata.Registry} {futur
   | entry _ _ _ key value tail => exact .entry key value tail
   | absent missing projected wf => exact .absent missing projected wf
   | present meaning _ ih => exact .present meaning ih
+
+/-- A type and its runtime view hold the same views. -/
+theorem holdsView_runtimeType (signatures : ProgramSignatures) (type : TypeSystem.Ty) :
+    SourceCoreRootTypes.holdsView signatures (SourceCoreRawMetadata.runtimeType type) =
+      SourceCoreRootTypes.holdsView signatures type := by
+  induction type with
+  | application function argument functionIH argumentIH =>
+    simp only [SourceCoreRawMetadata.runtimeType, SourceCoreRootTypes.holdsView_application, functionIH, argumentIH]
+  | function parameter result parameterIH resultIH =>
+    simp only [SourceCoreRawMetadata.runtimeType, SourceCoreRootTypes.holdsView_function, parameterIH, resultIH]
+  | product left right leftIH rightIH =>
+    simp only [SourceCoreRawMetadata.runtimeType, SourceCoreRootTypes.holdsView_product, leftIH, rightIH]
+  | mapping key value keyIH valueIH =>
+    simp only [SourceCoreRawMetadata.runtimeType, SourceCoreRootTypes.holdsView_mapping, keyIH, valueIH]
+  | proxy inner innerIH => simp only [SourceCoreRawMetadata.runtimeType, SourceCoreRootTypes.holdsView_proxy, innerIH]
+  | comptime inner innerIH => simp only [SourceCoreRawMetadata.runtimeType, SourceCoreRootTypes.holdsView_comptime, innerIH]
+  | _ => rfl
+
+/-- Two types with one runtime view hold the same views. -/
+theorem viewFree_of_runtimeType {signatures : ProgramSignatures} {expected actual : TypeSystem.Ty}
+    (same : SourceCoreRawMetadata.runtimeType expected = SourceCoreRawMetadata.runtimeType actual)
+    (free : SourceCoreRootTypes.ViewFree signatures expected) : SourceCoreRootTypes.ViewFree signatures actual := by
+  unfold SourceCoreRootTypes.ViewFree at free ⊢
+  rw [← holdsView_runtimeType, ← same, holdsView_runtimeType]
+  exact free
+
+/-- A substitution whose every lookup is view-free keeps a view-free type view-free. -/
+theorem viewFree_apply {signatures : ProgramSignatures} {substitution : TypeSystem.ParameterSubstitution}
+    (replacements : ∀ parameter replacement, substitution.lookup? parameter = some replacement →
+      SourceCoreRootTypes.ViewFree signatures replacement) :
+    ∀ {type : TypeSystem.Ty}, SourceCoreRootTypes.ViewFree signatures type →
+      SourceCoreRootTypes.ViewFree signatures (substitution.apply type)
+  | .variable _, free => free
+  | .parameter parameter, free => by
+    show SourceCoreRootTypes.ViewFree signatures ((substitution.lookup? parameter).getD (.parameter parameter))
+    cases found : substitution.lookup? parameter with
+    | none => exact free
+    | some replacement => exact replacements parameter replacement found
+  | .constructor _, free => free
+  | .application function argument, free => by
+    obtain ⟨functionFree, argumentFree⟩ := free.application
+    show SourceCoreRootTypes.ViewFree signatures
+      (.application (substitution.apply function) (substitution.apply argument))
+    simp [SourceCoreRootTypes.ViewFree, SourceCoreRootTypes.holdsView_application,
+      viewFree_apply replacements functionFree, viewFree_apply replacements argumentFree]
+  | .function parameter result, free => by
+    obtain ⟨parameterFree, resultFree⟩ := free.function
+    show SourceCoreRootTypes.ViewFree signatures
+      (.function (substitution.apply parameter) (substitution.apply result))
+    simp [SourceCoreRootTypes.ViewFree, SourceCoreRootTypes.holdsView_function,
+      viewFree_apply replacements parameterFree, viewFree_apply replacements resultFree]
+  | .product left right, free => by
+    obtain ⟨leftFree, rightFree⟩ := free.product
+    show SourceCoreRootTypes.ViewFree signatures (.product (substitution.apply left) (substitution.apply right))
+    simp [SourceCoreRootTypes.ViewFree, SourceCoreRootTypes.holdsView_product,
+      viewFree_apply replacements leftFree, viewFree_apply replacements rightFree]
+  | .mapping key value, free => by
+    obtain ⟨keyFree, valueFree⟩ := free.mapping
+    show SourceCoreRootTypes.ViewFree signatures (.mapping (substitution.apply key) (substitution.apply value))
+    simp [SourceCoreRootTypes.ViewFree, SourceCoreRootTypes.holdsView_mapping,
+      viewFree_apply replacements keyFree, viewFree_apply replacements valueFree]
+  | .proxy inner, free => viewFree_apply replacements (type := inner) free
+  | .comptime inner, free => viewFree_apply replacements (type := inner) free
+  | .error, free => free
 
 theorem ValuesRep.length {types : List TypeSystem.Ty} {sources : List Dynamic.Value} {values : List Value} {coreTypes : List Ty}
     (related : ValuesRep checked registry functions mapping world types sources values coreTypes) :
@@ -407,7 +510,7 @@ private theorem unsigned_word_fields {sourceType : TypeSystem.Ty} {type : TypeSy
         rw [← checked.catalog.project_runtimeType, view]
         rfl
       cases Except.ok.inj (projected.symm.trans scalar)
-  | unit | bool | word | integer | product | function | proxy | mappingValue =>
+  | unit | bool | word | integer | product | function | proxy | mappingValue | arrayRef | arraySlice =>
       intro view
       cases view
   | nil | cons | empty | entry | absent | present => trivial
@@ -429,7 +532,7 @@ private theorem word_view_fields {sourceType : TypeSystem.Ty}
         rw [← checked.catalog.project_runtimeType, view]
         rfl
       cases Except.ok.inj (projected.symm.trans scalar)
-  | unit | bool | integer | fixed | product | function | proxy | mappingValue =>
+  | unit | bool | integer | fixed | product | function | proxy | mappingValue | arrayRef | arraySlice =>
       intro view
       cases view
   | nil | cons | empty | entry | absent | present => trivial
@@ -760,7 +863,8 @@ theorem ValueRep.mapping_shape {sourceType : TypeSystem.Ty} {source : Dynamic.Va
   induction related using ValueRep.rec
     (motive_2 := fun _ _ _ _ _ => True) (motive_3 := fun _ _ _ _ _ _ _ => True)
     (motive_4 := fun _ _ _ _ => True) with
-  | unit | bool | word | integer | fixed | product | proxy | constructed => intro _ _ _ impossible; cases impossible
+  | unit | bool | word | integer | fixed | product | proxy | constructed | arrayRef | arraySlice =>
+    intro _ _ _ impossible; cases impossible
   | function related =>
     intro _ _ _ impossible
     have shape := functions.source_function related
@@ -836,6 +940,8 @@ theorem ValueRep.map_functions {checked : SourceCoreCompatibleCatalog.Checked}
   | proxy header identity registered => exact .proxy header identity registered
   | constructed header owner selected projected registered _ ih => exact .constructed header owner selected projected registered ih
   | compatible same _ ih => exact .compatible same ih
+  | arrayRef elementProjection identityEq mapped typed => exact .arrayRef elementProjection identityEq mapped typed
+  | arraySlice _ bounded view ih => exact .arraySlice ih bounded view
   | mappingValue header identity key value registered _ _ entries fallback =>
     exact .mappingValue header identity key value registered entries fallback
   | nil => exact .nil

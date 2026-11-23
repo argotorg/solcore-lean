@@ -663,6 +663,8 @@ private theorem selected_of_representation {raw : TypeSystem.Ty} {sourceValue : 
   | proxy => cases closure
   | constructed => cases closure
   | mappingValue => cases closure
+  | arrayRef => cases closure
+  | arraySlice => cases closure
   | function value =>
     cases closure
     exact ⟨_, _, rfl, CallableIndexedOwnedGeneralFunctionSelection.of_model profile value⟩

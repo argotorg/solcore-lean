@@ -300,7 +300,7 @@ private theorem scalar_fields (represented : ValueRep checked registry functions
     ScalarFields source value type := by
   induction represented using ValueRep.rec (motive_2 := fun _ _ _ _ _ => True)
     (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
-  | unit | product | proxy | constructed | mappingValue => trivial
+  | unit | product | proxy | constructed | mappingValue | arrayRef | arraySlice => trivial
   | bool boolean => exact ⟨boolean, rfl, rfl⟩
   | word word => exact ⟨word, rfl, rfl⟩
   | fixed word => exact ⟨word, rfl, rfl⟩
@@ -351,7 +351,7 @@ theorem fixed_fields {sourceType : TypeSystem.Ty} {type : TypeSystem.FixedIntege
         rw [← checked.catalog.project_runtimeType, view]
         rfl
       cases Except.ok.inj (projected.symm.trans scalar)
-  | unit | bool | word | integer | product | function | proxy | mappingValue =>
+  | unit | bool | word | integer | product | function | proxy | mappingValue | arrayRef | arraySlice =>
       intro view
       cases view
   | nil | cons | empty | entry | absent | present => trivial

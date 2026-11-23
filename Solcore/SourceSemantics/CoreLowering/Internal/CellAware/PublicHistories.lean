@@ -1910,6 +1910,7 @@ theorem exports :
   have shape : SourceCorePublicOutputShapes.Output recipe.compiled.compatible.checked encodedValues.registry
       (finalStore.map Core.Value.type) recipe.program.layouts.definitions requested payload := by
     have shaped := CompatiblePublicOutputShapes.ValueRep.output represented
+      (CompatiblePayload.viewFree_of_runtimeType resultView started.result_viewFree)
     rw [exactRegistry, result.2.1.runtime_hasTypes.world_eq] at shaped
     exact .compatible resultView shaped
   have checkpointRegistry : checkpoint.RegistryAt encodedValues.registry := by
@@ -2123,6 +2124,7 @@ theorem exports :
   have shape : SourceCorePublicOutputShapes.Output recipe.compiled.compatible.checked encodedValues.registry
       (finalStore.map Core.Value.type) recipe.program.layouts.definitions header.function.resultType payload := by
     have shaped := CompatiblePublicOutputShapes.ValueRep.output represented
+      (RecursiveNamedPublicRootSourceSignature.result_viewFree selected)
     rw [exactRegistry, result.2.2.1.runtime_hasTypes.world_eq] at shaped
     exact shaped
   have checkpointRegistry : checkpoint.RegistryAt encodedValues.registry := by

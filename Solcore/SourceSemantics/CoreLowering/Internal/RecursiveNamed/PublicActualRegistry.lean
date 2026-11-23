@@ -1441,6 +1441,7 @@ theorem public_resume_has_sufficient_fuel [FunctionCalls.FaultTokens semanticFau
   have shape : SourceCorePublicOutputShapes.Output recipe.compiled.compatible.checked encodedValues.registry
       (finalStore.map Core.Value.type) recipe.program.layouts.definitions header.function.resultType payload := by
     have shaped := CompatiblePublicOutputShapes.ValueRep.output representedResult
+      (RecursiveNamedPublicRootSourceSignature.result_viewFree selected)
     rw [contextAt] at shaped
     rw [result.2.2.1.runtime_hasTypes.world_eq] at shaped
     exact shaped
@@ -2810,6 +2811,7 @@ theorem public_resume_has_sufficient_fuel [FunctionCalls.FaultTokens semanticFau
   have shape : SourceCorePublicOutputShapes.Output recipe.compiled.compatible.checked encodedValues.registry
       (finalStore.map Core.Value.type) recipe.program.layouts.definitions actualResult payload := by
     have shaped := CompatiblePublicOutputShapes.ValueRep.output represented
+      (CompatiblePayload.viewFree_of_runtimeType resultView started.result_viewFree)
     rw [contextAt] at shaped
     rw [resultAt.2.1.runtime_hasTypes.world_eq] at shaped
     exact .compatible resultView shaped

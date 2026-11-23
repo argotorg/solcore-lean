@@ -874,9 +874,9 @@ private theorem unit_view {expected : TypeSystem.Ty} {source : Dynamic.Value} {v
   induction represented using CompatiblePayload.ValueRep.rec (motive_2 := fun _ _ _ _ _ => True)
     (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
   | unit => intro _; exact ⟨rfl, rfl, rfl⟩
-  | bool | word | integer | fixed | product | function | proxy | mappingValue =>
+  | bool | word | integer | fixed | product | function | proxy | mappingValue | arrayRef | arraySlice =>
     intro impossible
-    simp [SourceCoreRawMetadata.runtimeType, TypeSystem.Ty.unit, TypeSystem.Ty.bool, TypeSystem.Ty.fixed,
+    simp [TypeSystem.Ty.array, TypeSystem.Ty.arraySlice, SourceCoreRawMetadata.runtimeType, TypeSystem.Ty.unit, TypeSystem.Ty.bool, TypeSystem.Ty.fixed,
       TypeSystem.Ty.word, TypeSystem.Ty.integer] at impossible
   | constructed metadata owner selected projected registered payloads _ =>
     intro impossible
@@ -907,9 +907,9 @@ private theorem product_view {expected : TypeSystem.Ty} {source : Dynamic.Value}
       (mapping := mapping) (world := world) expected source value type := by
   induction represented using CompatiblePayload.ValueRep.rec (motive_2 := fun _ _ _ _ _ => True)
     (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
-  | unit | bool | word | integer | fixed | function | proxy | mappingValue =>
+  | unit | bool | word | integer | fixed | function | proxy | mappingValue | arrayRef | arraySlice =>
     intro left right impossible
-    simp [SourceCoreRawMetadata.runtimeType, TypeSystem.Ty.unit, TypeSystem.Ty.bool, TypeSystem.Ty.fixed,
+    simp [TypeSystem.Ty.array, TypeSystem.Ty.arraySlice, SourceCoreRawMetadata.runtimeType, TypeSystem.Ty.unit, TypeSystem.Ty.bool, TypeSystem.Ty.fixed,
       TypeSystem.Ty.word, TypeSystem.Ty.integer] at impossible
   | product first second firstIH secondIH =>
     intro left right viewed
@@ -941,9 +941,9 @@ private theorem nominal_source {expected : TypeSystem.Ty} {source : Dynamic.Valu
       ∃ metadata sources, source = .constructed metadata sources := by
   induction represented using CompatiblePayload.ValueRep.rec (motive_2 := fun _ _ _ _ _ => True)
     (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
-  | unit | bool | word | integer | fixed | product | function | proxy | mappingValue =>
+  | unit | bool | word | integer | fixed | product | function | proxy | mappingValue | arrayRef | arraySlice =>
     intro declaration arguments impossible
-    simp [SourceCoreRawMetadata.runtimeType, SourceCoreDataCatalog.nominalParts,
+    simp [TypeSystem.Ty.array, TypeSystem.Ty.arraySlice, SourceCoreRawMetadata.runtimeType, SourceCoreDataCatalog.nominalParts,
       TypeSystem.Ty.unit, TypeSystem.Ty.bool, TypeSystem.Ty.word, TypeSystem.Ty.integer, TypeSystem.Ty.fixed] at impossible
   | constructed => intro _ _ _; exact ⟨_, _, rfl⟩
   | compatible same related ih => intro declaration arguments viewed; exact ih declaration arguments (same ▸ viewed)

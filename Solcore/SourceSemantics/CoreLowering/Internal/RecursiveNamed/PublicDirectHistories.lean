@@ -404,6 +404,24 @@ theorem actual_start_compatible {artifact : Artifact} {session : Session artifac
   have same := TypeSystem.Ty.function.inj (actualView.symm.trans importedView.symm)
   exact ⟨actualParameter, actualResult, nativeParameter, nativeResult, callable, packed, encodedValues, actual, same⟩
 
+/-- A started call's selected result holds no memory array, slice or memref: the session calls no
+handle whose type holds one (the memory arrays note, decision 5). -/
+theorem StartAt.result_viewFree {artifact : Artifact} {session : Session artifact} {recipe : Recipe}
+    {handle : SourceCorePublicValues.Handle} {argument : SourceCorePublicValues.Value}
+    {checkpoint : Checkpoint artifact} {fuel : Nat} {world : StoreTyping} {store : Store}
+    {parameter result : TypeSystem.Ty} {nativeParameter nativeResult : Core.Ty}
+    {callable packed : Core.Value} {encodedValues : SourceCoreCompatibleValues.Context}
+    (started : StartAt session handle argument fuel checkpoint recipe world store
+      parameter result nativeParameter nativeResult callable packed encodedValues) :
+    SourceCoreRootTypes.ViewFree recipe.compiled.compatible.checked.signatures result := by
+  have free := started.selected.viewFree.2
+  have atRecipe := started.recipe_eq
+  cases artifact
+  rename_i authority actualRecipe
+  change actualRecipe = recipe at atRecipe
+  subst actualRecipe
+  exact free
+
 section Inputs
 variable {artifact : Artifact} {session : Session artifact} {recipe : Recipe}
   {handle : SourceCorePublicValues.Handle} {argument : SourceCorePublicValues.Value}

@@ -467,6 +467,7 @@ theorem first_function
   have shape : SourceCorePublicOutputShapes.Output recipe.compiled.compatible.checked start.encodedValues.registry
       (finalStore.map Core.Value.type) recipe.program.layouts.definitions header.function.resultType payload := by
     have shaped := CompatiblePublicOutputShapes.ValueRep.output representedResult
+      (RecursiveNamedPublicRootSourceSignature.result_viewFree start.selected)
     rw [support.registry, ← startupRegistry] at shaped
     rw [result.2.2.1.runtime_hasTypes.world_eq] at shaped
     exact shaped

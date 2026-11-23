@@ -818,6 +818,7 @@ theorem word_fields (observations : FunctionObservations checked.catalog functio
     ∃ word, source = .word word ∧ value = .word word := by
   cases CompatibleEquality.ValueRep.observation observations related with
   | word word => exact ⟨word, rfl, rfl⟩
+  | view shape => cases shape
 
 theorem integer_fields (observations : FunctionObservations checked.catalog functions identities)
     {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {value : Value}
@@ -825,6 +826,7 @@ theorem integer_fields (observations : FunctionObservations checked.catalog func
     ∃ integer, source = .integer integer ∧ value = .integer integer := by
   cases CompatibleEquality.ValueRep.observation observations related with
   | integer integer => exact ⟨integer, rfl, rfl⟩
+  | view shape => cases shape
 
 /-- Plain assignment supports every authenticated payload. Numeric compound
 assignment also accepts staged type views, without changing their metadata. -/

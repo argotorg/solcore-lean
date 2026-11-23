@@ -5224,6 +5224,7 @@ theorem forward_initial {fixture : CompiledFixture} {observed : ObservedProgram 
   have shape : SourceCorePublicOutputShapes.Output fixture.recipe.compiled.compatible.checked encodedValues.registry
       (finalStore.map Core.Value.type) fixture.recipe.program.layouts.definitions inventory.wordHeader.header.function.resultType payload := by
     have shaped := CompatiblePublicOutputShapes.ValueRep.output representedResult
+      (RecursiveNamedPublicRootSourceSignature.result_viewFree selected)
     rw [receiver.registry, ← startupRegistry] at shaped
     rw [result.2.2.1.runtime_hasTypes.world_eq] at shaped
     exact shaped
@@ -5493,6 +5494,7 @@ theorem forward_factory {fixture : CompiledFixture} {observed : ObservedProgram 
   have shape : SourceCorePublicOutputShapes.Output fixture.recipe.compiled.compatible.checked request.encodedValues.registry
       (finalStore.map Core.Value.type) fixture.recipe.program.layouts.definitions request.header.function.resultType payload := by
     have shaped := CompatiblePublicOutputShapes.ValueRep.output representedResult
+      (RecursiveNamedPublicRootSourceSignature.result_viewFree request.selected)
     rw [← registry] at shaped
     rw [result.2.2.1.runtime_hasTypes.world_eq] at shaped
     exact shaped
@@ -5656,6 +5658,7 @@ theorem forward_call {fixture : CompiledFixture} {observed : ObservedProgram fix
   have shape : SourceCorePublicOutputShapes.Output fixture.recipe.compiled.compatible.checked request.encodedValues.registry
       (finalStore.map Core.Value.type) fixture.recipe.program.layouts.definitions request.header.function.resultType payload := by
     have shaped := CompatiblePublicOutputShapes.ValueRep.output representedResult
+      (RecursiveNamedPublicRootSourceSignature.result_viewFree request.selected)
     rw [← registry] at shaped
     rw [result.2.2.1.runtime_hasTypes.world_eq] at shaped
     exact shaped

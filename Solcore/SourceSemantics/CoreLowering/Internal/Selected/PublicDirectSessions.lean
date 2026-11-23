@@ -583,6 +583,7 @@ theorem forward_call
   have shape : SourceCorePublicOutputShapes.Output recipe.compiled.compatible.checked encodedValues.registry
       (finalStore.map Core.Value.type) recipe.program.layouts.definitions actualResult payload := by
     have shaped := CompatiblePublicOutputShapes.ValueRep.output represented
+      (CompatiblePayload.viewFree_of_runtimeType resultView started.result_viewFree)
     rw [contextAt] at shaped
     rw [resultAt.2.1.runtime_hasTypes.world_eq] at shaped
     exact .compatible resultView shaped
@@ -1343,6 +1344,7 @@ theorem forward_call
   have shape : SourceCorePublicOutputShapes.Output recipe.compiled.compatible.checked encodedValues.registry
       (finalStore.map Core.Value.type) recipe.program.layouts.definitions actualResult payload := by
     have shaped := CompatiblePublicOutputShapes.ValueRep.output represented
+      (CompatiblePayload.viewFree_of_runtimeType resultView started.result_viewFree)
     rw [contextAt] at shaped
     rw [resultAt.2.1.runtime_hasTypes.world_eq] at shaped
     exact .compatible resultView shaped

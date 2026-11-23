@@ -166,6 +166,7 @@ theorem forward_call (support : SelectedCompilationPhysicalProgramSupport.Suppor
   have shape : SourceCorePublicOutputShapes.Output recipe.compiled.compatible.checked request.encodedValues.registry
       (finalStore.map Core.Value.type) recipe.program.layouts.definitions request.header.function.resultType payload := by
     have shaped := CompatiblePublicOutputShapes.ValueRep.output representedResult
+      (RecursiveNamedPublicRootSourceSignature.result_viewFree request.selected)
     rw [← registry] at shaped
     rw [result.2.2.1.runtime_hasTypes.world_eq] at shaped
     exact shaped
@@ -308,6 +309,7 @@ theorem forward_call_at_input_registry (support : SelectedCompilationPhysicalPro
   have shape : SourceCorePublicOutputShapes.Output recipe.compiled.compatible.checked request.encodedValues.registry
       (finalStore.map Core.Value.type) recipe.program.layouts.definitions request.header.function.resultType payload := by
     have shaped := CompatiblePublicOutputShapes.ValueRep.output representedResult
+      (RecursiveNamedPublicRootSourceSignature.result_viewFree request.selected)
     rw [← registry] at shaped
     rw [result.2.2.1.runtime_hasTypes.world_eq] at shaped
     exact shaped
@@ -451,6 +453,7 @@ theorem first_function
   have shape : SourceCorePublicOutputShapes.Output recipe.compiled.compatible.checked start.encodedValues.registry
       (finalStore.map Core.Value.type) recipe.program.layouts.definitions header.function.resultType payload := by
     have shaped := CompatiblePublicOutputShapes.ValueRep.output representedResult
+      (RecursiveNamedPublicRootSourceSignature.result_viewFree start.selected)
     rw [receiverRegistry] at shaped
     rw [result.2.2.1.runtime_hasTypes.world_eq] at shaped
     exact shaped
@@ -607,6 +610,7 @@ theorem first_scalar
   have shape : SourceCorePublicOutputShapes.Output recipe.compiled.compatible.checked start.encodedValues.registry
       (finalStore.map Core.Value.type) recipe.program.layouts.definitions header.function.resultType payload := by
     have shaped := CompatiblePublicOutputShapes.ValueRep.output representedResult
+      (RecursiveNamedPublicRootSourceSignature.result_viewFree start.selected)
     rw [receiverRegistry] at shaped
     rw [result.2.2.1.runtime_hasTypes.world_eq] at shaped
     exact shaped
@@ -1052,6 +1056,7 @@ theorem forward_function (support : SelectedCompilationPhysicalProgramSupport.Su
   have shape : SourceCorePublicOutputShapes.Output recipe.compiled.compatible.checked request.encodedValues.registry
       (finalStore.map Core.Value.type) recipe.program.layouts.definitions request.header.function.resultType payload := by
     have shaped := CompatiblePublicOutputShapes.ValueRep.output representedResult
+      (RecursiveNamedPublicRootSourceSignature.result_viewFree request.selected)
     rw [← registry] at shaped
     rw [result.2.2.1.runtime_hasTypes.world_eq] at shaped
     exact shaped
@@ -1233,6 +1238,7 @@ theorem forward_function_at_input_registry (support : SelectedCompilationPhysica
   have shape : SourceCorePublicOutputShapes.Output recipe.compiled.compatible.checked request.encodedValues.registry
       (finalStore.map Core.Value.type) recipe.program.layouts.definitions request.header.function.resultType payload := by
     have shaped := CompatiblePublicOutputShapes.ValueRep.output representedResult
+      (RecursiveNamedPublicRootSourceSignature.result_viewFree request.selected)
     rw [← registry] at shaped
     rw [result.2.2.1.runtime_hasTypes.world_eq] at shaped
     exact shaped
@@ -1933,6 +1939,7 @@ theorem forward_function_at_input_registry (support : SelectedCompilationPhysica
   have shape : SourceCorePublicOutputShapes.Output recipe.compiled.compatible.checked request.encodedValues.registry
       (finalStore.map Core.Value.type) recipe.program.layouts.definitions request.header.function.resultType payload := by
     have shaped := CompatiblePublicOutputShapes.ValueRep.output representedResult
+      (RecursiveNamedPublicRootSourceSignature.result_viewFree request.selected)
     rw [← registry] at shaped
     rw [result.2.2.1.runtime_hasTypes.world_eq] at shaped
     exact shaped
@@ -2856,6 +2863,7 @@ theorem first_function
   have shape : SourceCorePublicOutputShapes.Output recipe.compiled.compatible.checked start.encodedValues.registry
       (finalStore.map Core.Value.type) recipe.program.layouts.definitions header.function.resultType payload := by
     have shaped := CompatiblePublicOutputShapes.ValueRep.output representedResult
+      (RecursiveNamedPublicRootSourceSignature.result_viewFree start.selected)
     rw [support.registry, ← startupRegistry] at shaped
     rw [result.2.2.1.runtime_hasTypes.world_eq] at shaped
     exact shaped

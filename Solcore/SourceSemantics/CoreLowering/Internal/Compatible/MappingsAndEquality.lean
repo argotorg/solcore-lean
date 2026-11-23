@@ -310,15 +310,20 @@ inductive Carrier (profile : Bool) : Ty → Prop where
   | mapping (id : DataTypeId) (value : Ty) : Carrier profile (.product .word (.product (.sum .unit value) (.namedData id)))
   | function (parameter result : Ty) (plain : profile = false) : Carrier profile (TaggedFunction.functionType parameter result)
   | contracted (parameter result : Ty) (marked : profile = true) : Carrier profile (CallableContract.functionType parameter result)
+  /-- A view's type, which no comparison takes. -/
+  | view {type : Ty} (shape : CompatiblePayload.ViewCarrier type) : Carrier profile type
 
 theorem Carrier.not_sum {profile : Bool} {left right : Ty} : ¬ Carrier profile (.sum left right) := by
-  intro impossible; cases impossible
+  intro impossible
+  cases impossible with
+  | view shape => cases shape
 
 theorem Carrier.not_mapping_tail {profile : Bool} {value : Ty} {id : DataTypeId} :
     ¬ Carrier profile (.product (.sum .unit value) (.namedData id)) := by
   intro impossible
   cases impossible with
   | product first => exact first.not_sum
+  | view shape => cases shape
 
 theorem Carrier.not_tagged_contract {parameter result : Ty} :
     ¬ Carrier true (TaggedFunction.functionType parameter result) := by
@@ -326,6 +331,7 @@ theorem Carrier.not_tagged_contract {parameter result : Ty} :
   cases impossible with
   | product first => exact first.not_sum
   | function _ _ impossible => cases impossible
+  | view shape => cases shape
 
 theorem Carrier.product_not_mapping {catalog : Catalog} {left right : Ty}
     (second : Carrier catalog.callableContracts right) :
@@ -348,10 +354,15 @@ theorem Carrier.product_contract_shape {profile : Bool} {left right : Ty}
     cases first with
     | unit | bool | word | integer | namedData | mapping | contracted => rfl
     | function _ _ impossible => cases impossible
+    | view shape =>
+      cases shape with
+      | cell => rfl
+      | slice inner => cases inner <;> rfl
     | product head tail =>
       cases head with
       | unit | bool | word | integer | product | namedData | mapping | contracted => rfl
       | function _ _ impossible => cases impossible
+      | view shape => cases shape <;> rfl
 
 inductive Observation (catalog : Catalog) (registry : Registry) (identities : Dynamic.Value → Word → Prop) :
     Ty → Dynamic.Value → Value → Prop where
@@ -394,6 +405,9 @@ inductive Observation (catalog : Catalog) (registry : Registry) (identities : Dy
       (meaning : DataMeaning registry catalog ⟨id, index⟩ source packed)
       (representation : Observation catalog registry identities payloadType packed payload) :
       Observation catalog registry identities (.namedData id) source (.constructed ⟨id, index⟩ payload)
+  /-- A memory array's reference or a slice, at a view's type, which no comparison takes. -/
+  | view {type : Ty} {source : Dynamic.Value} {value : Value} (shape : CompatiblePayload.ViewCarrier type) :
+      Observation catalog registry identities type source value
 
 theorem Observation.carrier {catalog : Catalog} {registry : Registry}
     {identities : Dynamic.Value → Word → Prop} {type : Ty} {source : Dynamic.Value} {value : Value}
@@ -408,6 +422,7 @@ theorem Observation.carrier {catalog : Catalog} {registry : Registry}
   | identified _ _ _ _ profile | anonymous _ _ _ _ profile => exact .function _ _ profile
   | contractedIdentified _ _ _ _ _ profile | contractedAnonymous _ _ _ _ _ profile => exact .contracted _ _ profile
   | data => exact .namedData _
+  | view shape => exact .view shape
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleEquality
 end
@@ -461,6 +476,46 @@ theorem registered_payload {catalog : Catalog} {id : DataTypeId} {entry : Source
   simpa [SourceCoreCompatibleCatalog.Catalog.definitions, DataEnvironment.lookupConstructorPayloadType?,
     DataEnvironment.lookupDataType?, selected, definitionSelected] using registered
 
+theorem _root_.Solcore.SourceSemantics.CoreLowering.CompatiblePayload.ViewCarrier.not_mapping {catalog : Catalog} {type : Ty} (shape : CompatiblePayload.ViewCarrier type) :
+    isMappingCarrier catalog type = false := by
+  cases shape with
+  | cell => rfl
+  | slice inner => cases inner <;> rfl
+
+theorem _root_.Solcore.SourceSemantics.CoreLowering.CompatiblePayload.ViewCarrier.not_contract {type : Ty} (shape : CompatiblePayload.ViewCarrier type) :
+    SourceCoreDataEquality.isCallableContractType type = false := by
+  cases shape with
+  | cell => rfl
+  | slice inner =>
+    cases inner with
+    | cell => rfl
+    | slice inner => cases inner <;> rfl
+
+/-- No comparison is generated at a view's type. -/
+theorem _root_.Solcore.SourceSemantics.CoreLowering.CompatiblePayload.ViewCarrier.compareType_refused {catalog : Catalog} {type : Ty} (shape : CompatiblePayload.ViewCarrier type) :
+    ∀ {fuel depth : Nat} {left right compiled : Expr}, compareType fuel catalog depth type left right ≠ .ok compiled := by
+  induction shape with
+  | cell contents =>
+    intro fuel depth left right compiled
+    cases fuel with
+    | zero => simp [compareType]
+    | succ fuel => simp [compareType, isMappingCarrier]
+  | @slice base inner ih =>
+    intro fuel depth left right compiled accepted
+    cases fuel with
+    | zero => simp [compareType] at accepted
+    | succ fuel =>
+      have noMapping := (CompatiblePayload.ViewCarrier.slice inner).not_mapping (catalog := catalog)
+      have noContract := (CompatiblePayload.ViewCarrier.slice inner).not_contract
+      have generated : (show Except Error Expr from do
+          let first ← compareType fuel catalog depth base (.first left) (.first right)
+          let second ← compareType fuel catalog depth (.product .word .word) (.second left) (.second right)
+          pure (.ifE first second (.bool false))) = .ok compiled := by
+        cases inner <;> simpa only [compareType, noMapping, noContract, Bool.false_eq_true, Bool.and_false,
+          ↓reduceIte] using accepted
+      obtain ⟨_, firstCompiled, _⟩ := bind_ok generated
+      exact ih firstCompiled
+
 theorem tree_of_compareType {catalog : Catalog} {registry : Registry}
     {identities : Dynamic.Value → Word → Prop} {helperFuel : Nat} {bodies : List Expr}
     (generatedHelpers : helperBodies helperFuel catalog = .ok bodies)
@@ -483,11 +538,14 @@ theorem tree_of_compareType {catalog : Catalog} {registry : Registry}
     | succ fuel =>
       simp only [compareType, isMappingCarrier, Bool.false_eq_true, ↓reduceIte, pure, Except.pure, Except.ok.injEq] at accepted
       subst compiled
-      cases rightObserved
-      first | exact ⟨true, .base .unit⟩ | exact ⟨_, .base (.bool leftSelected rightSelected)⟩ |
-        exact ⟨_, .base (.word leftSelected rightSelected)⟩ | exact ⟨_, .base (.integer leftSelected rightSelected)⟩
+      cases rightObserved with
+      | view shape => cases shape
+      | _ =>
+        first | exact ⟨true, .base .unit⟩ | exact ⟨_, .base (.bool leftSelected rightSelected)⟩ |
+          exact ⟨_, .base (.word leftSelected rightSelected)⟩ | exact ⟨_, .base (.integer leftSelected rightSelected)⟩
   | @product leftType rightType a b x y first second firstIH secondIH =>
     cases rightObserved with
+    | view shape => exact absurd accepted shape.compareType_refused
     | mapping => exact False.elim second.carrier.not_mapping_tail
     | identified => exact False.elim first.carrier.not_sum
     | anonymous => exact False.elim first.carrier.not_sum
@@ -506,7 +564,7 @@ theorem tree_of_compareType {catalog : Catalog} {registry : Registry}
           have carrier := first.carrier
           have noMap := second.carrier.product_not_mapping (left := leftType)
           have shape := Carrier.product_contract_shape (right := rightType) carrier
-          cases leftType <;> try cases carrier
+          cases leftType <;> try cases carrier <;> try cases ‹CompatiblePayload.ViewCarrier _›
           all_goals simpa only [compareType, noMap, shape, Bool.false_eq_true, ↓reduceIte] using accepted
         obtain ⟨leftCode, leftCompiled, generated⟩ := bind_ok generated
         obtain ⟨rightCode, rightCompiled, generated⟩ := bind_ok generated
@@ -516,6 +574,7 @@ theorem tree_of_compareType {catalog : Catalog} {registry : Registry}
         exact ⟨_, .product leftTree rightTree⟩
   | @mapping id valueType recognized key value entries carrier =>
     cases rightObserved with
+    | view shape => exact absurd accepted shape.compareType_refused
     | product _ otherSecond => exact False.elim otherSecond.carrier.not_mapping_tail
     | mapping =>
       cases fuel with
@@ -536,6 +595,7 @@ theorem tree_of_compareType {catalog : Catalog} {registry : Registry}
       | product first => exact False.elim first.carrier.not_sum
       | identified _ _ _ other _ => exact ⟨_, .base (.identified meaning other leftSelected rightSelected)⟩
       | anonymous source => exact ⟨false, .base (.anonymousRight _ source leftSelected rightSelected)⟩
+      | view shape => cases shape
   | @anonymous source parameter result code profile =>
     cases fuel with
     | zero => simp [compareType] at accepted
@@ -547,6 +607,7 @@ theorem tree_of_compareType {catalog : Catalog} {registry : Registry}
       cases rightObserved with
       | product first => exact False.elim first.carrier.not_sum
       | identified | anonymous => exact ⟨false, .base (.anonymousLeft source _ leftSelected rightSelected)⟩
+      | view shape => cases shape
   | @contractedIdentified source identity parameter result code contract meaning profile =>
     cases fuel with
     | zero => simp [compareType] at accepted
@@ -560,6 +621,7 @@ theorem tree_of_compareType {catalog : Catalog} {registry : Registry}
       | product first => exact False.elim (Carrier.not_tagged_contract (by simpa only [profile] using first.carrier))
       | contractedIdentified _ _ _ _ other _ => exact ⟨_, .base (.identified meaning other (.first leftSelected) (.first rightSelected))⟩
       | contractedAnonymous source => exact ⟨false, .base (.anonymousRight _ source (.first leftSelected) (.first rightSelected))⟩
+      | view shape => cases shape
   | @contractedAnonymous source parameter result code contract profile =>
     cases fuel with
     | zero => simp [compareType] at accepted
@@ -572,9 +634,11 @@ theorem tree_of_compareType {catalog : Catalog} {registry : Registry}
       cases rightObserved with
       | product first => exact False.elim (Carrier.not_tagged_contract (by simpa only [profile] using first.carrier))
       | contractedIdentified | contractedAnonymous => exact ⟨false, .base (.anonymousLeft source _ (.first leftSelected) (.first rightSelected))⟩
+      | view shape => cases shape
   | @data id index entry source packed payloadType payload selected notMapping registered meaning representation ih =>
     rw [data_compareType selected notMapping accepted, invoke_rename]
     cases rightObserved with
+    | view shape => cases shape
     | @data _ otherIndex otherEntry otherSource otherPacked otherPayloadType otherPayload
         otherSelected otherNotMapping otherRegistered otherMeaning otherRepresentation =>
       have entries := Option.some.inj (selected.symm.trans otherSelected)
@@ -618,6 +682,7 @@ theorem tree_of_compareType {catalog : Catalog} {registry : Registry}
         apply Tree.dataDifferent distinct (.first (.var rfl)) (.second (.var rfl))
           (by simpa [Expr.rename, Expr.weakenAt, shift, Renaming.lift] using renamedLeft)
           (by simpa [branchEq, Expr.rename] using renamedRight)
+  | view shape => exact absurd accepted shape.compareType_refused
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleEquality
 end
@@ -743,6 +808,8 @@ theorem ValueRep.observation {checked : SourceCoreCompatibleCatalog.Checked} {re
     exact .mapping layout.dataType layout.valueType (mapping_recognized identity keyProjection valueProjection)
       keyType valueType sources _
   | compatible _ _ ih => exact ih
+  | arrayRef => exact .view (.cell _)
+  | arraySlice _ _ view _ => exact .view (.slice view)
   | nil => exact ⟨.unit, .nil, .unit⟩
   | @cons sourceType source value type sourceTypes sources values types head tail first rest =>
     obtain ⟨packed, packing, observed⟩ := rest
@@ -1202,7 +1269,8 @@ structure Fields (checked : SourceCoreCompatibleCatalog.Checked) (registry : Reg
         Fields checked registry functions mapping world sourceKey sourceValue sources header layout entries fallback := by
   induction related using ValueRep.rec
     (motive_2 := fun _ _ _ _ _ => True) (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
-  | unit | bool | word | integer | fixed | product | proxy | constructed => intro _ _ _ impossible; cases impossible
+  | unit | bool | word | integer | fixed | product | proxy | constructed | arrayRef | arraySlice =>
+    intro _ _ _ impossible; cases impossible
   | function related =>
     intro _ _ _ impossible
     have shape := functions.source_function related
@@ -1314,7 +1382,8 @@ theorem constructor_fields {expected : TypeSystem.Ty} {source : Dynamic.Value} {
         ConstructorFields checked registry functions mapping world expected metadata tag id sources values types := by
   induction related using ValueRep.rec
     (motive_2 := fun _ _ _ _ _ => True) (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
-  | unit | bool | word | integer | fixed | product | proxy | mappingValue => intro _ _ impossible; cases impossible
+  | unit | bool | word | integer | fixed | product | proxy | mappingValue | arrayRef | arraySlice =>
+    intro _ _ impossible; cases impossible
   | function related =>
     intro _ _ impossible
     have shape := functions.source_function related
@@ -1560,6 +1629,69 @@ theorem resolved_payloads_project {checked : SourceCoreCompatibleCatalog.Checked
     _ = (left.payloadTypes.map SourceCoreRawMetadata.runtimeType).mapM checked.catalog.project := (projectList_runtimeType _ _).symm
     _ = (right.payloadTypes.map SourceCoreRawMetadata.runtimeType).mapM checked.catalog.project := congrArg (List.mapM checked.catalog.project) same
     _ = _ := projectList_runtimeType _ _
+
+private theorem lookup_mem_keys {substitution : TypeSystem.ParameterSubstitution}
+    {parameter : TypeSystem.TypeParameterId} {replacement : TypeSystem.Ty}
+    (found : substitution.lookup? parameter = some replacement) : parameter ∈ substitution.map Prod.fst := by
+  induction substitution with
+  | nil => simp [TypeSystem.ParameterSubstitution.lookup?] at found
+  | cons entry rest ih =>
+    obtain ⟨candidate, value⟩ := entry
+    by_cases same : candidate = parameter
+    · subst same; exact List.mem_cons_self ..
+    · simp only [TypeSystem.ParameterSubstitution.lookup?, same, ↓reduceIte] at found
+      exact List.mem_cons_of_mem _ (ih found)
+
+private theorem mapM_member {α β : Type} {function : α → Option β} :
+    ∀ {inputs : List α} {outputs : List β}, inputs.mapM function = some outputs →
+      ∀ {input : α}, input ∈ inputs → ∃ output ∈ outputs, function input = some output
+  | [], _, _, _, member => by cases member
+  | first :: rest, outputs, mapped, input, member => by
+    rw [List.mapM_cons] at mapped
+    cases head : function first with
+    | none => simp [head] at mapped
+    | some selected =>
+      cases tail : rest.mapM function with
+      | none => simp [head, tail] at mapped
+      | some others =>
+        simp only [head, tail, Option.bind_some, Option.some.injEq, bind, pure] at mapped
+        subst mapped
+        rcases List.mem_cons.mp member with same | inRest
+        · subst same; exact ⟨selected, List.mem_cons_self .., head⟩
+        · obtain ⟨output, outputMember, found⟩ := mapM_member tail inRest
+          exact ⟨output, List.mem_cons_of_mem _ outputMember, found⟩
+
+/-- An authentic constructor's payloads are view-free when its result type is. -/
+theorem payloads_viewFree {signatures : ProgramSignatures} {metadata : DataConstructorInstantiation}
+    (authentic : SourceCoreRawMetadata.constructorAuthentic signatures metadata = true)
+    (free : SourceCoreRootTypes.ViewFree signatures metadata.resultType) :
+    ∀ payload ∈ metadata.payloadTypes, SourceCoreRootTypes.ViewFree signatures payload := by
+  cases facts authentic with
+  | mk signature constructor arguments signatureSelected constructorSelected parameters argumentsSelected
+      payloads result =>
+    rw [result] at free
+    obtain ⟨headFree, argumentsFree⟩ := SourceCoreRootTypes.ViewFree.applyMany free
+    have signatureMember : signature ∈ signatures.dataTypes := by
+      have inFilter : signature ∈ signatures.dataTypes.filter
+          (fun item => decide (item.id = metadata.constructor.dataType)) := by
+        rw [signatureSelected]; exact List.mem_singleton.mpr rfl
+      exact (List.mem_filter.mp inFilter).1
+    have constructorMember : constructor ∈ signature.constructors := by
+      have inFilter : constructor ∈ signature.constructors.filter
+          (fun item => decide (item.id = metadata.constructor)) := by
+        rw [constructorSelected]; exact List.mem_singleton.mpr rfl
+      exact (List.mem_filter.mp inFilter).1
+    intro payload member
+    rw [payloads] at member
+    obtain ⟨declared, declaredMember, rfl⟩ := List.mem_map.mp member
+    have declaredFree := SourceCoreRootTypes.ViewFree.payload headFree signatureMember rfl
+      (List.mem_flatMap.mpr ⟨constructor, constructorMember, declaredMember⟩)
+    refine CompatiblePayload.viewFree_apply (fun parameter replacement found => ?_) declaredFree
+    have keyed := lookup_mem_keys found
+    rw [parameters] at keyed
+    obtain ⟨argument, argumentMember, selected⟩ := mapM_member argumentsSelected keyed
+    have same := Option.some.inj (found.symm.trans selected)
+    exact same ▸ argumentsFree argument argumentMember
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleConstructorMetadata
 end
@@ -3343,6 +3475,11 @@ theorem ValueRep.source_runtimeView {checked : SourceCoreCompatibleCatalog.Check
     cases ih with
     | intro typed view =>
       exact .intro typed (view.trans (runtimeType_eq_of_metadata same.symm))
+  | arrayRef => exact (Dynamic.ValueRuntimeType.arrayRef _ _).matches
+  | arraySlice _ _ _ ih =>
+    cases ih with
+    | intro typed view =>
+      exact .intro (.arraySlice _ _ typed) (by simp only [Dynamic.runtimeType, TypeSystem.Ty.arraySlice, view])
   | nil | cons | empty | entry | absent | present => trivial
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePayload
@@ -3376,7 +3513,7 @@ theorem word_fields {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {value
         rw [← checked.catalog.project_runtimeType, view]
         rfl
       cases Except.ok.inj (projected.symm.trans scalar)
-  | unit | bool | integer | fixed | product | function | proxy | mappingValue =>
+  | unit | bool | integer | fixed | product | function | proxy | mappingValue | arrayRef | arraySlice =>
       intro view
       cases view
   | nil | cons | empty | entry | absent | present => trivial
@@ -3396,7 +3533,7 @@ theorem integer_fields {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {va
         rw [← checked.catalog.project_runtimeType, view]
         rfl
       cases Except.ok.inj (projected.symm.trans scalar)
-  | unit | bool | word | fixed | product | function | proxy | mappingValue =>
+  | unit | bool | word | fixed | product | function | proxy | mappingValue | arrayRef | arraySlice =>
       intro view
       cases view
   | nil | cons | empty | entry | absent | present => trivial
@@ -3888,18 +4025,26 @@ private def Meaning (sourceType : TypeSystem.Ty) (source : Dynamic.Value) (nativ
 private theorem represents_shape {sourceType : TypeSystem.Ty} {source : Dynamic.Value}
     {native : Value} {type : Ty}
     (related : ValueRep checked registry functions mapping world sourceType source native type) :
+    SourceCoreRootTypes.ViewFree checked.signatures sourceType →
     Meaning (checked := checked) (registry := registry) (ambient := ambient) (world := world) sourceType source native := by
   induction related using ValueRep.rec
-    (motive_2 := fun types _ natives _ _ => SourceCorePublicOutputShapes.Payloads checked registry world ambient.definitions types natives)
-    (motive_3 := fun key value _ entries _ _ _ => SourceCorePublicOutputShapes.Entries checked registry world ambient.definitions key value entries)
-    (motive_4 := fun raw fallback nativeType _ =>
+    (motive_2 := fun types _ natives _ _ => (∀ payload ∈ types, SourceCoreRootTypes.ViewFree checked.signatures payload) →
+      SourceCorePublicOutputShapes.Payloads checked registry world ambient.definitions types natives)
+    (motive_3 := fun key value _ entries _ _ _ => SourceCoreRootTypes.ViewFree checked.signatures key →
+      SourceCoreRootTypes.ViewFree checked.signatures value →
+      SourceCorePublicOutputShapes.Entries checked registry world ambient.definitions key value entries)
+    (motive_4 := fun raw fallback nativeType _ => SourceCoreRootTypes.ViewFree checked.signatures raw →
       SourceCorePublicOutputShapes.Default checked registry raw nativeType (OrderedMapping.optionValue nativeType fallback)) with
-  | unit => exact ⟨.unit, fun _ data => by cases data; exact ⟨_, rfl, .unit⟩⟩
-  | bool value => exact ⟨.bool value, fun _ data => by cases data; exact ⟨_, rfl, .bool _⟩⟩
-  | word value => exact ⟨.word value, fun _ data => by cases data; exact ⟨_, rfl, .word _⟩⟩
-  | fixed value canonical => exact ⟨.fixed value canonical, fun _ data => by cases data; exact ⟨_, rfl, .fixed _ canonical⟩⟩
-  | integer value => exact ⟨.integer value, fun _ data => by cases data; exact ⟨_, rfl, .integer _⟩⟩
+  | unit => exact fun _ => ⟨.unit, fun _ data => by cases data; exact ⟨_, rfl, .unit⟩⟩
+  | bool value => exact fun _ => ⟨.bool value, fun _ data => by cases data; exact ⟨_, rfl, .bool _⟩⟩
+  | word value => exact fun _ => ⟨.word value, fun _ data => by cases data; exact ⟨_, rfl, .word _⟩⟩
+  | fixed value canonical => exact fun _ => ⟨.fixed value canonical, fun _ data => by cases data; exact ⟨_, rfl, .fixed _ canonical⟩⟩
+  | integer value => exact fun _ => ⟨.integer value, fun _ data => by cases data; exact ⟨_, rfl, .integer _⟩⟩
   | product _ _ first second =>
+    intro free
+    obtain ⟨leftFree, rightFree⟩ := free.product
+    have first := first leftFree
+    have second := second rightFree
     refine ⟨.product first.1 second.1, ?_⟩
     intro raw data
     cases data with
@@ -3909,13 +4054,15 @@ private theorem represents_shape {sourceType : TypeSystem.Ty} {source : Dynamic.
       exact ⟨.product a b, by simp only [SourceCoreCompatibleValues.defaultFromSource?, firstAt, secondAt, bind, Option.bind, pure],
         .product firstShape secondShape⟩
   | function represented =>
+    intro _
     refine ⟨.function (functions.projection represented) (functions.runtime_hasType represented), ?_⟩
     intro raw data
     have callable := functions.source_function represented
     cases callable <;> cases data
   | proxy metadata identity _ =>
-    exact ⟨.proxy metadata.lookup identity, fun _ data => by cases data; exact ⟨_, rfl, .proxy metadata.lookup identity⟩⟩
+    exact fun _ => ⟨.proxy metadata.lookup identity, fun _ data => by cases data; exact ⟨_, rfl, .proxy metadata.lookup identity⟩⟩
   | @constructed metadata id tag sources natives types metadataAt owner selected _ registered payloads ih =>
+    intro free
     have authentic := metadataAt.authenticated
     change SourceCoreRawMetadata.constructorAuthentic registry.signatures metadata = true at authentic
     rw [owner] at authentic
@@ -3925,9 +4072,14 @@ private theorem represents_shape {sourceType : TypeSystem.Ty} {source : Dynamic.
     have nominal : ∃ declaration arguments, metadata.resultType = TypeSystem.Ty.nominal declaration arguments := by
       cases CompatibleConstructorMetadata.facts authentic with
       | mk _ _ _ _ _ _ _ _ result => exact ⟨_, _, result⟩
+    have ih := ih (CompatibleConstructorMetadata.payloads_viewFree authentic free)
     refine ⟨?_, fun _ data => by cases data⟩
     simpa only [pack_eq] using SourceCorePublicOutputShapes.Output.constructed metadataAt.lookup resolved nominal ih
   | @mappingValue key value id layout sources entries fallback metadata identity keyProjection valueProjection registered stored _ entriesIH defaultIH =>
+    intro free
+    obtain ⟨keyFree, valueFree⟩ := free.mapping
+    have entriesIH := entriesIH keyFree valueFree
+    have defaultIH := defaultIH valueFree
     have layoutAt := layout_at identity keyProjection valueProjection registered
     refine ⟨.mapping metadata.lookup layoutAt entriesIH defaultIH, ?_⟩
     intro raw data
@@ -3935,29 +4087,39 @@ private theorem represents_shape {sourceType : TypeSystem.Ty} {source : Dynamic.
     cases stored
     exact ⟨_, rfl, .mapping metadata.lookup layoutAt defaultIH⟩
   | compatible same _ ih =>
+    intro free
+    have ih := ih (CompatiblePayload.viewFree_of_runtimeType same free)
     refine ⟨.compatible same ih.1, ?_⟩
     intro raw data
     obtain ⟨carrier, projected, shaped⟩ := ih.2 raw data
     exact ⟨carrier, projected, .compatible same shaped⟩
+  | arrayRef => exact fun free => absurd free (SourceCoreRootTypes.ViewFree.not_array _)
+  | arraySlice => exact fun free => absurd free (SourceCoreRootTypes.ViewFree.not_arraySlice _)
   | nil => exact .nil
-  | cons _ _ head tail => exact .cons head.1 tail
+  | cons _ _ head tail =>
+    rename_i free
+    exact .cons (head (free _ (List.mem_cons_self ..))).1 (tail fun other member => free other (List.mem_cons_of_mem _ member))
   | empty key value _ _ => exact .empty key value
-  | entry _ _ _ key value tail => exact .entry key.1 value.1 tail
+  | entry _ _ _ key value tail =>
+    rename_i keyFree valueFree
+    exact .entry (key keyFree).1 (value valueFree).1 (tail keyFree valueFree)
   | @absent raw nativeType missing _ _ =>
     have absent := (CompatiblePayload.defaultValue?_absent_iff (type := raw) (fuel := raw.size + 1) (by omega)).mpr missing
     exact .absent (by simp only [SourceCoreCompatibleValues.defaultValue?, absent, Option.bind_none])
   | @present raw source native nativeType meaning _ ih =>
+    rename_i free
     obtain ⟨rawValue, computed, data⟩ := CompatiblePayload.defaultValue?_canonical meaning
-    obtain ⟨carrier, projected, shaped⟩ := ih.2 rawValue data
+    obtain ⟨carrier, projected, shaped⟩ := (ih free).2 rawValue data
     exact .present (by simp only [SourceCoreCompatibleValues.defaultValue?, computed, Option.bind_some, projected]) shaped
 
 /-- The existing independent relation at the actual boundary registry closes
 all structural requirements of the public output codec. -/
 theorem ValueRep.output {sourceType : TypeSystem.Ty} {source : Dynamic.Value}
     {native : Value} {type : Ty}
-    (related : ValueRep checked registry functions mapping world sourceType source native type) :
+    (related : ValueRep checked registry functions mapping world sourceType source native type)
+    (free : SourceCoreRootTypes.ViewFree checked.signatures sourceType) :
     SourceCorePublicOutputShapes.Output checked registry world ambient.definitions sourceType native :=
-  (represents_shape related).1
+  (represents_shape related free).1
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePublicOutputShapes
 end
