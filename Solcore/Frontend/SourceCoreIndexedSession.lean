@@ -59,6 +59,8 @@ inductive ErrorCode where
   | invalidExportedPrefix (validationFuel : Nat)
   /-- A root's parameter or result type has no public value (`SourceCoreRootTypes.holdsView`). -/
   | rootWithoutPublicValue (key : Key) (type : Ty)
+  /-- A called handle's parameter or result type has no public value (`SourceCoreRootTypes.holdsView`). -/
+  | handleWithoutPublicValue (type : Ty)
   deriving Repr
 structure Error where
   path : List PathStep := []
@@ -724,6 +726,12 @@ private structure CallableSelection (artifact : Artifact) (world : Core.StoreTyp
   typed : Core.RuntimeValueHasType world value
     (Core.CallableContract.functionType nativeParameter request.type) artifact.program.layouts.definitions
 
+/-- A called handle's parameter and result have public values: its type holds
+no memory array, slice or memref (the memory arrays note, decision 5). -/
+private def checkPublicHandle (signatures : ProgramSignatures) (type : Ty) : Except Error Unit :=
+  if SourceCoreRootTypes.holdsView signatures type then throw ⟨[], .handleWithoutPublicValue type⟩
+  else pure ()
+
 /-- Resolve the actual retained callable before validating its packed input.
 The host boundary has runtime availability; it supplies no staged caller
 receipt. Existing compiled source calls keep their own exact stage guards. -/
@@ -731,6 +739,7 @@ private def selectCallable {artifact : Artifact} (session : Session artifact) (h
     Except Error (CallableSelection artifact session.world) := do
   let value ← resolve session.authority session.registry handle.sourceType handle
   let .pair (.pair _ _) (.word descriptor) := value | throw ⟨[], .malformedCallable⟩
+  checkPublicHandle artifact.recipe.compiled.compatible.checked.signatures handle.sourceType
   let table ← match artifact.program.base.callableContext with
     | some native => pure native.table
     | none => throw ⟨[], .malformedCallable⟩
@@ -4520,6 +4529,7 @@ theorem Session.HandleSelectionAt.spec {artifact : Artifact} {session : Session 
   obtain ⟨value, resolved, accepted⟩ := root_factory_bind_ok accepted
   split at accepted
   next identity closure descriptor =>
+    obtain ⟨⟨⟩, _public, accepted⟩ := root_factory_bind_ok accepted
     cases contextAt : artifact.program.base.callableContext with
     | none => simp [contextAt, bind, Except.bind, throw, throwThe] at accepted
     | some context =>
@@ -4600,6 +4610,38 @@ theorem Session.HandleSelectionAt.spec {artifact : Artifact} {session : Session 
             subst actual
             simpa only [Bool.or_eq_true, not_or, Bool.not_eq_true] using ordinary
   next value mismatch => cases accepted
+
+private theorem function_parts_viewFree {signatures : ProgramSignatures} {type parameter result : Ty}
+    (parts : functionParts type = some (parameter, result))
+    (free : SourceCoreRootTypes.ViewFree signatures type) :
+    SourceCoreRootTypes.ViewFree signatures parameter ∧ SourceCoreRootTypes.ViewFree signatures result := by
+  induction type with
+  | comptime type ih => exact ih parts free.comptime
+  | function left right => cases parts; exact free.function
+  | _ => cases parts
+
+/-- A selected handle's parameter and result hold no memory array, slice or memref: the
+session calls no other handle (the memory arrays note, decision 5). -/
+theorem Session.HandleSelectionAt.viewFree {artifact : Artifact} {session : Session artifact}
+    {handle : Handle} {parameter result : Ty} {nativeParameter nativeResult : Core.Ty}
+    {callable : Core.Value}
+    (selected : session.HandleSelectionAt handle parameter result nativeParameter nativeResult callable) :
+    SourceCoreRootTypes.ViewFree artifact.recipe.compiled.compatible.checked.signatures parameter ∧
+      SourceCoreRootTypes.ViewFree artifact.recipe.compiled.compatible.checked.signatures result := by
+  have parts := selected.spec.1
+  obtain ⟨selection, accepted, rfl, rfl, _⟩ := selected
+  unfold selectCallable at accepted
+  obtain ⟨_value, _resolved, accepted⟩ := root_factory_bind_ok accepted
+  split at accepted
+  next =>
+    obtain ⟨⟨⟩, gate, _⟩ := root_factory_bind_ok accepted
+    apply function_parts_viewFree parts
+    unfold checkPublicHandle at gate
+    split at gate
+    · cases gate
+    · rename_i free
+      simpa using free
+  next => cases accepted
 
 /-- Direct startup retains the same original authority, world and slots. -/
 def Checkpoint.InitialRegistryFrom {artifact : Artifact} (checkpoint : Checkpoint artifact)

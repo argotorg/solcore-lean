@@ -436,8 +436,22 @@ private def viewRootWorkspace : Workspace.RawWorkspace := {
     "function nestedResult() returns (Nest) { return .Nested(.Hold(new uint256[](2))); }",
     "function functionResult() returns (function(uint256[]) returns (Word)) { return lam(xs: uint256[]) { return 0; }; }",
     "function wrapper(n: uint256) returns (uint256) { let a: uint256[] = new uint256[](n); return a.length(); }",
-    "function wordWrap() returns (Wrap<Word>) { return .Wrapped(1); }"
+    "function wordWrap() returns (Wrap<Word>) { return .Wrapped(1); }",
+    "function grow(n: uint256) returns (uint256[]) { return new uint256[](n); }",
+    "function total(xs: uint256[]) returns (uint256) { return xs.length(); }",
+    "function viaHandles(n: uint256) returns (uint256) { return total(grow(n)); }"
   ]}] }
+
+/-- Issue the named handle of a declaration and call it with one argument. -/
+private def callNamed {artifact : SourceCoreExecution.Artifact} (session : SourceCoreExecution.Session artifact)
+    (id : Resolved.DeclarationId) (argument : SourceCorePublicValues.Value) :
+    IO (Except SourceCoreIndexedSession.Error (SourceCoreExecution.Outcome artifact)) := do
+  let issued ← match ← session.named ⟨id, []⟩ with
+    | .ok issued => pure issued
+    | .error error => throw (IO.userError s!"named issuance refused: {reprStr error}")
+  match issued.value with
+  | .function handle => issued.session.invokePacked handle argument {executionFuel := 300000}
+  | _ => throw (IO.userError "named issuance gave no handle")
 
 /-- A root's signature takes no array, slice or memref anywhere (the memory arrays note, decision 5):
 the compiler rejects each such root, and compiles word roots over arrays and enums of words. -/
@@ -463,7 +477,19 @@ private def testViewRoots : IO Unit := do
   match SourceCoreIndexedSession.Recipe.prepare cached with
   | .error { code := .rootWithoutPublicValue _ _, .. } => pure ()
   | other => throw (IO.userError s!"a session root holding a view was not rejected: prepared {other.toOption.isSome}")
-  IO.println "ROOT_PUBLIC_TYPES_PASS: roots holding a memory array, a slice or a memref, through tuples, type arguments, enum payloads and function types, rejected by the compiler and by the session's roots; word roots over arrays compiled"
+  -- A handle whose type holds a view is issued, but the session does not call it.
+  let viaHandles ← declaration program "viaHandles"
+  let compiled ← get "word root over handles" (compileChecked program [Seed.declaration viaHandles] options)
+  let entry ← Tests.SourceCompilerFeatureSupport.fromCompiled compiled
+  let session ← Tests.SourceCompilerFeatureSupport.boot (← entry.execution.open)
+  for name in ["grow", "total"] do
+    match ← callNamed session (← declaration program name) (.word (w 3)) with
+    | .error { code := .handleWithoutPublicValue _, .. } => pure ()
+    | _ => throw (IO.userError s!"a handle holding a view was called: {name}")
+  match ← callNamed session viaHandles (.word (w 3)) with
+  | .ok (.succeeded completion) => require (completion.value == .word (w 3)) "the word handle over arrays changed its result"
+  | _ => throw (IO.userError "the word handle over arrays failed")
+  IO.println "ROOT_PUBLIC_TYPES_PASS: roots holding a memory array, a slice or a memref, through tuples, type arguments, enum payloads and function types, rejected by the compiler and by the session's roots, and handles holding one not called; word roots and handles over arrays run"
 
 def run : IO Unit := do
   testViewRoots
