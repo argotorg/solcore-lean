@@ -184,6 +184,42 @@ class AdmissionTests(unittest.TestCase):
         # Array forms are read only in the array emitter's sources: v1's rules for the others stay.
         self.assertEqual(decided(source=SOURCE.replace("sc_fn0(sc_x)", "sc_fn0(ridx(lidx(sc_x, 0), 1))")), "admitted")
 
+    def test_a_bundle_lifts_its_entry_and_keeps_its_other_files_without_std_imports_and_with_std_tobool(self):
+        entry = SOURCE.replace("import { div as sc_div, mod as sc_mod } from std.opcodes;",
+                               "import { sc_lib } from lib;").replace("sc_fn0(sc_x)", "sc_lib(sc_x)")
+        library = ("pragma solcore;\nimport * from std;\nexport { sc_lib };\n"
+                   "function sc_lib(x: word) returns (word) {\n    let b: bool = tobool(x);\n    return x;\n}\n")
+        case = make_case(source=entry, emitter="solcore-source-modules-v3")
+        case["sourceBundle"] = {"entry": "case.sol", "files": [{"path": "case.sol", "source": entry},
+                                                               {"path": "lib.sol", "source": library}]}
+        decided = native.admission(case)
+        self.assertTrue(decided["admitted"], decided)
+        self.assertIn("import { sc_lib } from lib;", decided["source"])
+        self.assertIn("function sc_native_run(", decided["source"])
+        [module] = decided["modules"]
+        self.assertEqual(module["path"], "lib.sol")
+        self.assertNotIn("import * from std;", module["content"])
+        self.assertEqual(module["content"].count("function tobool"), 1)
+        self.assertTrue(module["content"].endswith(native.STD_TOBOOL))
+        # A library file that defines its own `tobool` keeps it alone; a comment's call adds nothing.
+        own = library + "function tobool(x: word) returns (bool) { return true; }\n"
+        case["sourceBundle"]["files"][1]["source"] = own
+        self.assertEqual(native.admission(case)["modules"][0]["content"].count("function tobool"), 1)
+        case["sourceBundle"]["files"][1]["source"] = library.replace("tobool(x)", "x != 0 /* tobool(x) */")
+        self.assertNotIn("function tobool", native.admission(case)["modules"][0]["content"])
+        # The lifted entry is `main.sol` at the bundle's root.
+        for files, entry_path in (([{"path": "case.sol", "source": entry}, {"path": "main.sol", "source": library}],
+                                   "case.sol"),
+                                  ([{"path": "src/case.sol", "source": entry}], "src/case.sol"),
+                                  ([{"path": "lib.sol", "source": library}], "case.sol"),
+                                  ([{"path": "case.sol", "source": entry}, {"path": "case.sol", "source": entry}],
+                                   "case.sol")):
+            case["sourceBundle"] = {"entry": entry_path, "files": files}
+            self.assertEqual(native.admission(case)["reason"], "sources", files)
+        single = native.admission(make_case(emitter="solcore-source-comptime-v3"))
+        self.assertTrue(single["admitted"])
+        self.assertEqual(single["modules"], [])
+
     def test_memory_arrays_are_admitted_without_std_array_traits(self):
         def decided(source=ARRAYS, types=("uint64",)):
             result = native.admission(make_case(source=source, emitter="solcore-source-memory-arrays-v2",
@@ -410,7 +446,7 @@ class RunTests(unittest.TestCase):
                                 "--profile", "runtime-word"])
         check = json.loads(output.getvalue())
         self.assertEqual((code, check["status"], sorted(check["corpora"])), (0, "ready", ["runtime-word"]))
-        self.assertEqual(check["versions"], {"admission": "native-admission-v8", "adapter": "native-lift-v4",
+        self.assertEqual(check["versions"], {"admission": "native-admission-v9", "adapter": "native-lift-v5",
                                              "comparison": "native-compare-v1"})
         self.assertEqual(sorted(check["scripts"]), sorted(native.SCRIPTS))
         args, _ = native.parse_args(["--check", "--mode", "random", "--seed", "5"])

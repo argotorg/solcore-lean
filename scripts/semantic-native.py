@@ -56,8 +56,8 @@ runner = suite.pure_campaign
 SCHEMA = "solcore-lean.semantic-native.v1"
 REQUEST_SCHEMA = "solcore-lean.semantic-native-request.v1"
 RESULT_SCHEMA = "solcore-lean.semantic-native-result.v1"
-ADMISSION = "native-admission-v8"
-ADAPTER = "native-lift-v4"
+ADMISSION = "native-admission-v9"
+ADAPTER = "native-lift-v5"
 COMPARISON = "native-compare-v1"
 TOOL = ROOT / ".lake/build/bin/semantic-native-tool"
 SCRIPTS = ("semantic-native.py", "semantic-suite.py", "semantic-campaign.py", "semantic-differential.py",
@@ -78,7 +78,8 @@ EMITTERS = frozenset((
     "solcore-source-loops-v3", "solcore-source-nested-loops-v2", "solcore-source-recursion-v2",
     "solcore-source-recursive-loops-v2", "solcore-source-loop-closures-v2", "solcore-source-primitives-v2",
     "solcore-source-shifts-v2", "solcore-source-checked-arithmetic-v2", "solcore-source-enums-v2",
-    "solcore-source-closure-captures-v2", "solcore-source-closure-factories-v2", "solcore-source-memory-arrays-v2"))
+    "solcore-source-closure-captures-v2", "solcore-source-closure-factories-v2", "solcore-source-memory-arrays-v2",
+    "solcore-source-comptime-v3", "solcore-source-modules-v3"))
 # The twelve fixed-width types a method's parameters and result may have, each with whether it is unsigned and its
 # width. The entry takes a parameter of one of them by `Typedef.abs` at a local of its type, as a call's argument has no
 # expected type in Lean's inference, and gives such a result by `Typedef.rep`; `uint256` keeps v2's `uint256(...)`.
@@ -112,8 +113,6 @@ NOT_ADMITTED = {
     "solcore-source-memory-calls-v2": "std's memory traits and bytes",
     "solcore-source-traits-v2": "qualified trait method calls",
     "solcore-source-trait-hierarchies-v2": "qualified trait method calls and trait methods' own generics",
-    "solcore-source-comptime-v3": "comptime constant functions",
-    "solcore-source-modules-v3": "comptime constant functions and module bundles",
     "solcore-source-array-abi-v2": "array parameters",
 }
 # Known differences from upstream, each recognized by the native error it gives.
@@ -252,14 +251,27 @@ def array_forms(source: str) -> dict[str, list[str]]:
     return found
 
 
+def without_std_imports(text: str) -> str:
+    """A source without its std imports other than those of `std.opcodes`, each line kept as an empty line."""
+    return STD_IMPORT.sub(lambda match: match.group(0) if STD_OPCODES_IMPORT.search(match.group(0)) else "", text)
+
+
+def with_std_tobool(text: str) -> str:
+    """A source with std's own `tobool` appended where its code calls it and defines none."""
+    code = code_only(text)
+    if TOBOOL_CALL.search(code) and not TOBOOL_DEFINITION.search(code):
+        return text + "\n" + STD_TOBOOL
+    return text
+
+
 def lift(source: str, method: str) -> dict:
-    """native-lift-v4 on a case's source: its std imports other than those of `std.opcodes` dropped, each line kept
-    as an empty line, and its one contract's functions moved to the top level without their visibility and
-    mutability words; std's own `tobool` appended where the code calls it and defines none; then a Word entry of
-    `method` appended, which takes each parameter of the twelve types by `Typedef.abs` at a local of its type (a
-    `uint256` one by `uint256`) and gives such a result by `Typedef.rep`. Gives the lifted source, the entry's name
-    and the parameters' types, or the reason it cannot."""
-    text = STD_IMPORT.sub(lambda match: match.group(0) if STD_OPCODES_IMPORT.search(match.group(0)) else "", source)
+    """native-lift-v5 on a case's source, or a bundle's entry (`bundle_files`): its std imports other than those of
+    `std.opcodes` dropped, each line kept as an empty line, and its one contract's functions moved to the top level
+    without their visibility and mutability words; std's own `tobool` appended where the code calls it and defines
+    none; then a Word entry of `method` appended, which takes each parameter of the twelve types by `Typedef.abs` at a
+    local of its type (a `uint256` one by `uint256`) and gives such a result by `Typedef.rep`. Gives the lifted
+    source, the entry's name and the parameters' types, or the reason it cannot."""
+    text = without_std_imports(source)
     contracts = list(CONTRACT.finditer(text))
     if len(contracts) != 1:
         return {"reason": "contract shape", "detail": f"{len(contracts)} contracts"}
@@ -282,10 +294,7 @@ def lift(source: str, method: str) -> dict:
         return {"reason": "storage field", "detail": f"{fields} fields"}
     if others:
         return {"reason": "contract member", "detail": f"{others} members"}
-    lifted = text[:match.start()] + "\n".join(functions) + text[closing + 1:]
-    code = code_only(lifted)
-    if TOBOOL_CALL.search(code) and not TOBOOL_DEFINITION.search(code):
-        lifted = lifted + "\n" + STD_TOBOOL
+    lifted = with_std_tobool(text[:match.start()] + "\n".join(functions) + text[closing + 1:])
     header = re.search(HEADER.format(name=re.escape(method)), "\n".join(functions))
     if not header:
         return {"reason": "parameters or result", "detail": "no method header"}
@@ -308,6 +317,25 @@ def lift(source: str, method: str) -> dict:
                   f"{locals_}    {body}\n}}\n")
     return {"reason": None, "source": lifted + entry_text, "function": entry, "parameters": len(types),
             "types": types}
+
+
+def bundle_files(bundle) -> tuple[str, list[dict]] | None:
+    """A source bundle's entry source and its other files (native-lift-v5), each of those without std's imports but
+    those of `std.opcodes` and with std's own `tobool` where it calls it and defines none. The lifted entry is
+    `main.sol` beside them, so the entry must sit at the bundle's root and no other file may be `main.sol`; None for
+    any other bundle."""
+    files = bundle.get("files") if isinstance(bundle, dict) else None
+    entry = bundle.get("entry") if isinstance(bundle, dict) else None
+    if not isinstance(files, list) or not all(isinstance(item, dict) and isinstance(item.get("path"), str) and
+                                              isinstance(item.get("source"), str) for item in files):
+        return None
+    sources = {item["path"]: item["source"] for item in files}
+    if not isinstance(entry, str) or entry not in sources or "/" in entry or len(sources) != len(files) or \
+            ("main.sol" in sources and entry != "main.sol"):
+        return None
+    modules = [{"path": item["path"], "content": with_std_tobool(without_std_imports(item["source"]))}
+               for item in files if item["path"] != entry]
+    return sources[entry], modules
 
 
 def abi_encodes(word: int, kind: str) -> bool:
@@ -344,13 +372,22 @@ def admission(case: dict) -> dict:
     emitter = provenance.get("emitterVersion")
     if emitter not in EMITTERS:
         return refuse("emitter", emitter)
-    if not isinstance(case.get("source"), str) or "sourceBundle" in case or "sources" in case:
+    if "sources" in case:
+        return refuse("sources")
+    if "sourceBundle" in case:
+        read = bundle_files(case["sourceBundle"])
+        if read is None:
+            return refuse("sources")
+        source, modules = read
+    elif isinstance(case.get("source"), str):
+        source, modules = case["source"], []
+    else:
         return refuse("sources")
     contract = case.get("contract") if isinstance(case.get("contract"), dict) else {}
     method = contract.get("method")
     if not isinstance(method, str) or not re.fullmatch(r"[A-Za-z_]\w*", method):
         return refuse("contract shape", "no method")
-    lifted = lift(case["source"], method)
+    lifted = lift(source, method)
     if lifted["reason"]:
         return refuse(lifted["reason"], lifted.get("detail"))
     if contract.get("signature") != f"{method}({','.join(lifted['types'])})":
@@ -362,11 +399,12 @@ def admission(case: dict) -> dict:
     outside = [kind for word, kind in zip(words, lifted["types"]) if not abi_encodes(int(word), kind)]
     if outside:
         return refuse("calldata range", ", ".join(outside))
-    forms = array_forms(case["source"]) if emitter in ARRAY_EMITTERS else {}
+    forms = array_forms(source) if emitter in ARRAY_EMITTERS else {}
     for reason in ARRAY_REASONS:
         if reason in forms:
             return refuse(reason, ", ".join(forms[reason]))
-    return {"admitted": True, "source": lifted["source"], "function": lifted["function"], "arguments": words}
+    return {"admitted": True, "source": lifted["source"], "modules": modules, "function": lifted["function"],
+            "arguments": words}
 
 
 def symptom(detail: str) -> str:
@@ -434,7 +472,7 @@ def compare(core: dict, observation: dict) -> dict:
 def run_tool(tool: Path, program: dict, inputs: list[list[str]], work: Path, timeout: float) -> dict:
     """One native tool run of a program with all of its inputs: the tool's result, or a timeout or crash."""
     request = {"schema": REQUEST_SCHEMA, "entry": "main.sol",
-               "sources": [{"path": "main.sol", "content": program["source"]}],
+               "sources": [{"path": "main.sol", "content": program["source"]}, *program.get("modules", [])],
                "function": program["function"], "inputs": inputs, **FUEL}
     path = work / "request.json"
     path.write_text(json.dumps(request))
@@ -552,8 +590,10 @@ class NativeRun:
                 counter(totals["reasons"], decided["reason"])
                 continue
             counts["admitted"] += 1
-            key = digest((decided["function"] + "\0" + decided["source"]).encode())
-            group = groups.setdefault(key, {"programSha256": key, "source": decided["source"],
+            modules = decided.get("modules", [])
+            key = digest((decided["function"] + "\0" + decided["source"] +
+                          ("\0" + json.dumps(modules, sort_keys=True) if modules else "")).encode())
+            group = groups.setdefault(key, {"programSha256": key, "source": decided["source"], "modules": modules,
                                             "function": decided["function"], "cases": []})
             group["cases"].append((index, case, decided["arguments"]))
         counts["programs"] = len(groups)
