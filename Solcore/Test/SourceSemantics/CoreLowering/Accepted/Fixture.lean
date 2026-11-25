@@ -505,7 +505,7 @@ theorem WholeInventory.call_inputs {fixture : CompiledFixture workspace options}
           (CallableIndexedOwnedSelectedNamedHeaderReceipts.reissued input.prepared packet.selected) packet.aligned) := by
   obtain ⟨call⟩ := calls.at_slot input.prepared.selected
   let prepared := CallableIndexedOwnedSelectedNamedHeaderReceipts.reissued input.prepared packet.selected
-  obtain ⟨body, ready, -⟩ := CellAwarePublicAcceptedNamedRoot.refined_body prepared packet.aligned
+  obtain ⟨body, ready, contexts⟩ := CellAwarePublicAcceptedNamedRoot.refined_body prepared packet.aligned
   have sourceEq : packet.header.function.source = CallableIndexedNamedGeneration.source input.prepared.named := by
     rw [packet.header.agreement.source, packet.aligned.named]
     rfl
@@ -534,7 +534,7 @@ theorem WholeInventory.call_inputs {fixture : CompiledFixture workspace options}
     (admitted := CellAwareInvocationAcceptedMatches.Admitted (index prepared packet.aligned))
     (generalized := CellAwareInvocationAcceptedInputs.Generalized (attachment := fun _ _ _ => True)
       (index prepared packet.aligned))
-    ready indexShape
+    ready contexts indexShape
   exact ⟨body, covered,
     CellAwareInvocationAcceptedNestedCheck.closedNested prepared.compilation
       (CellAwareInvocationAcceptedNamedHeaders.record prepared packet.aligned) call.nodes,

@@ -1924,7 +1924,7 @@ theorem accepted_tick (selected : SelectedInventory whole row) (shape : TickShap
       selected.packet.header.function.body := by
     rw [bodyEq, selected.result_eq, selected.source_eq]
     exact acceptedRow.shape
-  obtain ⟨body, ready, -⟩ := CellAwarePublicAcceptedNamedRoot.refined_body prepared selected.packet.aligned
+  obtain ⟨body, ready, contexts⟩ := CellAwarePublicAcceptedNamedRoot.refined_body prepared selected.packet.aligned
   obtain ⟨sourceCompiled, artifact, checked⟩ := CellAwarePublicAcceptedNamedRoot.compilation_receipts
     fixture.original.checked fixture.original.accepted fixture.original.selected
   obtain ⟨allocated, sourceTrace⟩ := selected.tick_source_body actualShape ⟨[]⟩ flag
@@ -1939,7 +1939,7 @@ theorem accepted_tick (selected : SelectedInventory whole row) (shape : TickShap
     (admitted := CellAwareInvocationAcceptedMatches.Admitted (index prepared selected.packet.aligned))
     (generalized := CellAwareInvocationAcceptedInputs.Generalized (attachment := fun _ _ _ => True)
       (index prepared selected.packet.aligned))
-    ready indexShape
+    ready contexts indexShape
   obtain ⟨_capture, _value, _finalStore, _finalMap, _finalWorld, requiredExecution, requiredOutput, _result, output⟩ :=
     CellAwarePublicAcceptedNamedForward.first_value_selected callableProfile initial.issued prepared
       selected.packet.aligned fixture.ready diagnostic support start.selected (owner fixture.original.recipe.compiled)

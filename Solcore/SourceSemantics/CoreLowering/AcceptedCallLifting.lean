@@ -893,6 +893,37 @@ theorem statements (unique : NodeOccurrencesUnique scope.source) {child : Expres
       | breaking => exact .ifBreaking (lookupStatement?_sound found) form tested staged
       | continuing => exact .ifContinuing (lookupStatement?_sound found) form tested staged
       | fault => exact .ifFault (lookupStatement?_sound found) form tested staged
+  | @matched mode id rest node resolution found form scrutinee _ _ _ armsIH fallbackIH tailIH =>
+    intro size context environment before after finalContext outcome within
+    have body : ∀ {statements : List StatementId}, ((∃ arm ∈ resolution.cases, arm.body = statements) ∨
+        resolution.defaultBody = some statements) →
+        ∀ {innerSize : Nat} {context environment before innerContext inner after}, innerSize ≤ bound →
+        SourceExecutionSize.StatementsExecute program innerSize context scope.evidence scope.source environment
+          before statements innerContext inner after →
+        Staging.Recursive.StatementsIn program registry false scope context environment before statements
+          innerContext (control inner) after := by
+      intro statements selected innerSize context environment before innerContext inner after within executes
+      rcases selected with ⟨arm, member, rfl⟩ | same
+      · exact armsIH arm member within executes
+      · rw [same] at fallbackIH
+        exact fallbackIH within executes
+    apply sequence unique found (fun _ same => by rw [form] at same; cases same)
+    · intro context environment before middleContext nextEnvironment middle finalContext outcome after headSize
+        tailSize headBelow tailBelow head next
+      obtain ⟨rfl, inner, same, staged⟩ := match_lift unique lift found form scrutinee body (by omega) head
+      cases inner with
+      | fallthrough innerEnvironment =>
+        cases same
+        exact .matchFallthrough (lookupStatement?_sound found) form staged (tailIH (by omega) next)
+      | _ => cases same
+    · intro context environment before finalContext outcome after headSize headBelow head terminal
+      obtain ⟨rfl, inner, rfl, staged⟩ := match_lift unique lift found form scrutinee body (by omega) head
+      cases inner with
+      | fallthrough => cases terminal
+      | returned => exact .matchReturned (lookupStatement?_sound found) form staged
+      | breaking => exact .matchBreaking (lookupStatement?_sound found) form staged
+      | continuing => exact .matchContinuing (lookupStatement?_sound found) form staged
+      | fault => exact .matchFault (lookupStatement?_sound found) form staged
   | breaking found form =>
     intro size context environment before after finalContext outcome _
     apply sequence unique found (fun _ same => by rw [form] at same; cases same)
@@ -2453,7 +2484,8 @@ section
 executions with the same reason and heap, given the value and fault liftings
 of their expressions below the size. A statement faults in its expression, its
 target, bare or through mapping indices, the operand of its in-place `~`, its
-inner list, a header item or an iteration of its loop, or a
+inner list, the pattern or selected body of its match, a header item or an
+iteration of its loop, or a
 falling-through statement is followed by a fault in the rest of its list; the
 staged rule of the same form carries the fault, at the context, environment
 and heap of the original execution. -/
@@ -3695,6 +3727,47 @@ theorem statements_fault (unique : NodeOccurrencesUnique scope.source) {child : 
       · simp [Expressible] at expressible
       · exact .ifFault (lookupStatement?_sound found) form (lift test (by omega) evaluate)
           (branchFault (by omega) signatures failed)
+  | @matched mode id rest node resolution found form scrutinee arms fallback _ armsIH fallbackIH tailIH =>
+    intro size context environment before after finalContext reason within signatures expressible original
+    have body : ∀ {statements : List StatementId}, ((∃ arm ∈ resolution.cases, arm.body = statements) ∨
+        resolution.defaultBody = some statements) →
+        ∀ {innerSize : Nat} {context environment before innerContext inner after}, innerSize ≤ bound →
+        SourceExecutionSize.StatementsExecute program innerSize context scope.evidence scope.source environment
+          before statements innerContext inner after →
+        Staging.Recursive.StatementsIn program registry false scope context environment before statements
+          innerContext (CellAwareInvocationAcceptedStatementLifting.control inner) after := by
+      intro statements selected innerSize context environment before innerContext inner after within executes
+      rcases selected with ⟨arm, member, rfl⟩ | same
+      · exact CellAwareInvocationAcceptedSizedLifting.statements unique lift (arms arm member) within executes
+      · rw [same] at fallback
+        exact CellAwareInvocationAcceptedSizedLifting.statements unique lift fallback within executes
+    have bodyFault : ∀ {statements : List StatementId}, ((∃ arm ∈ resolution.cases, arm.body = statements) ∨
+        resolution.defaultBody = some statements) →
+        ∀ {innerSize : Nat} {context environment before innerContext after}, innerSize ≤ bound →
+        context.signatures = program.signatures →
+        SourceExecutionSize.StatementsFault program innerSize context scope.evidence scope.source environment
+          before statements innerContext reason after →
+        Staging.Recursive.StatementsIn program registry false scope context environment before statements
+          innerContext (.fault (.semantic reason)) after := by
+      intro statements selected innerSize context environment before innerContext after within signatures failed
+      rcases selected with ⟨arm, member, rfl⟩ | same
+      · exact armsIH arm member within signatures expressible failed
+      · rw [same] at fallbackIH
+        exact fallbackIH within signatures expressible failed
+    refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original
+    · intro context environment before middleContext nextEnvironment middle finalContext after headSize
+        tailSize headBelow tailBelow signatures head next
+      obtain ⟨rfl, inner, same, staged⟩ :=
+        CellAwareInvocationAcceptedSizedLifting.match_lift unique lift found form scrutinee body (by omega) head
+      cases inner with
+      | fallthrough innerEnvironment =>
+        cases same
+        exact .matchFallthrough (lookupStatement?_sound found) form staged
+          (tailIH (by omega) signatures expressible next)
+      | _ => cases same
+    · intro context environment before after headSize headBelow signatures fault
+      exact .matchFault (lookupStatement?_sound found) form
+        (match_fault unique lift faultLift found form scrutinee bodyFault (by omega) signatures expressible fault)
   | breaking found form =>
     intro size context environment before after finalContext reason _ signatures _ original
     refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original

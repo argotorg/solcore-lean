@@ -25,13 +25,13 @@ section
 /-! Source statement lists that the accepted-body route closes at named rows:
 value and unit returns, monomorphic declarations, bare assignments, assignments
 through mapping indices and in-place `~`, bare or through mapping indices, that
-the compiler refines, expression statements, blocks, conditionals, `while` and
+the compiler refines, expression statements, blocks, conditionals, matches, `while` and
 `for` loops with headers of these forms, `break` and `continue`, and a function body's final value of its
 declared type, each with its expressions in a given predicate. `Shape` recognizes these lists on the
-Source; `covered` shows that every refined accepted tree of such a list is
-covered by the statement closure, and `shapeWith?` recognizes them on an
-actually compiled row with the expressions a given check admits; `shape?` is
-its instance at subset sites. -/
+Source; `covered` shows that every refined accepted tree of such a list whose
+match receipts are at admitted contexts is covered by the statement closure,
+and `shapeWith?` recognizes them on an actually compiled row with the
+expressions a given check admits; `shape?` is its instance at subset sites. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -74,7 +74,8 @@ inductive ItemsShape (source : TypedSource) (child : ExpressionId → Prop) : Li
 /-- Statement lists of the supported forms. A list may end without returning
 only as a branch or block body, or in a Unit function, and a function body may
 end in a value whose node has the expected type; every expression of the list
-satisfies `child`. -/
+satisfies `child`. The arms of a match and its default, when it has one, are
+branch bodies. -/
 inductive Shape (source : TypedSource) (expected : TypeSystem.Ty) (child : ExpressionId → Prop) :
     Bool → List StatementId → Prop where
   | nil {mode : Bool} (allowed : mode = false ∨ expected = .unit) : Shape source expected child mode []
@@ -128,6 +129,12 @@ inductive Shape (source : TypedSource) (expected : TypeSystem.Ty) (child : Expre
       (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
       (test : child condition) (left : Shape source expected child false thenBody)
       (right : Shape source expected child false (elseBody.getD []))
+      (tail : Shape source expected child mode rest) : Shape source expected child mode (id :: rest)
+  | matched {mode : Bool} {id : StatementId} {rest : List StatementId} {node : StatementNode}
+      {resolution : MatchResolution} (found : source.lookupStatement? id = some node)
+      (form : node.form = .matchWith resolution) (scrutinee : child resolution.scrutinee)
+      (arms : ∀ arm ∈ resolution.cases, Shape source expected child false arm.body)
+      (fallback : Shape source expected child false (resolution.defaultBody.getD []))
       (tail : Shape source expected child mode rest) : Shape source expected child mode (id :: rest)
   | breaking {mode : Bool} {id : StatementId} {rest : List StatementId} {node : StatementNode}
       (found : source.lookupStatement? id = some node) (form : node.form = .breakStmt) :
@@ -306,6 +313,20 @@ def itemsWith? (source : TypedSource) (child : ExpressionId → Prop)
       let ⟨tail⟩ ← itemsWith? source child child? rest
       pure ⟨.projectedBitNotted assignable keys tail⟩
 
+/-- Proof-producing recognition of match arms whose bodies `body?` recognizes. -/
+def armsWith? {body : List StatementId → Prop}
+    (body? : (statements : List StatementId) → Option (PLift (body statements))) :
+    (cases : List TypedMatchCase) → Option (PLift (∀ arm ∈ cases, body arm.body))
+  | [] => some ⟨fun _ member => by cases member⟩
+  | arm :: rest => do
+    let ⟨head⟩ ← body? arm.body
+    let ⟨tail⟩ ← armsWith? body? rest
+    pure ⟨fun other member => by
+      rcases List.mem_cons.mp member with same | member
+      · subst same
+        exact head
+      · exact tail other member⟩
+
 /-- Proof-producing recognition of a supported statement list whose
 expressions satisfy `child`, which `child?` checks. The fuel bounds the nesting
 of statement lists. -/
@@ -394,7 +415,13 @@ def shapeWith? (source : TypedSource) (expected : TypeSystem.Ty) (child : Expres
         let ⟨after⟩ ← itemsWith? source child child? post
         let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
         pure ⟨.forLooped found form initial test inner after tail⟩
-      | _ => none
+      | .matchWith resolution => do
+        let ⟨scrutinee⟩ ← child? resolution.scrutinee
+        let ⟨arms⟩ ← armsWith? (fun statements => shapeWith? source expected child child? fuel false statements)
+          resolution.cases
+        let ⟨fallback⟩ ← shapeWith? source expected child child? fuel false (resolution.defaultBody.getD [])
+        let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
+        pure ⟨.matched found form scrutinee arms fallback tail⟩
 
 /-- Proof-producing recognition of a supported statement list whose expressions
 are subset sites of the row. The fuel bounds the nesting of statement lists. -/
@@ -440,6 +467,7 @@ private theorem head_expanded {source : TypedSource} {expected : TypeSystem.Ty} 
   | discarded found form => exact ⟨_, found, by rw [form]; rfl⟩
   | block found form => exact ⟨_, found, by rw [form]; rfl⟩
   | conditional found form => exact ⟨_, found, by rw [form]; rfl⟩
+  | matched found form => exact ⟨_, found, by rw [form]; rfl⟩
   | breaking found form => exact ⟨_, found, by rw [form]; rfl⟩
   | continuing found form => exact ⟨_, found, by rw [form]; rfl⟩
   | whileLooped found form => exact ⟨_, found, by rw [form]; rfl⟩
@@ -501,8 +529,9 @@ private theorem items_covered {policy : SourceCoreLoops.Policy} {source semantic
     | bitNotted _ tail => exact ⟨sameSource, ih ready tail⟩
     | projectedBitNotted _ _ tail => exact ⟨sameSource, ih ready tail⟩
 
-/-- Every refined accepted tree of a supported statement list is covered, for
-every match and generalized input. -/
+/-- Every refined accepted tree of a supported statement list whose match
+receipts are at contexts that `admitted` admits is covered, for every
+generalized input. -/
 theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semantic : TypedSource}
     {expected : TypeSystem.Ty} {admitted : SourceCoreCompatibleDataMatches.Context → Prop} {generalized : Prop}
     {child : ExpressionId → Prop} (sameSource : index.compilerSource = semantic) :
@@ -510,44 +539,44 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
       {statements : List StatementId} {code : Expr}
       (tree : Tree index.policy index.compilerSource index.result index.reasonAt mode escaped fuel scope
         statements code),
-      tree.Ready → Shape index.compilerSource expected child mode statements →
+      tree.Ready → tree.MatchContexts admitted → Shape index.compilerSource expected child mode statements →
       Covered semantic expected admitted generalized tree := by
   intro mode escaped fuel scope statements code tree
   induction tree with
   | nil =>
-    intro _ shape
+    intro _ _ shape
     cases shape with
     | nil allowed => exact allowed
-  | returning => intro _ _; trivial
-  | returnUnit => intro _ _; trivial
-  | breaking => intro _ _; trivial
-  | continuing => intro _ _; trivial
+  | returning => intro _ _ _; trivial
+  | returnUnit => intro _ _ _; trivial
+  | breaking => intro _ _ _; trivial
+  | continuing => intro _ _ _; trivial
   | initialized read form _ _ _ _ _ _ _ ih =>
-    intro ready shape
+    intro ready contexts shape
     cases shape with
     | declared found form' monomorphic _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
       rw [form] at form'
       cases form'
-      exact ⟨.inl monomorphic, ih ready tail⟩
+      exact ⟨.inl monomorphic, ih ready contexts tail⟩
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
-      clear ih ready
+      clear ih ready contexts
       simp_all
   | absent read form _ _ _ _ ih =>
-    intro ready shape
+    intro ready contexts shape
     cases shape with
     | uninitialized found form' _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ih ready tail
+      exact ih ready contexts tail
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
-      clear ih ready
+      clear ih ready contexts
       simp_all
   | assigning read form _ _ _ _ =>
-    intro ready shape
+    intro ready contexts shape
     cases shape with
     | assigned found form' assignable _ _ =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
@@ -562,38 +591,38 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
-      clear ready
+      clear ready contexts
       simp_all
   | assigned read form _ _ _ _ ih =>
-    intro ready shape
+    intro ready contexts shape
     cases shape with
     | assigned found _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready tail⟩
+      exact ⟨sameSource, ih ready contexts tail⟩
     | projectedAssigned found _ _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready tail⟩
+      exact ⟨sameSource, ih ready contexts tail⟩
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
-      clear ih ready
+      clear ih ready contexts
       simp_all
   | projectedAssigned read form _ _ _ _ ih =>
-    intro ready shape
+    intro ready contexts shape
     cases shape with
     | assigned found _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready tail⟩
+      exact ⟨sameSource, ih ready contexts tail⟩
     | projectedAssigned found _ _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready tail⟩
+      exact ⟨sameSource, ih ready contexts tail⟩
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
-      clear ih ready
+      clear ih ready contexts
       simp_all
   | bitNotting read form _ _ _ _ =>
-    intro ready shape
+    intro ready contexts shape
     cases shape with
     | bitNotted found form' assignable _ =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
@@ -608,105 +637,106 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
-      clear ready
+      clear ready contexts
       simp_all
   | bitNotted read form _ _ _ _ ih =>
-    intro ready shape
+    intro ready contexts shape
     cases shape with
     | bitNotted found _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready tail⟩
+      exact ⟨sameSource, ih ready contexts tail⟩
     | projectedBitNotted found _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready tail⟩
+      exact ⟨sameSource, ih ready contexts tail⟩
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
-      clear ih ready
+      clear ih ready contexts
       simp_all
   | projectedBitNotted read form _ _ _ _ ih =>
-    intro ready shape
+    intro ready contexts shape
     cases shape with
     | bitNotted found _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready tail⟩
+      exact ⟨sameSource, ih ready contexts tail⟩
     | projectedBitNotted found _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready tail⟩
+      exact ⟨sameSource, ih ready contexts tail⟩
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
-      clear ih ready
+      clear ih ready contexts
       simp_all
   | discard read form _ _ _ _ ih =>
-    intro ready shape
+    intro ready contexts shape
     cases shape with
     | discarded found _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ih ready tail
+      exact ih ready contexts tail
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
-      clear ih ready
+      clear ih ready contexts
       simp_all
   | block read form _ _ innerIH tailIH =>
-    intro ready shape
+    intro ready contexts shape
     cases shape with
     | block found form' inner tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
       rw [form] at form'
       cases form'
-      exact ⟨innerIH ready.1 inner, tailIH ready.2 tail⟩
+      exact ⟨innerIH ready.1 contexts.1 inner, tailIH ready.2 contexts.2 tail⟩
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
-      clear innerIH tailIH ready
+      clear innerIH tailIH ready contexts
       simp_all
   | conditional read form _ _ _ _ _ _ leftIH rightIH tailIH =>
-    intro ready shape
+    intro ready contexts shape
     cases shape with
     | conditional found form' _ left right tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
       rw [form] at form'
       cases form'
-      exact ⟨leftIH ready.1 left, rightIH ready.2.1 right, tailIH ready.2.2 tail⟩
+      exact ⟨leftIH ready.1 contexts.1 left, rightIH ready.2.1 contexts.2.1 right,
+        tailIH ready.2.2 contexts.2.2 tail⟩
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
-      clear leftIH rightIH tailIH ready
+      clear leftIH rightIH tailIH ready contexts
       simp_all
   | whileLoop read form _ _ _ _ _ _ innerIH tailIH =>
-    intro ready shape
+    intro ready contexts shape
     cases shape with
     | whileLooped found form' _ inner tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
       rw [form] at form'
       cases form'
-      exact ⟨innerIH ready.1 inner, tailIH ready.2 tail⟩
+      exact ⟨innerIH ready.1 contexts.1 inner, tailIH ready.2 contexts.2 tail⟩
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
-      clear innerIH tailIH ready
+      clear innerIH tailIH ready contexts
       simp_all
   | forLoop read form _ _ _ _ initial _ after _ innerIH tailIH =>
-    intro ready shape
+    intro ready contexts shape
     cases shape with
     | forLooped found form' initialShape _ inner afterShape tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
       rw [form] at form'
       cases form'
-      exact ⟨items_covered sameSource initial ready.1 initialShape, innerIH ready.2.1 inner,
-        items_covered sameSource after ready.2.2.1 afterShape, tailIH ready.2.2.2 tail⟩
+      exact ⟨items_covered sameSource initial ready.1 initialShape, innerIH ready.2.1 contexts.1 inner,
+        items_covered sameSource after ready.2.2.1 afterShape, tailIH ready.2.2.2 contexts.2 tail⟩
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
-      clear innerIH tailIH ready
+      clear innerIH tailIH ready contexts
       simp_all
   | forBoundary _ _ outside _ =>
-    intro _ _
+    intro _ _ _
     exact absurd ⟨True.intro, True.intro⟩ outside
   | tailValue read form _ _ _ _ =>
-    intro _ shape
+    intro _ _ shape
     cases shape with
     | tail found form' typed _ =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
@@ -719,7 +749,7 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
       simp_all
   | valueDiscard read form notTail _ _ _ _ _ =>
-    intro _ shape
+    intro _ _ shape
     cases shape with
     | tail => exact absurd notTail (by decide)
     | _ =>
@@ -727,16 +757,30 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
       simp_all
   | boundary read outside =>
-    intro _ shape
+    intro _ _ shape
     obtain ⟨_, found, expanded⟩ := head_expanded shape
     obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
     rw [outside] at expanded
     cases expanded
-  | _ =>
-    intro _ shape
-    exfalso
-    cases shape <;>
-    · obtain rfl := Option.some.inj ((node_of_read index (by assumption)).symm.trans (by assumption))
+  | matching => intro ready _ _; exact False.elim ready
+  | matched read form receipt branches _ branchIH tailIH =>
+    intro ready contexts shape
+    cases shape with
+    | matched found form' _ arms fallback tail =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      rw [form] at form'
+      cases form'
+      refine ⟨contexts.1, sameSource, fun request member => ?_, tailIH ready.2 contexts.2.2 tail⟩
+      refine branchIH request member (ready.1 request member) (contexts.2.1 request member) ?_
+      rcases receipt.original request member with ⟨arm, armMember, same⟩ | same
+      · rw [same]
+        exact arms arm armMember
+      · rw [same] at fallback
+        exact fallback
+    | _ =>
+      exfalso
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
+      clear branchIH tailIH ready contexts
       simp_all
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedBodyShape
@@ -901,7 +945,8 @@ declarations allocate the same cell, a bare assignment resolves its target
 without changing the heap and writes it by the same rule, an assignment or an
 in-place `~` through mapping indices evaluates its keys in order before the
 same snapshot and write, blocks and conditional arms restore their entry bindings while
-keeping their heap, and a `while` or `for` loop runs the same header items and
+keeping their heap, a match allocates the same hidden cell and runs the arm or default it selects,
+restoring its entry bindings after it, and a `while` or `for` loop runs the same header items and
 iterations, falling through at its own bindings. Each control outcome is carried unchanged, with the
 context, environment and heap of the original execution. Fault executions are
 not lifted here. -/
@@ -1662,6 +1707,38 @@ theorem statements (unique : NodeOccurrencesUnique scope.source) {mode : Bool} {
       | breaking => exact .ifBreaking (lookupStatement?_sound found) form tested staged
       | continuing => exact .ifContinuing (lookupStatement?_sound found) form tested staged
       | fault => exact .ifFault (lookupStatement?_sound found) form tested staged
+  | @matched mode id rest node resolution found form scrutinee _ _ _ armsIH fallbackIH tailIH =>
+    intro context environment before after finalContext outcome
+    have body : ∀ {statements : List StatementId}, ((∃ arm ∈ resolution.cases, arm.body = statements) ∨
+        resolution.defaultBody = some statements) →
+        ∀ {context environment before innerContext inner after},
+        Dynamic.StatementsExecute program context scope.evidence scope.source environment before statements
+          innerContext inner after →
+        Staging.Recursive.StatementsIn program registry false scope context environment before statements
+          innerContext (control inner) after := by
+      intro statements selected context environment before innerContext inner after executes
+      rcases selected with ⟨arm, member, rfl⟩ | same
+      · exact armsIH arm member executes
+      · rw [same] at fallbackIH
+        exact fallbackIH executes
+    apply sequence unique found (fun _ same => by rw [form] at same; cases same)
+    · intro context environment before middleContext nextEnvironment middle finalContext outcome after head next
+      obtain ⟨rfl, inner, same, staged⟩ := match_lift unique found form
+        (fun evaluate => expression_value unique scrutinee evaluate) body head
+      cases inner with
+      | fallthrough innerEnvironment =>
+        cases same
+        exact .matchFallthrough (lookupStatement?_sound found) form staged (tailIH next)
+      | _ => cases same
+    · intro context environment before finalContext outcome after head terminal
+      obtain ⟨rfl, inner, rfl, staged⟩ := match_lift unique found form
+        (fun evaluate => expression_value unique scrutinee evaluate) body head
+      cases inner with
+      | fallthrough => cases terminal
+      | returned => exact .matchReturned (lookupStatement?_sound found) form staged
+      | breaking => exact .matchBreaking (lookupStatement?_sound found) form staged
+      | continuing => exact .matchContinuing (lookupStatement?_sound found) form staged
+      | fault => exact .matchFault (lookupStatement?_sound found) form staged
   | breaking found form =>
     intro context environment before after finalContext outcome
     apply sequence unique found (fun _ same => by rw [form] at same; cases same)
