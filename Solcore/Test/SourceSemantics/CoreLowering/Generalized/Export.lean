@@ -1924,7 +1924,7 @@ theorem accepted_tick (selected : SelectedInventory whole row) (shape : TickShap
       selected.packet.header.function.body := by
     rw [bodyEq, selected.result_eq, selected.source_eq]
     exact acceptedRow.shape
-  obtain ⟨body, ready⟩ := CellAwarePublicAcceptedNamedRoot.refined_body prepared selected.packet.aligned
+  obtain ⟨body, ready, -⟩ := CellAwarePublicAcceptedNamedRoot.refined_body prepared selected.packet.aligned
   obtain ⟨sourceCompiled, artifact, checked⟩ := CellAwarePublicAcceptedNamedRoot.compilation_receipts
     fixture.original.checked fixture.original.accepted fixture.original.selected
   obtain ⟨allocated, sourceTrace⟩ := selected.tick_source_body actualShape ⟨[]⟩ flag

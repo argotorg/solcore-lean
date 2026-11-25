@@ -1432,6 +1432,25 @@ def Tree.Ready {mode : Bool} {escaped : Word} {fuel scope statements code}
   | .whileLoop _ _ _ _ _ _ inner tail => inner.Ready ∧ tail.Ready
   | .forLoop _ _ _ _ _ _ initial inner after tail => initial.Ready ∧ inner.Ready ∧ after.Ready ∧ tail.Ready
 
+/-- Every match receipt of the tree is at a compilation context that `admitted` admits. -/
+def Tree.MatchContexts (admitted : SourceCoreCompatibleDataMatches.Context → Prop) {mode : Bool} {escaped : Word}
+    {fuel scope statements code} (tree : Tree policy source result reasonAt mode escaped fuel scope statements code) :
+    Prop :=
+  match tree with
+  | .nil | .returning .. | .returnUnit .. | .boundary .. | .forBoundary .. | .breaking .. | .continuing ..
+    | .tailValue .. => True
+  | .initialized _ _ _ _ _ _ _ tail _ | .absent _ _ _ _ tail _ | .assigning _ _ _ tail _ | .assigned _ _ _ tail _ _
+    | .projectedAssigned _ _ _ tail _ _ | .bitNotting _ _ _ tail _ | .bitNotted _ _ _ tail _ _
+    | .projectedBitNotted _ _ _ tail _ _ | .discard _ _ _ _ _ tail | .valueDiscard _ _ _ _ _ _ tail
+    | .matching _ _ _ _ tail => tail.MatchContexts admitted
+  | .block _ _ inner tail | .whileLoop _ _ _ _ _ _ inner tail | .forLoop _ _ _ _ _ _ _ inner _ tail =>
+      inner.MatchContexts admitted ∧ tail.MatchContexts admitted
+  | .conditional _ _ _ _ _ left right tail =>
+      left.MatchContexts admitted ∧ right.MatchContexts admitted ∧ tail.MatchContexts admitted
+  | @Tree.matched _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ compilation _ _ _ branches tail =>
+      admitted compilation ∧ (∀ request member, (branches request member).MatchContexts admitted) ∧
+        tail.MatchContexts admitted
+
 /-- The profile identifies the actual callback. Unsupported original writes
 keep their complete action and suffix in the returned tree. -/
 theorem Tree.accepted {escaped : Word} {fuel scope statements code}
@@ -1521,6 +1540,152 @@ theorem Tree.accepted {escaped : Word} {fuel scope statements code}
   | forBoundary _ _ _ accepted => exact accepted
   | boundary _ _ accepted => exact accepted
 
+/-- Every accepted tree refines to one with the receipt of every write the compiler supports and of every
+match, each match receipt at the context of `matchPolicy`, which `admitted` admits. A match receipt of the
+given tree is issued again at that context from its own callback action. -/
+theorem Tree.refine_matches {values : SourceCoreCompatibleValues.Context}
+    {invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word}
+    {invalidOperand : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Solcore.Syntax.ValueAssignOp → Word}
+    {missing : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word}
+    (matched : CompatibleAssignmentStatements.AssignmentPolicy policy values invalidProjection invalidOperand missing)
+    {invalidUnary : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word}
+    (unary : CompatibleBitNotStatements.Policy policy values invalidProjection invalidUnary missing)
+    {compilation : SourceCoreCompatibleDataMatches.Context}
+    (matchPolicy : CompatibleMatchAmbientLowering.PolicySuccess policy compilation)
+    {admitted : SourceCoreCompatibleDataMatches.Context → Prop} (admittedAt : admitted compilation)
+    {mode : Bool} {escaped : Word} {fuel scope statements code}
+    (tree : Tree policy source result reasonAt mode escaped fuel scope statements code) :
+    ∃ refined : Tree policy source result reasonAt mode escaped fuel scope statements code,
+      refined.Ready ∧ refined.MatchContexts admitted := by
+  classical
+  induction fuel using Nat.strongRecOn generalizing mode scope statements code with
+  | ind fuel ih =>
+    cases tree with
+    | nil => exact ⟨.nil, True.intro, True.intro⟩
+    | breaking read form statementType => exact ⟨.breaking read form statementType, True.intro, True.intro⟩
+    | continuing read form statementType => exact ⟨.continuing read form statementType, True.intro, True.intro⟩
+    | returning read form statementType child generated childType =>
+        exact ⟨.returning read form statementType child generated childType, True.intro, True.intro⟩
+    | returnUnit read form statementType unitType =>
+        exact ⟨.returnUnit read form statementType unitType, True.intro, True.intro⟩
+    | tailValue read form child generated statementType childType =>
+        exact ⟨.tailValue read form child generated statementType childType, True.intro, True.intro⟩
+    | valueDiscard read form notTail child generated statementType remaining =>
+        obtain ⟨tail, ready, contexts⟩ := ih _ (Nat.lt_succ_self _) remaining
+        exact ⟨.valueDiscard read form notTail child generated statementType tail, ready, contexts⟩
+    | initialized read form statementType projected child generated childType remaining allocated =>
+        obtain ⟨tail, ready, contexts⟩ := ih _ (Nat.lt_succ_self _) remaining
+        exact ⟨.initialized read form statementType projected child generated childType tail allocated, ready,
+          contexts⟩
+    | absent read form statementType projected remaining allocated =>
+        obtain ⟨tail, ready, contexts⟩ := ih _ (Nat.lt_succ_self _) remaining
+        exact ⟨.absent read form statementType projected tail allocated, ready, contexts⟩
+    | @assigning mode escaped fuel scope id rest node stored assignment operator expression tail code
+        read form statementType remaining assigned =>
+        obtain ⟨tail, ready, contexts⟩ := ih _ (Nat.lt_succ_self _) remaining
+        by_cases supported : Assignable source assignment operator
+        · obtain ⟨profile, bare, target⟩ := supported
+          obtain ⟨receipt⟩ := AcceptedBareAssignmentReceipt.of_accepted matched profile bare assigned
+          exact ⟨.assigned read form statementType tail receipt (target receipt.binder receipt.declaration), ready,
+            contexts⟩
+        · by_cases projected : ProjectedAssignable source assignment operator
+          · obtain ⟨receipt⟩ := AcceptedProjectedAssignmentReceipt.of_accepted matched projected.1 projected.2.1
+              projected.2.2 assigned
+            exact ⟨.projectedAssigned read form statementType tail receipt
+              (projected.2.2 receipt.binder receipt.description.binding), ready, contexts⟩
+          · exact ⟨.assigning read form statementType tail assigned,
+              ⟨fun eligible => eligible.elim supported projected, ready⟩, contexts⟩
+    | assigned read form statementType remaining receipt targetType =>
+        obtain ⟨tail, ready, contexts⟩ := ih _ (Nat.lt_succ_self _) remaining
+        exact ⟨.assigned read form statementType tail receipt targetType, ready, contexts⟩
+    | projectedAssigned read form statementType remaining receipt route =>
+        obtain ⟨tail, ready, contexts⟩ := ih _ (Nat.lt_succ_self _) remaining
+        exact ⟨.projectedAssigned read form statementType tail receipt route, ready, contexts⟩
+    | @bitNotting mode escaped fuel scope id rest node stored assignment body code
+        read form statementType remaining assigned =>
+        obtain ⟨tail, ready, contexts⟩ := ih _ (Nat.lt_succ_self _) remaining
+        by_cases supported : BitNotAssignable source assignment
+        · obtain ⟨profile, bare, target⟩ := supported
+          have lowered := assigned
+          simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
+            unary, remaining.accepted, bind, Except.bind] at lowered
+          obtain ⟨receipt⟩ := AcceptedBareBitNotReceipt.of_accepted unary profile bare unary lowered
+          exact ⟨.bitNotted read form statementType tail receipt (target receipt.binder receipt.declaration), ready,
+            contexts⟩
+        · by_cases projected : ProjectedBitNotAssignable source assignment
+          · have lowered := assigned
+            simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
+              unary, remaining.accepted, bind, Except.bind] at lowered
+            obtain ⟨receipt⟩ := AcceptedProjectedBitNotReceipt.of_accepted unary projected.1 projected.2.1
+              projected.2.2 unary lowered
+            exact ⟨.projectedBitNotted read form statementType tail receipt
+              (projected.2.2 receipt.binder receipt.description.binding), ready, contexts⟩
+          · exact ⟨.bitNotting read form statementType tail assigned,
+              ⟨fun eligible => eligible.elim supported projected, ready⟩, contexts⟩
+    | bitNotted read form statementType remaining receipt targetType =>
+        obtain ⟨tail, ready, contexts⟩ := ih _ (Nat.lt_succ_self _) remaining
+        exact ⟨.bitNotted read form statementType tail receipt targetType, ready, contexts⟩
+    | projectedBitNotted read form statementType remaining receipt route =>
+        obtain ⟨tail, ready, contexts⟩ := ih _ (Nat.lt_succ_self _) remaining
+        exact ⟨.projectedBitNotted read form statementType tail receipt route, ready, contexts⟩
+    | discard read form child generated statementType remaining =>
+        obtain ⟨tail, ready, contexts⟩ := ih _ (Nat.lt_succ_self _) remaining
+        exact ⟨.discard read form child generated statementType tail, ready, contexts⟩
+    | block read form inner remaining =>
+        obtain ⟨inner, innerReady, innerContexts⟩ := ih _ (Nat.lt_succ_self _) inner
+        obtain ⟨tail, tailReady, tailContexts⟩ := ih _ (Nat.lt_succ_self _) remaining
+        exact ⟨.block read form inner tail, ⟨innerReady, tailReady⟩, innerContexts, tailContexts⟩
+    | conditional read form child generated conditionType left right remaining =>
+        obtain ⟨left, leftReady, leftContexts⟩ := ih _ (Nat.lt_succ_self _) left
+        obtain ⟨right, rightReady, rightContexts⟩ := ih _ (Nat.lt_succ_self _) right
+        obtain ⟨tail, tailReady, tailContexts⟩ := ih _ (Nat.lt_succ_self _) remaining
+        exact ⟨.conditional read form child generated conditionType left right tail,
+          ⟨leftReady, rightReady, tailReady⟩, leftContexts, rightContexts, tailContexts⟩
+    | @matching _ _ childFuel _ _ _ _ _ _ _ _ _ read form selected accepted remaining =>
+        obtain ⟨receipt⟩ := AcceptedNamedMatchFlow.of_accepted matchPolicy selected accepted
+        have each : ∀ request ∈ receipt.requests, ∃ refined :
+            Tree policy source result reasonAt false escaped childFuel request.scope request.statements request.code,
+            refined.Ready ∧ refined.MatchContexts admitted := by
+          intro request member
+          obtain ⟨raw⟩ := of_accepted (receipt.bodies request member)
+          exact ih _ (Nat.lt_succ_self _) raw
+        let branches := fun request member => Classical.choose (each request member)
+        have branchesReady := fun request member => (Classical.choose_spec (each request member)).1
+        have branchesContexts := fun request member => (Classical.choose_spec (each request member)).2
+        obtain ⟨tail, tailReady, tailContexts⟩ := ih _ (Nat.lt_succ_self _) remaining
+        exact ⟨.matched read form receipt branches tail, ⟨branchesReady, tailReady⟩, admittedAt, branchesContexts,
+          tailContexts⟩
+    | @matched _ _ childFuel _ _ _ _ _ _ _ _ _ read form issued _ remaining =>
+        obtain ⟨receipt⟩ := AcceptedNamedMatchFlow.of_accepted matchPolicy issued.selected issued.accepted
+        have each : ∀ request ∈ receipt.requests, ∃ refined :
+            Tree policy source result reasonAt false escaped childFuel request.scope request.statements request.code,
+            refined.Ready ∧ refined.MatchContexts admitted := by
+          intro request member
+          obtain ⟨raw⟩ := of_accepted (receipt.bodies request member)
+          exact ih _ (Nat.lt_succ_self _) raw
+        let branches := fun request member => Classical.choose (each request member)
+        have branchesReady := fun request member => (Classical.choose_spec (each request member)).1
+        have branchesContexts := fun request member => (Classical.choose_spec (each request member)).2
+        obtain ⟨tail, tailReady, tailContexts⟩ := ih _ (Nat.lt_succ_self _) remaining
+        exact ⟨.matched read form receipt branches tail, ⟨branchesReady, tailReady⟩, admittedAt, branchesContexts,
+          tailContexts⟩
+    | whileLoop read form statementType child generated conditionType inner remaining =>
+        obtain ⟨inner, innerReady, innerContexts⟩ := ih _ (Nat.lt_succ_self _) inner
+        obtain ⟨tail, tailReady, tailContexts⟩ := ih _ (Nat.lt_succ_self _) remaining
+        exact ⟨.whileLoop read form statementType child generated conditionType inner tail,
+          ⟨innerReady, tailReady⟩, innerContexts, tailContexts⟩
+    | forLoop read form statementType child generated conditionType initial inner after remaining =>
+        obtain ⟨initial, initialReady⟩ := initial.refine matched unary
+        obtain ⟨inner, innerReady, innerContexts⟩ := ih _ (Nat.lt_succ_self _) inner
+        obtain ⟨after, afterReady⟩ := after.refine matched unary
+        obtain ⟨tail, tailReady, tailContexts⟩ := ih _ (Nat.lt_succ_self _) remaining
+        exact ⟨.forLoop read form statementType child generated conditionType initial inner after tail,
+          ⟨initialReady, innerReady, afterReady, tailReady⟩, innerContexts, tailContexts⟩
+    | forBoundary read form outside accepted =>
+        exact ⟨.forBoundary read form outside accepted, True.intro, True.intro⟩
+    | boundary read outside accepted => exact ⟨.boundary read outside accepted, True.intro, True.intro⟩
+
+/-- `refine_matches` without its match contexts. -/
 theorem Tree.refine {values : SourceCoreCompatibleValues.Context}
     {invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word}
     {invalidOperand : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Solcore.Syntax.ValueAssignOp → Word}
@@ -1533,114 +1698,8 @@ theorem Tree.refine {values : SourceCoreCompatibleValues.Context}
     {mode : Bool} {escaped : Word} {fuel scope statements code}
     (tree : Tree policy source result reasonAt mode escaped fuel scope statements code) :
     ∃ refined : Tree policy source result reasonAt mode escaped fuel scope statements code, refined.Ready := by
-  classical
-  induction fuel using Nat.strongRecOn generalizing mode scope statements code with
-  | ind fuel ih =>
-    cases tree with
-    | nil => exact ⟨.nil, True.intro⟩
-    | breaking read form statementType => exact ⟨.breaking read form statementType, True.intro⟩
-    | continuing read form statementType => exact ⟨.continuing read form statementType, True.intro⟩
-    | returning read form statementType child generated childType =>
-        exact ⟨.returning read form statementType child generated childType, True.intro⟩
-    | returnUnit read form statementType unitType =>
-        exact ⟨.returnUnit read form statementType unitType, True.intro⟩
-    | tailValue read form child generated statementType childType =>
-        exact ⟨.tailValue read form child generated statementType childType, True.intro⟩
-    | valueDiscard read form notTail child generated statementType remaining =>
-        obtain ⟨tail, ready⟩ := ih _ (Nat.lt_succ_self _) remaining
-        exact ⟨.valueDiscard read form notTail child generated statementType tail, ready⟩
-    | initialized read form statementType projected child generated childType remaining allocated =>
-        obtain ⟨tail, ready⟩ := ih _ (Nat.lt_succ_self _) remaining
-        exact ⟨.initialized read form statementType projected child generated childType tail allocated, ready⟩
-    | absent read form statementType projected remaining allocated =>
-        obtain ⟨tail, ready⟩ := ih _ (Nat.lt_succ_self _) remaining
-        exact ⟨.absent read form statementType projected tail allocated, ready⟩
-    | @assigning mode escaped fuel scope id rest node stored assignment operator expression tail code
-        read form statementType remaining assigned =>
-        obtain ⟨tail, ready⟩ := ih _ (Nat.lt_succ_self _) remaining
-        by_cases supported : Assignable source assignment operator
-        · obtain ⟨profile, bare, target⟩ := supported
-          obtain ⟨receipt⟩ := AcceptedBareAssignmentReceipt.of_accepted matched profile bare assigned
-          exact ⟨.assigned read form statementType tail receipt (target receipt.binder receipt.declaration), ready⟩
-        · by_cases projected : ProjectedAssignable source assignment operator
-          · obtain ⟨receipt⟩ := AcceptedProjectedAssignmentReceipt.of_accepted matched projected.1 projected.2.1 projected.2.2 assigned
-            exact ⟨.projectedAssigned read form statementType tail receipt (projected.2.2 receipt.binder receipt.description.binding), ready⟩
-          · exact ⟨.assigning read form statementType tail assigned,
-              (fun eligible => eligible.elim supported projected), ready⟩
-    | assigned read form statementType remaining receipt targetType =>
-        obtain ⟨tail, ready⟩ := ih _ (Nat.lt_succ_self _) remaining
-        exact ⟨.assigned read form statementType tail receipt targetType, ready⟩
-    | projectedAssigned read form statementType remaining receipt route =>
-        obtain ⟨tail, ready⟩ := ih _ (Nat.lt_succ_self _) remaining
-        exact ⟨.projectedAssigned read form statementType tail receipt route, ready⟩
-    | @bitNotting mode escaped fuel scope id rest node stored assignment body code
-        read form statementType remaining assigned =>
-        obtain ⟨tail, ready⟩ := ih _ (Nat.lt_succ_self _) remaining
-        by_cases supported : BitNotAssignable source assignment
-        · obtain ⟨profile, bare, target⟩ := supported
-          have lowered := assigned
-          simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
-            unary, remaining.accepted, bind, Except.bind] at lowered
-          obtain ⟨receipt⟩ := AcceptedBareBitNotReceipt.of_accepted unary profile bare unary lowered
-          exact ⟨.bitNotted read form statementType tail receipt (target receipt.binder receipt.declaration), ready⟩
-        · by_cases projected : ProjectedBitNotAssignable source assignment
-          · have lowered := assigned
-            simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
-              unary, remaining.accepted, bind, Except.bind] at lowered
-            obtain ⟨receipt⟩ := AcceptedProjectedBitNotReceipt.of_accepted unary projected.1 projected.2.1 projected.2.2 unary lowered
-            exact ⟨.projectedBitNotted read form statementType tail receipt
-              (projected.2.2 receipt.binder receipt.description.binding), ready⟩
-          · exact ⟨.bitNotting read form statementType tail assigned,
-              (fun eligible => eligible.elim supported projected), ready⟩
-    | bitNotted read form statementType remaining receipt targetType =>
-        obtain ⟨tail, ready⟩ := ih _ (Nat.lt_succ_self _) remaining
-        exact ⟨.bitNotted read form statementType tail receipt targetType, ready⟩
-    | projectedBitNotted read form statementType remaining receipt route =>
-        obtain ⟨tail, ready⟩ := ih _ (Nat.lt_succ_self _) remaining
-        exact ⟨.projectedBitNotted read form statementType tail receipt route, ready⟩
-    | discard read form child generated statementType remaining =>
-        obtain ⟨tail, ready⟩ := ih _ (Nat.lt_succ_self _) remaining
-        exact ⟨.discard read form child generated statementType tail, ready⟩
-    | block read form inner remaining =>
-        obtain ⟨inner, innerReady⟩ := ih _ (Nat.lt_succ_self _) inner
-        obtain ⟨tail, tailReady⟩ := ih _ (Nat.lt_succ_self _) remaining
-        exact ⟨.block read form inner tail, innerReady, tailReady⟩
-    | conditional read form child generated conditionType left right remaining =>
-        obtain ⟨left, leftReady⟩ := ih _ (Nat.lt_succ_self _) left
-        obtain ⟨right, rightReady⟩ := ih _ (Nat.lt_succ_self _) right
-        obtain ⟨tail, tailReady⟩ := ih _ (Nat.lt_succ_self _) remaining
-        exact ⟨.conditional read form child generated conditionType left right tail, leftReady, rightReady, tailReady⟩
-    | @matching _ _ childFuel _ _ _ _ _ _ _ _ _ read form selected accepted remaining =>
-        obtain ⟨receipt⟩ := AcceptedNamedMatchFlow.of_accepted matchPolicy selected accepted
-        have each : ∀ request ∈ receipt.requests, ∃ refined :
-            Tree policy source result reasonAt false escaped childFuel request.scope request.statements request.code,
-            refined.Ready := by
-          intro request member
-          obtain ⟨raw⟩ := of_accepted (receipt.bodies request member)
-          exact ih _ (Nat.lt_succ_self _) raw
-        let branches := fun request member => Classical.choose (each request member)
-        have branchesReady := fun request member => Classical.choose_spec (each request member)
-        obtain ⟨tail, tailReady⟩ := ih _ (Nat.lt_succ_self _) remaining
-        exact ⟨.matched read form receipt branches tail, branchesReady, tailReady⟩
-    | matched read form receipt branches remaining =>
-        have each := fun request member => ih _ (Nat.lt_succ_self _) (branches request member)
-        let refined := fun request member => Classical.choose (each request member)
-        have branchesReady := fun request member => Classical.choose_spec (each request member)
-        obtain ⟨tail, tailReady⟩ := ih _ (Nat.lt_succ_self _) remaining
-        exact ⟨.matched read form receipt refined tail, branchesReady, tailReady⟩
-    | whileLoop read form statementType child generated conditionType inner remaining =>
-        obtain ⟨inner, innerReady⟩ := ih _ (Nat.lt_succ_self _) inner
-        obtain ⟨tail, tailReady⟩ := ih _ (Nat.lt_succ_self _) remaining
-        exact ⟨.whileLoop read form statementType child generated conditionType inner tail, innerReady, tailReady⟩
-    | forLoop read form statementType child generated conditionType initial inner after remaining =>
-        obtain ⟨initial, initialReady⟩ := initial.refine matched unary
-        obtain ⟨inner, innerReady⟩ := ih _ (Nat.lt_succ_self _) inner
-        obtain ⟨after, afterReady⟩ := after.refine matched unary
-        obtain ⟨tail, tailReady⟩ := ih _ (Nat.lt_succ_self _) remaining
-        exact ⟨.forLoop read form statementType child generated conditionType initial inner after tail,
-          initialReady, innerReady, afterReady, tailReady⟩
-    | forBoundary read form outside accepted => exact ⟨.forBoundary read form outside accepted, True.intro⟩
-    | boundary read outside accepted => exact ⟨.boundary read outside accepted, True.intro⟩
+  obtain ⟨refined, ready, _⟩ := tree.refine_matches matched unary matchPolicy (admitted := (· = compilation)) rfl
+  exact ⟨refined, ready⟩
 
 /-- A remaining compiler branch, retaining its exact action and local scope. -/
 inductive Boundary (policy : SourceCoreLoops.Policy) (source : TypedSource)

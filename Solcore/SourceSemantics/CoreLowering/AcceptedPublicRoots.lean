@@ -26,7 +26,8 @@ Main declarations:
   `CellAwarePublicAcceptedCallForward.first_fault_selected`, from a staged trace that faults to a
   failed public resumption;
 - `CellAwarePublicAcceptedNamedRoot.compilation_receipts` and
-  `CellAwarePublicAcceptedNamedRoot.refined_body`, which derive the static receipts.
+  `CellAwarePublicAcceptedNamedRoot.refined_body`, which derive the static receipts, the latter with
+  every match receipt at an admitted context.
 -/
 
 section
@@ -62,7 +63,9 @@ theorem compilation_receipts {recipe : SourceCoreIndexedSession.Recipe}
   exact checked
 
 /-- The accepted body receipt of a prepared header, refined so that every
-assignment the compiler supports carries its receipt. -/
+assignment the compiler supports carries its receipt, and every match receipt
+is at the header's own match context, which is admitted for the header's
+accepted-body index. -/
 theorem refined_body {whole : SourceCoreUnifiedCompilation.Compiled} {row : SourceSpecialization.SpecializedFunction}
     (prepared : RecursiveNamedPublicSpecializationMeaning.Prepared whole row) {instantiation : DeclarationInstantiation}
     {header : Header whole (Program.ofChecked whole.sourceProgram)}
@@ -71,11 +74,19 @@ theorem refined_body {whole : SourceCoreUnifiedCompilation.Compiled} {row : Sour
         (index prepared aligned).compilerSource (index prepared aligned).scope (index prepared aligned).statements
         (index prepared aligned).result (index prepared aligned).reasonAt (index prepared aligned).fellThrough
         (index prepared aligned).escaped (index prepared aligned).body,
-      body.tree.Ready := by
+      body.tree.Ready ∧
+        body.tree.MatchContexts (CellAwareInvocationAcceptedMatches.Admitted (index prepared aligned)) := by
+  have admitted : CellAwareInvocationAcceptedMatches.Admitted (index prepared aligned)
+      (RecursiveNamedPreparedHeaderPolicies.Prepared.ambientMatch prepared) :=
+    ⟨rfl, (RecursiveNamedPreparedHeaderPolicies.Prepared.match_allocator prepared aligned).trans
+        ((RecursiveNamedPreparedHeaderPolicies.Prepared.header_allocator prepared aligned).symm.trans
+          (congrArg SourceCoreLoops.Policy.sourceCells aligned.policy)),
+      Core.DataEnvironment.Extends.refl whole.indexed.layouts.definitions⟩
   obtain ⟨body⟩ := (index prepared aligned).body_receipt
-  obtain ⟨tree, ready⟩ := body.tree.refine (index prepared aligned).assignment_policy
+  obtain ⟨tree, ready, contexts⟩ := body.tree.refine_matches (index prepared aligned).assignment_policy
     (index prepared aligned).bitNot_policy (RecursiveNamedPreparedHeaderPolicies.Prepared.match_success prepared)
-  exact ⟨⟨body.flow, tree, body.emitted⟩, ready⟩
+    admitted
+  exact ⟨⟨body.flow, tree, body.emitted⟩, ready, contexts⟩
 
 variable {whole : SourceCoreUnifiedCompilation.Compiled}
   {headers : List (Header whole (Program.ofChecked whole.sourceProgram))}
