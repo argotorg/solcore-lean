@@ -351,6 +351,57 @@ end Inversion
 variable {program : Program} {registry : Staging.Recursive.Registry} {scope : Staging.Recursive.Scope}
   {expected : TypeSystem.Ty}
 
+/-- A sized Source match whose scrutinee `child` admits and whose selected body lifts within the bound is the
+staged match at its entry context. The outcome is the selected body's, restored to the entry bindings; without
+a selected body it falls through. -/
+private theorem match_lift {child : ExpressionId → Prop} {bound : Nat} (unique : NodeOccurrencesUnique scope.source)
+    (lift : ChildLifts program registry scope child bound) {id : StatementId} {node : StatementNode}
+    (found : scope.source.lookupStatement? id = some node) {resolution : MatchResolution}
+    (form : node.form = .matchWith resolution) (scrutinee : child resolution.scrutinee)
+    (body : ∀ {statements : List StatementId}, ((∃ arm ∈ resolution.cases, arm.body = statements) ∨
+        resolution.defaultBody = some statements) →
+      ∀ {size : Nat} {context environment before innerContext inner after}, size ≤ bound →
+      SourceExecutionSize.StatementsExecute program size context scope.evidence scope.source environment before
+        statements innerContext inner after →
+      Staging.Recursive.StatementsIn program registry false scope context environment before statements
+        innerContext (control inner) after)
+    {size : Nat} {context finalContext : SourceSemantics.Context} {environment : Dynamic.Environment}
+    {before after : Dynamic.Heap} {outcome : Dynamic.ControlOutcome} (within : size ≤ bound)
+    (head : SourceExecutionSize.StatementExecutes program size context scope.evidence scope.source environment
+      before id finalContext outcome after) :
+    finalContext = context ∧ ∃ inner, outcome = Dynamic.restoreControl environment inner ∧
+      Staging.Recursive.Match program registry scope context environment before resolution
+        ((control inner).restore environment) after := by
+  cases head with
+  | matchArm contains formEq scrutineeContains evaluate allocate select bindersEq valuesEq extended allocated
+      executes =>
+    obtain rfl := same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    subst bindersEq valuesEq
+    obtain ⟨arm, member, same⟩ := (CellAwareInvocationAcceptedStatementLifting.selected_body select).1 _ _ rfl
+    exact ⟨rfl, _, rfl, .arm scrutineeContains (lift scrutinee (Nat.lt_of_lt_of_le below_left within) evaluate)
+      allocate select extended allocated
+      (body (.inl ⟨arm, member, same⟩) (Nat.le_of_lt (Nat.lt_of_lt_of_le below_right within)) executes)⟩
+  | matchDefault contains formEq scrutineeContains evaluate allocate select executes =>
+    obtain rfl := same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact ⟨rfl, _, rfl, .default scrutineeContains (lift scrutinee (Nat.lt_of_lt_of_le below_left within) evaluate)
+      allocate select (body (.inr ((CellAwareInvocationAcceptedStatementLifting.selected_body select).2 _ rfl))
+        (Nat.le_of_lt (Nat.lt_of_lt_of_le below_right within)) executes)⟩
+  | matchNoBranch contains formEq scrutineeContains evaluate allocate select =>
+    obtain rfl := same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact ⟨rfl, .fallthrough environment, rfl, .noBranch scrutineeContains
+      (lift scrutinee (Nat.lt_of_lt_of_le below_one within) evaluate) allocate select⟩
+  | _ =>
+    exfalso
+    clear lift body
+    obtain rfl := same_node unique found (by assumption)
+    simp_all
+
 /-- One statement followed by the rest of its list, over sized derivations. A
 falling-through head runs the rest; a terminal head ends the list. -/
 private theorem sequence {mode : Bool} {id : StatementId} {rest : List StatementId} {node : StatementNode}
@@ -3238,6 +3289,74 @@ private theorem for_fault_lift {child : ExpressionId → Prop} {bound : Nat}
       exact .continueIterate (lift test (by omega) evaluate) (inner (by omega) executes)
         (CellAwareInvocationAcceptedSizedLifting.items_lift lift postShape (by omega) postExecutes).1
         (ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) (by omega) signatures expressible fault)
+
+/-- The sized Source fault of a match whose scrutinee `child` admits and whose selected body's faults lift
+within the bound, with an expressible reason at a context with the program's signatures, is a staged fault of
+the match with the same heap: a fault of its scrutinee, an invalid pattern, or a fault of its selected body. -/
+private theorem match_fault {child : ExpressionId → Prop} {bound : Nat} (unique : NodeOccurrencesUnique scope.source)
+    (lift : ChildLifts program registry scope child bound)
+    (faultLift : ChildFaultLifts program registry scope child bound) {id : StatementId} {node : StatementNode}
+    (found : scope.source.lookupStatement? id = some node) {resolution : MatchResolution}
+    (form : node.form = .matchWith resolution) (scrutinee : child resolution.scrutinee)
+    {reason : Dynamic.SemanticFault}
+    (body : ∀ {statements : List StatementId}, ((∃ arm ∈ resolution.cases, arm.body = statements) ∨
+        resolution.defaultBody = some statements) →
+      ∀ {size : Nat} {context environment before innerContext after}, size ≤ bound →
+      context.signatures = program.signatures →
+      SourceExecutionSize.StatementsFault program size context scope.evidence scope.source environment before
+        statements innerContext reason after →
+      Staging.Recursive.StatementsIn program registry false scope context environment before statements
+        innerContext (.fault (.semantic reason)) after)
+    {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+    {before after : Dynamic.Heap} (within : size ≤ bound) (signatures : context.signatures = program.signatures)
+    (expressible : Expressible reason)
+    (fault : SourceExecutionSize.StatementFaults program size context scope.evidence scope.source environment
+      before id reason after) :
+    Staging.Recursive.Match program registry scope context environment before resolution
+      (.fault (.semantic reason)) after := by
+  cases fault with
+  | missing absent => exact (Dynamic.StatementAbsentIn.excludes_contains absent (lookupStatement?_sound found)).elim
+  | matchScrutinee contains formEq failed =>
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact .scrutineeFault (faultLift scrutinee
+      (Nat.lt_of_lt_of_le CellAwareInvocationAcceptedSizedLifting.below_one within) signatures expressible failed)
+  | matchPattern contains formEq scrutineeContains evaluate allocate invalid =>
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact .patternFault scrutineeContains
+      (lift scrutinee (Nat.lt_of_lt_of_le CellAwareInvocationAcceptedSizedLifting.below_one within) evaluate)
+      allocate invalid
+  | matchArmBody contains formEq scrutineeContains evaluate allocate select bindersEq valuesEq extended allocated
+      failed =>
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    subst bindersEq valuesEq
+    obtain ⟨arm, member, same⟩ := (CellAwareInvocationAcceptedStatementLifting.selected_body select).1 _ _ rfl
+    exact .arm scrutineeContains
+      (lift scrutinee (Nat.lt_of_lt_of_le CellAwareInvocationAcceptedSizedLifting.below_left within) evaluate)
+      allocate select extended allocated
+      (body (.inl ⟨arm, member, same⟩)
+        (Nat.le_of_lt (Nat.lt_of_lt_of_le CellAwareInvocationAcceptedSizedLifting.below_right within))
+        (extended.signatures_eq.trans signatures) failed)
+  | matchDefaultBody contains formEq scrutineeContains evaluate allocate select failed =>
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact .default scrutineeContains
+      (lift scrutinee (Nat.lt_of_lt_of_le CellAwareInvocationAcceptedSizedLifting.below_left within) evaluate)
+      allocate select
+      (body (.inr ((CellAwareInvocationAcceptedStatementLifting.selected_body select).2 _ rfl))
+        (Nat.le_of_lt (Nat.lt_of_lt_of_le CellAwareInvocationAcceptedSizedLifting.below_right within))
+        signatures failed)
+  | _ =>
+    exfalso
+    clear lift faultLift body
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found (by assumption)
+    simp_all
 
 /-- A sized fault execution of a supported statement list with an expressible
 reason, at a context with the program's signatures, is a staged fault

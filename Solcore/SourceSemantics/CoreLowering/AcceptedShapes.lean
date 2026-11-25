@@ -923,6 +923,23 @@ def control : Dynamic.ControlOutcome → Staging.Recursive.BodyOutcome
   | .continuing environment => .continuing environment
   | .fault reason => .fault (.semantic reason)
 
+/-- A selected arm's body is the body of one of the match's arms, and a selected default is the match's
+default. -/
+theorem selected_body {context : SourceSemantics.Context} {value : Dynamic.Value} {cases : List TypedMatchCase}
+    {fallback : Option (List StatementId)} {selection : Dynamic.MatchCaseSelection}
+    (selected : Dynamic.MatchCasesSelect context value cases fallback selection) :
+    (∀ statements bindings, selection = .arm statements bindings → ∃ arm ∈ cases, arm.body = statements) ∧
+      ∀ statements, selection = .default statements → fallback = some statements := by
+  induction selected with
+  | head =>
+    exact ⟨(fun _ _ same => by cases same; exact ⟨_, List.mem_cons_self, rfl⟩), fun _ same => by cases same⟩
+  | tail _ _ ih =>
+    refine ⟨fun statements bindings same => ?_, ih.2⟩
+    obtain ⟨arm, member, body⟩ := ih.1 statements bindings same
+    exact ⟨arm, List.mem_cons_of_mem _ member, body⟩
+  | default => exact ⟨(fun _ _ same => by cases same), fun _ same => by cases same; rfl⟩
+  | noBranch => exact ⟨(fun _ _ same => by cases same), fun _ same => by cases same⟩
+
 /-- The ordinary statement-list judgment of each compiler mode: a function body
 has the implicit final return, a branch or block body does not. -/
 def Original (program : Program) : Bool → SourceSemantics.Context → Dynamic.EvidenceEnvironment → TypedSource →
@@ -1371,6 +1388,57 @@ private theorem for_lift {evidence : Dynamic.EvidenceEnvironment} {source : Type
       exact ⟨.forBreakFromBody (test evaluate.sound) (inner executes.sound), .inl rfl⟩
     | returns evaluate executes =>
       exact ⟨.returnedFromBody (test evaluate.sound) (inner executes.sound), .inr ⟨_, rfl⟩⟩
+
+/-- A Source match whose scrutinee and selected body lift is the staged match at its entry context. The
+outcome is the selected body's, restored to the entry bindings; without a selected body it falls through. -/
+private theorem match_lift (unique : NodeOccurrencesUnique scope.source) {id : StatementId} {node : StatementNode}
+    (found : scope.source.lookupStatement? id = some node) {resolution : MatchResolution}
+    (form : node.form = .matchWith resolution)
+    (scrutinee : ∀ {context environment before value after},
+      Dynamic.ExpressionEvaluates program context scope.evidence scope.source environment before
+        resolution.scrutinee value after →
+      Staging.Recursive.Expression program registry scope context environment before resolution.scrutinee
+        (.value value) after)
+    (body : ∀ {statements : List StatementId}, ((∃ arm ∈ resolution.cases, arm.body = statements) ∨
+        resolution.defaultBody = some statements) →
+      ∀ {context environment before innerContext inner after},
+      Dynamic.StatementsExecute program context scope.evidence scope.source environment before statements
+        innerContext inner after →
+      Staging.Recursive.StatementsIn program registry false scope context environment before statements
+        innerContext (control inner) after)
+    {context finalContext : SourceSemantics.Context} {environment : Dynamic.Environment}
+    {before after : Dynamic.Heap} {outcome : Dynamic.ControlOutcome}
+    (head : Dynamic.StatementExecutes program context scope.evidence scope.source environment before id
+      finalContext outcome after) :
+    finalContext = context ∧ ∃ inner, outcome = Dynamic.restoreControl environment inner ∧
+      Staging.Recursive.Match program registry scope context environment before resolution
+        ((control inner).restore environment) after := by
+  cases head with
+  | matchArm contains formEq scrutineeContains evaluate allocate select bindersEq valuesEq extended allocated
+      executes =>
+    obtain rfl := same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    subst bindersEq valuesEq
+    obtain ⟨arm, member, same⟩ := (selected_body select).1 _ _ rfl
+    exact ⟨rfl, _, rfl, .arm scrutineeContains (scrutinee evaluate) allocate select extended allocated
+      (body (.inl ⟨arm, member, same⟩) executes)⟩
+  | matchDefault contains formEq scrutineeContains evaluate allocate select executes =>
+    obtain rfl := same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact ⟨rfl, _, rfl, .default scrutineeContains (scrutinee evaluate) allocate select
+      (body (.inr ((selected_body select).2 _ rfl)) executes)⟩
+  | matchNoBranch contains formEq scrutineeContains evaluate allocate select =>
+    obtain rfl := same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact ⟨rfl, .fallthrough environment, rfl, .noBranch scrutineeContains (scrutinee evaluate) allocate select⟩
+  | _ =>
+    exfalso
+    clear scrutinee body
+    obtain rfl := same_node unique found (by assumption)
+    simp_all
 
 /-- One statement followed by the rest of its list. A falling-through head runs
 the rest; a terminal head ends the list. Both compiler modes share this
