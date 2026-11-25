@@ -6042,6 +6042,27 @@ def runWeakArguments : IO Unit := do
     "function main() returns (Word) { return run(1); }"]
   IO.println "SOURCE_CORE_WEAK_ARGUMENTS_PASS: upstream's weak trait arguments through the public API, an open argument fixed from the one impl, a given, a generic impl, a default alone and a default beside an ordinary impl, through a requirement on it, a chain, a partly open argument, two arguments and a condition, before a literal defaults and after, and refused as before with no impl, at Lean's own Coerce, with the argument fixed otherwise, with two requirements or an annotation that disagree and at a literal subject of another type"
 
+/-- Upstream's one result type through the public API: an implementation method of a program's
+own `Add` whose results are written as a tuple's elements for its trait method's one tuple runs
+through `+` as upstream folds it. Lean calls a trait method only through its operator, whose
+profile takes one result, so the converse, one tuple for two results, is the signatures' test
+(`testImplMethodResultTuples`). -/
+def runTupleResults : IO Unit := do
+  let add := "trait Add<T> { function add(x: T, y: T) returns (T); }"
+  let pairs := ["function main() returns (Word) {",
+    "  let p: (Word, Word) = (1, 2); let q: (Word, Word) = (3, 4);",
+    "  match (p + q) { case (u, v) { return u; } }", "}"]
+  let pairAdd (results : String) : List String := [add, "impl Add<(Word, Word)> {",
+    s!"  function add(x: (Word, Word), y: (Word, Word)) returns {results} \{",
+    "    match (x) { case (a, b) { match (y) { case (c, d) { return (b, c); } } } }", "  }", "}"]
+    ++ pairs
+  mainRunsTo "two results for a pair" (pairAdd "(Word, Word)") (word 2)
+  mainRunsTo "one tuple for a pair" (pairAdd "((Word, Word))") (word 2)
+  mainRunsTo "a generic pair" ([add,
+    "impl<A, B> Add<(A, B)> { function add(x: (A, B), y: (A, B)) returns (A, B) { return y; } }"]
+    ++ pairs) (word 3)
+  IO.println "SOURCE_CORE_TUPLE_RESULTS_PASS: upstream's one result type through the public API, an implementation method of a program's own Add returning a tuple's elements for its trait method's one result, at a closed and a generic pair, and one tuple for that result, through +, as upstream folds them"
+
 /-- Step 8e's fixture: the functions of upstream's `checked-arith`,
 `unchecked-scope`, `shift-operators`, `int-ops` and `issue92-checked-defaults`
 fixtures (`tests/e2e/*/main.sol` at e2eef194) that need no conversion and no
@@ -6921,6 +6942,7 @@ def run : IO Unit := do
   runNonFinalReturns
   runOverlappingImplementations
   runWeakArguments
+  runTupleResults
   runUpstreamFixtures
   runUpstreamArrayFixtures
   runArrayElementCases

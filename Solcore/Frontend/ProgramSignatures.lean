@@ -1954,8 +1954,9 @@ private def parameterComptime
 end UnmatchedProgramImplMethod
 
 /-- The signature comparison performed before an implementation method is
-attached to its selected trait method identity: an exact shape, and only
-predicates that its callers or its implementation provide. -/
+attached to its selected trait method identity: the same parameters and one
+result tuple, and only predicates that its callers or its implementation
+provide. -/
 private structure UnmatchedImplMethodMatchesTrait
     (substitution : TypeSystem.ParameterSubstitution)
     (implementationPredicates : List ProgramPredicate)
@@ -1964,8 +1965,8 @@ private structure UnmatchedImplMethodMatchesTrait
   name : traitMethod.name = implMethod.name
   parameter_types : implMethod.parameterTypes =
     traitMethod.parameterTypes.map substitution.apply
-  return_types : implMethod.returnTypes =
-    traitMethod.returnTypes.map substitution.apply
+  return_types : TypeSystem.Ty.productMany implMethod.returnTypes =
+    TypeSystem.Ty.productMany (traitMethod.returnTypes.map substitution.apply)
   parameter_comptime : implMethod.parameterComptime =
     traitMethod.parameterComptime
   return_comptime : implMethod.returnComptime = traitMethod.returnComptime
@@ -2181,8 +2182,11 @@ private theorem validateContained_success
         · exact induction success candidate candidateMember
       · simp [member] at success
 
-/-- Each trait method needs one implementation method of the same
-instantiated shape. Its predicates must be among those that are provided, as
+/-- Each trait method needs one implementation method with the same
+instantiated parameters and one result tuple: upstream's `SC0221` compares one
+result type, so `returns (a, b)` and `returns ((a, b))` are the same tuple
+(`Ty.productMany`), and `attachTraitMethods` records the trait method's
+instantiated results. Its predicates must be among those that are provided, as
 upstream checks with `SC0249`: a caller proves the trait method's predicates,
 instantiated at the head, and the implementation adds its own, which contain
 the trait's instantiated where predicates. The rule is membership, so an
@@ -2203,7 +2207,8 @@ private def validateRequiredImplMethods
         traitMethod.parameterTypes.map substitution.apply
       let expectedReturns := traitMethod.returnTypes.map substitution.apply
       if expectedParameters = implMethod.parameterTypes &&
-          expectedReturns = implMethod.returnTypes then
+          TypeSystem.Ty.productMany expectedReturns =
+            TypeSystem.Ty.productMany implMethod.returnTypes then
         if traitMethod.parameterComptime = implMethod.parameterComptime &&
             traitMethod.returnComptime = implMethod.returnComptime then
           validateContained
@@ -2251,8 +2256,9 @@ private theorem validateRequiredImplMethods_success_matches
               traitMethod.parameterTypes.map substitution.apply =
                 implMethod.parameterTypes
           · by_cases returnTypesEq :
-                traitMethod.returnTypes.map substitution.apply =
-                  implMethod.returnTypes
+                TypeSystem.Ty.productMany
+                    (traitMethod.returnTypes.map substitution.apply) =
+                  TypeSystem.Ty.productMany implMethod.returnTypes
             · by_cases parameterComptimeEq :
                   traitMethod.parameterComptime = implMethod.parameterComptime
               · by_cases returnComptimeEq :
@@ -2300,7 +2306,11 @@ private theorem validateRequiredImplMethods_success_matches
             · simp [parameterTypesEq, returnTypesEq] at success
           · simp [parameterTypesEq] at success
 
+/-- Attach each source method to the trait method of its name. Its results are
+recorded in that trait method's instantiated shape, which validation compared
+with the declared results as one tuple. -/
 private def attachTraitMethods
+    (substitution : TypeSystem.ParameterSubstitution)
     (traitMethods : List ProgramTraitMethodSignature) :
     List UnmatchedProgramImplMethod →
       Except ProgramSignatureError (List ProgramImplMethodSignature)
@@ -2309,21 +2319,23 @@ private def attachTraitMethods
       let some traitMethod := traitMethods.find? fun method =>
           method.name == implMethod.name
         | throw (.extraImplMethod implMethod.id implMethod.name)
-      let methods ← attachTraitMethods traitMethods rest
+      let methods ← attachTraitMethods substitution traitMethods rest
       pure ({
         id := implMethod.id
         traitMethod := traitMethod.id
         name := implMethod.name
         parameters := implMethod.parameters
-        returnTypes := implMethod.returnTypes
+        returnTypes := traitMethod.returnTypes.map substitution.apply
         returnComptime := implMethod.returnComptime
         wherePredicates := implMethod.wherePredicates
         source := implMethod.source
       } :: methods)
 
 /-- One output method is the field-for-field attachment of a retained source
-method to the trait method selected by its name. -/
+method to the trait method selected by its name, with that trait method's
+instantiated results. -/
 private def AttachedImplMethod
+    (substitution : TypeSystem.ParameterSubstitution)
     (traitMethods : List ProgramTraitMethodSignature)
     (unmatched : UnmatchedProgramImplMethod)
     (method : ProgramImplMethodSignature) : Prop :=
@@ -2333,7 +2345,7 @@ private def AttachedImplMethod
     method.traitMethod = traitMethod.id ∧
     method.name = unmatched.name ∧
     method.parameters = unmatched.parameters ∧
-    method.returnTypes = unmatched.returnTypes ∧
+    method.returnTypes = traitMethod.returnTypes.map substitution.apply ∧
     method.returnComptime = unmatched.returnComptime ∧
     method.wherePredicates = unmatched.wherePredicates ∧
     method.source = unmatched.source
@@ -2341,16 +2353,18 @@ private def AttachedImplMethod
 /-- Successful attachment is a bidirectional correspondence between input and
 output method rows; no source method is dropped or duplicated. -/
 private theorem attachTraitMethods_success_correspondence
+    {substitution : TypeSystem.ParameterSubstitution}
     {traitMethods : List ProgramTraitMethodSignature}
     {unmatchedMethods : List UnmatchedProgramImplMethod}
     {methods : List ProgramImplMethodSignature}
-    (success : attachTraitMethods traitMethods unmatchedMethods = .ok methods) :
+    (success : attachTraitMethods substitution traitMethods unmatchedMethods =
+      .ok methods) :
     (∀ method, method ∈ methods →
       ∃ unmatched, unmatched ∈ unmatchedMethods ∧
-        AttachedImplMethod traitMethods unmatched method) ∧
+        AttachedImplMethod substitution traitMethods unmatched method) ∧
     (∀ unmatched, unmatched ∈ unmatchedMethods →
       ∃ method, method ∈ methods ∧
-        AttachedImplMethod traitMethods unmatched method) := by
+        AttachedImplMethod substitution traitMethods unmatched method) := by
   induction unmatchedMethods generalizing methods with
   | nil =>
       change Except.ok [] = Except.ok methods at success
@@ -2364,7 +2378,7 @@ private theorem attachTraitMethods_success_correspondence
       | none => simp [traitMethodEq] at success
       | some traitMethod =>
           simp only [traitMethodEq] at success
-          cases restEq : attachTraitMethods traitMethods rest with
+          cases restEq : attachTraitMethods substitution traitMethods rest with
           | error error => simp [restEq, bind, Except.bind] at success
           | ok restMethods =>
               simp only [restEq, bind, Except.bind, pure, Pure.pure, Except.pure,
@@ -2394,7 +2408,7 @@ private theorem attachTraitMethods_success_correspondence
                     traitMethod := traitMethod.id
                     name := unmatched.name
                     parameters := unmatched.parameters
-                    returnTypes := unmatched.returnTypes
+                    returnTypes := traitMethod.returnTypes.map substitution.apply
                     returnComptime := unmatched.returnComptime
                     wherePredicates := unmatched.wherePredicates
                     source := unmatched.source
@@ -2412,7 +2426,9 @@ private theorem attachTraitMethods_success_structure
     {unmatchedMethods : List UnmatchedProgramImplMethod}
     {methods : List ProgramImplMethodSignature}
     {owner : Resolved.DeclarationId} {index : Nat}
-    (success : attachTraitMethods traitMethods unmatchedMethods = .ok methods)
+    {substitution : TypeSystem.ParameterSubstitution}
+    (success : attachTraitMethods substitution traitMethods unmatchedMethods =
+      .ok methods)
     (unmatched : UnmatchedImplMethodsStructural owner index [] unmatchedMethods) :
     ImplMethodsStructural owner index methods ∧
       methods.map (fun method => method.name) =
@@ -2430,7 +2446,7 @@ private theorem attachTraitMethods_success_structure
       | none => simp [traitMethodEq] at success
       | some traitMethod =>
           simp only [traitMethodEq] at success
-          cases restEq : attachTraitMethods traitMethods rest with
+          cases restEq : attachTraitMethods substitution traitMethods rest with
           | error error => simp [restEq, bind, Except.bind] at success
           | ok restMethods =>
               simp only [restEq, bind, Except.bind, pure, Pure.pure, Except.pure,
@@ -2533,7 +2549,8 @@ private theorem validatedAndAttachedImplMethods_matchTrait
       unmatchedMethods)
     (validated : validateRequiredImplMethods implementation substitution
       implementationPredicates trait.methods unmatchedMethods = .ok ())
-    (attached : attachTraitMethods trait.methods unmatchedMethods = .ok methods) :
+    (attached : attachTraitMethods substitution trait.methods unmatchedMethods =
+      .ok methods) :
     ImplMethodCatalogMatchesTrait substitution implementationPredicates trait
       methods := by
   have required := validateRequiredImplMethods_success_matches validated
@@ -2561,7 +2578,7 @@ private theorem validatedAndAttachedImplMethods_matchTrait
             UnmatchedProgramImplMethod.parameterTypes, methodParameters]
         _ = traitMethod.parameterTypes.map substitution.apply :=
           methodMatch.parameter_types
-    · exact methodReturns.trans methodMatch.return_types
+    · exact methodReturns
     · calc
         method.parameterComptime = unmatched.parameterComptime := by
           simp [ProgramImplMethodSignature.parameterComptime,
@@ -2648,7 +2665,8 @@ private def implementationSignatureOfDeclaration
     declaration scope source.value.methods 0 []
   validateRequiredImplMethods declaration.id substitution conditions
     traitSignature.methods unmatchedMethods
-  let methods ← attachTraitMethods traitSignature.methods unmatchedMethods
+  let methods ← attachTraitMethods substitution traitSignature.methods
+    unmatchedMethods
   pure {
     id := declaration.id
     isDefault := source.value.defaultMarker.isSome
@@ -3561,7 +3579,8 @@ private theorem implementationSignatureOfDeclaration_success_header
                 apply Except.SuccessSatisfies.bind
                 intro methodsChecked
                 apply Except.SuccessSatisfies.bind_property
-                  (attachTraitMethods traitSignature.methods unmatchedMethods) _
+                  (attachTraitMethods substitution traitSignature.methods
+                    unmatchedMethods) _
                   (Except.SuccessSatisfies.of_success _ (fun result resultEq =>
                     (attachTraitMethods_success_structure resultEq
                       unmatchedStructure).1))
@@ -3675,7 +3694,8 @@ private theorem implementationSignatureOfDeclaration_success_method_catalog
                 intro methodsChecked validationSuccess
                 cases methodsChecked
                 apply Except.SuccessSatisfies.bind_property
-                  (attachTraitMethods traitSignature.methods unmatchedMethods) _
+                  (attachTraitMethods substitution traitSignature.methods
+                    unmatchedMethods) _
                   (Except.SuccessSatisfies.of_success _ (fun methods attached =>
                     validatedAndAttachedImplMethods_matchTrait traitStructure
                       unmatchedStructure validationSuccess attached))

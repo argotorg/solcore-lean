@@ -4391,6 +4391,69 @@ private def testMethodFailures : IO Unit := do
     | .traitMethodLocalGenerics { methodIndex := 0, .. } => true
     | _ => false
 
+/-- The one method of the one implementation that a source's signatures collect. -/
+private def collectedImplMethod (label content : String) :
+    IO ProgramImplMethodSignature := do
+  let source ← parsed "results.solc" ("pragma solcore;\n" ++ content)
+  let environment ← catalog [source]
+  match buildProgramSignatures environment with
+  | .ok signatures =>
+      match signatures.implementations with
+      | [implementation] =>
+          match implementation.methods with
+          | [method] => pure method
+          | methods => throw (IO.userError s!"{label}: {methods.length} methods")
+      | implementations =>
+          throw (IO.userError s!"{label}: {implementations.length} implementations")
+  | .error errors => throw (IO.userError s!"{label} was refused: {reprStr errors}")
+
+/-- Upstream's `SC0221` compares one result type, so `returns (a, b)` and `returns ((a, b))`
+are one tuple: an implementation method's results may be written either way against its trait
+method's, and the method records its trait method's instantiated results; results whose tuple
+differs are refused as before. -/
+private def testImplMethodResultTuples : IO Unit := do
+  let neg := "trait Neg<T> { function neg(x: T) returns (T); }"
+  let recorded (label content : String) (accept : List TypeSystem.Ty → Bool) : IO Unit := do
+    let method ← collectedImplMethod label content
+    assertTrue (accept method.returnTypes) s!"{label} recorded {reprStr method.returnTypes}"
+  recorded "two results for a pair" (String.intercalate "\n" [neg,
+    "impl Neg<(Word, Bool)> { function neg(p: (Word, Bool)) returns (Word, Bool) { return p; } }"])
+    (· == [.product .word .bool])
+  recorded "a generic pair" (String.intercalate "\n" [neg,
+    "impl<A, B> Neg<(A, B)> { function neg(p: (A, B)) returns (A, B) { return p; } }"])
+    fun | [.product _ _] => true | _ => false
+  recorded "one tuple for two results" (String.intercalate "\n" [
+    "trait Split<T> { function split(x: T) returns (Word, Word); }",
+    "impl Split<Word> { function split(x: Word) returns ((Word, Word)) { return (x, x); } }"])
+    (· == [.word, .word])
+  recorded "three results for a nested pair" (String.intercalate "\n" [neg,
+    "impl Neg<(Word, (Bool, Word))> {",
+    "  function neg(p: (Word, (Bool, Word))) returns (Word, Bool, Word) { return p; }",
+    "}"])
+    (· == [.product .word (.product .bool .word)])
+  recorded "a nested pair for three elements" (String.intercalate "\n" [neg,
+    "impl Neg<(Word, Bool, Word)> {",
+    "  function neg(p: (Word, Bool, Word)) returns (Word, (Bool, Word)) { return p; }",
+    "}"])
+    (· == [.product .word (.product .bool .word)])
+  recorded "one tuple as before" (String.intercalate "\n" [neg,
+    "impl Neg<(Word, Bool)> { function neg(p: (Word, Bool)) returns ((Word, Bool)) { return p; } }"])
+    (· == [.product .word .bool])
+  expectSingleError (String.intercalate "\n" ["pragma solcore;", neg,
+    "impl Neg<(Word, Bool)> {",
+    "  function neg(p: (Word, Bool)) returns (Word, Bool, Word) { return (1, true, 2); }",
+    "}"]) fun error => match error with
+    | .implMethodSignatureMismatch { methodIndex := 0, .. } { methodIndex := 0, .. } _ _
+        [.product .word .bool] [.word, .bool, .word] => true
+    | _ => false
+  expectSingleError (String.intercalate "\n" ["pragma solcore;", neg,
+    "impl Neg<(Word, Bool)> {",
+    "  function neg(p: (Word, Bool)) returns (Bool, Word) { return (true, 1); }",
+    "}"]) fun error => match error with
+    | .implMethodSignatureMismatch { methodIndex := 0, .. } { methodIndex := 0, .. } _ _
+        [.product .word .bool] [.bool, .word] => true
+    | _ => false
+
 private def implMethodPredicateWorkspace (content : String) :
     Workspace.RawWorkspace := {
   entry := "main.solc"
@@ -4820,6 +4883,7 @@ def testProgramSignatures : IO Unit := do
   ProgramSignatures.testFailures
   ProgramSignatures.testTraitPredicateContainmentAllowsReorderingAndExtras
   ProgramSignatures.testMethodFailures
+  ProgramSignatures.testImplMethodResultTuples
   ProgramSignatures.testImplMethodPredicateRule
   ProgramSignatures.testOverlappingDefaultRule
   ProgramSignatures.testOrphanImplementationRule
