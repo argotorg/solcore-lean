@@ -12,11 +12,40 @@ own lowering of the index and the right side is the heads' children, checker typ
 the root's writability at the array of the target's type and the index's and the right side's nodes, and the
 diagnostic words come from the body's own fault tables. The fault inventory's concrete gate
 (`CompatiblePlaceMissingPreparationCoverage.concrete`) holds at the write, from the element write's receipt
-at the initial context, whose catalog's sources are closed. Main declarations:
+at the initial context, whose catalog's sources are closed. The heads are at a Source of which the compiler's
+is a metadata view, which declares the same binders (`LambdaMetadataViews.MetadataView.declaredBinders`) and
+so keeps each root binder (`MetadataView.rootBinder`). Main declarations:
 `CellAwareInvocationAcceptedElementWrites.element_head` and `element_bitNot_head`.
 -/
 
 set_option autoImplicit false
+
+namespace Solcore.SourceSemantics.CoreLowering.LambdaMetadataViews
+open Frontend SourceInference DataPatternValues
+
+private theorem nodes_flatMap {α : Type} {a b : List Node} (related : ListRel NodeView a b) (f : Node → List α)
+    (same : ∀ {before after}, NodeView before after → f before = f after) : a.flatMap f = b.flatMap f := by
+  induction related with
+  | nil => rfl
+  | cons head _ ih => simp only [List.flatMap_cons, same head, ih]
+
+/-- A metadata view declares the same binders: it keeps the inputs, each statement node and each expression
+node's form. -/
+theorem MetadataView.declaredBinders {original view : TypedSource} (related : MetadataView original view) :
+    SourceCoreDataPlaces.declaredBinders original = SourceCoreDataPlaces.declaredBinders view := by
+  unfold SourceCoreDataPlaces.declaredBinders
+  rw [related.inputs, nodes_flatMap related.nodes _ (fun kept => by cases kept with
+    | expression _ form => simp only [form]
+    | statement => rfl)]
+
+/-- A metadata view keeps the root binder of every local: it keeps the owner and the declared binders. -/
+theorem MetadataView.rootBinder {original view : TypedSource} (related : MetadataView original view) :
+    SourceCoreDataPlaces.rootBinder original = SourceCoreDataPlaces.rootBinder view := by
+  funext root
+  unfold SourceCoreDataPlaces.rootBinder
+  rw [related.owner, related.declaredBinders]
+
+end Solcore.SourceSemantics.CoreLowering.LambdaMetadataViews
 
 namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedElementWrites
 open Core Frontend SourceInference
@@ -97,9 +126,10 @@ at the body's own place lowering (`Index.assignment_lowered`) gives the root's s
 leaf and the children, whose certificate is the compiler's own lowering; checker typing gives the root's
 writability, the index's and the right side's nodes, the right side's view and the profile. The head's code
 is the compiler's, its words are this body's, and the write meets the fault inventory's concrete gate, from
-that receipt in the compiled catalog's closed sources. -/
+that receipt in the compiled catalog's closed sources. The head is at a Source of which the compiler's is a
+metadata view, which declares the same binders. -/
 theorem element_head (index : ActualBodyInvocation.Index compiled bodyRelation) {target : TypedSource}
-    (sameSource : index.compilerSource = target) (unique : NodeOccurrencesUnique target)
+    (view : LambdaMetadataViews.MetadataView target index.compilerSource) (unique : NodeOccurrencesUnique target)
     {fuel : Nat} {scope : SourceCoreLocalCell.Scope} {site : SourceCoreElaboration.ErrorSite}
     {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
     {output : Ty} {next code : Expr}
@@ -112,11 +142,11 @@ theorem element_head (index : ActualBodyInvocation.Index compiled bodyRelation) 
       code = head.emit next output ∧ head.invalidProjection = index.invalidProjection site assignment.target.root ∧
         head.invalid = index.invalidOperand site assignment.target.root operator ∧
         CompatiblePlaceMissingPreparationCoverage.concrete target assignment = true := by
-  subst target
   obtain ⟨key, single⟩ : ∃ key, assignment.target.projections = [.element key] := ⟨_, receipt.single⟩
   have generated := CompatibleElementWrites.generated_of_place single (index.assignment_lowered receipt.accepted)
   have gate := CompatibleElementWrites.generated_concrete
     (CallableIndexedOwnedPublicCatalogClosedSources.compiled_closed compiled) generated
+  rw [← view.declaredBinders] at gate
   obtain ⟨writable, ⟨_, keyTyped⟩, rightTyped, profile⟩ := element_assignment_facts single typed
   obtain ⟨keyNode, keyFound⟩ := expression_found unique keyTyped
   obtain ⟨_, rhsTyped, _⟩ := id rightTyped
@@ -135,9 +165,10 @@ theorem element_head (index : ActualBodyInvocation.Index compiled bodyRelation) 
 the body's own absent-operand place lowering (`Index.bitNot_lowered`) gives the root's slot, the comparison,
 the leaf and the index's code, checker validity gives the root's writability and the index's node, and the
 receipt's Word or fixed-width target gives in-place `~`'s profile. The head's code is the compiler's, its
-words are this body's, and the write meets the fault inventory's concrete gate, as `element_head`'s does. -/
+words are this body's, and the write meets the fault inventory's concrete gate, as `element_head`'s does, at
+a Source of which the compiler's is a metadata view. -/
 theorem element_bitNot_head (index : ActualBodyInvocation.Index compiled bodyRelation) {target : TypedSource}
-    (sameSource : index.compilerSource = target) (unique : NodeOccurrencesUnique target)
+    (view : LambdaMetadataViews.MetadataView target index.compilerSource) (unique : NodeOccurrencesUnique target)
     {fuel : Nat} {scope : SourceCoreLocalCell.Scope} {site : SourceCoreElaboration.ErrorSite}
     {assignment : AssignmentResolution} {output : Ty} {next code : Expr}
     (receipt : AcceptedElementBitNotReceipt.Receipt index.policy fuel index.compilerSource scope site assignment
@@ -149,12 +180,12 @@ theorem element_bitNot_head (index : ActualBodyInvocation.Index compiled bodyRel
       code = head.emit next output ∧ head.invalidProjection = index.invalidProjection site assignment.target.root ∧
         head.invalid = index.invalidUnary site assignment.target.root ∧
         CompatiblePlaceMissingPreparationCoverage.concrete target assignment = true := by
-  subst target
   obtain ⟨key, single⟩ : ∃ key, assignment.target.projections = [.element key] := ⟨_, receipt.single⟩
   have generated := CompatibleElementWrites.generated_of_place single
     (index.bitNot_lowered receipt.callbackSelected receipt.accepted)
   have gate := CompatibleElementWrites.generated_concrete
     (CallableIndexedOwnedPublicCatalogClosedSources.compiled_closed compiled) generated
+  rw [← view.declaredBinders] at gate
   have profile := WideBitNotProfile.of_word_or_fixed receipt.sourceProfile
   obtain ⟨writable, _, keyTyped⟩ := element_bitNot_facts single typed
   obtain ⟨keyNode, keyFound⟩ := expression_found unique keyTyped

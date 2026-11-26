@@ -470,7 +470,10 @@ section
 /-! The accepted bare-assignment and bit-not receipts of an actual body supply
 the flow heads used by the mixed-cell write theorems. A right-hand side
 certificate is the compiler's own child lowering; checker typing supplies
-writability, and diagnostic words come from the body's own fault tables. -/
+writability, and diagnostic words come from the body's own fault tables. The
+`_view` heads are at a Source of which the compiler's is a metadata view: the
+view keeps the root binder, and with the Source's route of a projected write,
+the place's description, so the place lowering (`lower_view`). -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedAssignments
@@ -610,6 +613,199 @@ theorem projected_bitNot_head (index : ActualBodyInvocation.Index compiled bodyR
     (WideBitNotProfile.of_word_or_fixed receipt.sourceProfile)
     (fun id _ member generated _ => by
       obtain ⟨node, found, _⟩ := route.key_typed unique (sourceTyped _ receipt.description.binding) member
+      exact ⟨node, found, generated⟩) lowered native
+
+/-- A route traversal reads a Source only through its owner and the node types of its keys. -/
+theorem routeSteps_congr {checked : SourceCoreCompatibleDataPlaces.Checked} {signatures : ProgramSignatures}
+    {site : SourceCoreElaboration.ErrorSite} {root : Resolved.LocalId} {first second : TypedSource}
+    (owner : first.owner = second.owner) :
+    ∀ {projections : List PlaceProjection},
+      (∀ key ∈ DataPlaceKeyOrder.sourceKeys projections, (first.lookupExpression? key).map ExpressionNode.type =
+        (second.lookupExpression? key).map ExpressionNode.type) →
+      ∀ type, SourceCoreCompatibleDataPlaces.routeSteps checked signatures first site root type projections =
+        SourceCoreCompatibleDataPlaces.routeSteps checked signatures second site root type projections := by
+  intro projections
+  induction projections with
+  | nil => intro _ _; rfl
+  | cons projection rest ih =>
+    intro keys type
+    cases projection with
+    | member name index =>
+      simp only [SourceCoreCompatibleDataPlaces.routeSteps, ih (fun key member => keys key member)]
+    | element key => rfl
+    | index key =>
+      have tail := ih (fun other member => keys other (List.mem_cons_of_mem _ member))
+      have head := keys key (List.mem_cons_self ..)
+      cases left : first.lookupExpression? key <;> cases right : second.lookupExpression? key <;>
+        rw [left, right] at head
+      · simp only [SourceCoreCompatibleDataPlaces.routeSteps, owner, tail, left, right]
+      · cases head
+      · cases head
+      · have same : _ = _ := Option.some.inj head
+        simp only [SourceCoreCompatibleDataPlaces.routeSteps, owner, tail, left, right, pure_bind, same]
+
+/-- Two mapping routes from one root type read keys of the same node types. -/
+theorem route_keys {first second : TypedSource} {root leaf : TypeSystem.Ty} {projections : List PlaceProjection}
+    (left : AcceptedProjectedAssignmentRoute.Route first root projections leaf)
+    (right : AcceptedProjectedAssignmentRoute.Route second root projections leaf) :
+    ∀ key ∈ DataPlaceKeyOrder.sourceKeys projections, (first.lookupExpression? key).map ExpressionNode.type =
+      (second.lookupExpression? key).map ExpressionNode.type := by
+  induction left with
+  | nil => intro key member; cases member
+  | index found same tail ih =>
+    cases right with
+    | index found' same' tail' =>
+      intro key member
+      rcases List.mem_cons.mp member with rfl | member
+      · rw [found, found', Option.map_some, Option.map_some, same, same']
+      · exact ih tail' key member
+
+/-- A place's description is the same along a metadata view whose keys keep their node types. -/
+theorem describe_view {context : SourceCoreCompatibleDataPlaces.Context} {signatures : ProgramSignatures}
+    {site : SourceCoreElaboration.ErrorSite} {assignment : AssignmentResolution} {original view : TypedSource}
+    (related : LambdaMetadataViews.MetadataView original view)
+    (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections,
+      (original.lookupExpression? key).map ExpressionNode.type = (view.lookupExpression? key).map ExpressionNode.type) :
+    SourceCoreCompatibleDataPlaces.describe context signatures original site assignment =
+      SourceCoreCompatibleDataPlaces.describe context signatures view site assignment := by
+  have binders : SourceCoreCompatibleDataPlaces.rootBinder original = SourceCoreCompatibleDataPlaces.rootBinder view :=
+    related.rootBinder
+  simp only [SourceCoreCompatibleDataPlaces.describe, binders, routeSteps_congr related.owner keys]
+
+/-- A place lowering that takes no element reads its Source only through the place's description and the
+lowering of its children: with the view's description, and its children lowered at the view, it is the
+view's lowering. -/
+theorem lower_view {context : SourceCoreCompatibleDataPlaces.Context} {signatures : ProgramSignatures}
+    {expression : SourceCoreCompatibleDataPlaces.ExpressionLowerer} {fuel : Nat} {original view : TypedSource}
+    {scope : SourceCoreLocalCell.Scope} {site : SourceCoreElaboration.ErrorSite} {assignment : AssignmentResolution}
+    {operator : Syntax.ValueAssignOp} {rhs : Option ExpressionId} {output : Ty} {next : Expr}
+    {reasonAt : ExpressionId → Word} {invalidProjection invalidOperand : Word} {missing : TypeSystem.Ty → Word}
+    (plain : SourceCoreCompatibleDataPlaces.takesElement assignment.target.projections = false)
+    (described : SourceCoreCompatibleDataPlaces.describe context signatures original site assignment =
+      SourceCoreCompatibleDataPlaces.describe context signatures view site assignment) :
+    SourceCoreCompatibleDataPlaces.lower context signatures (fun fuel _ => expression fuel view) fuel original scope
+        site assignment operator rhs output next reasonAt invalidProjection invalidOperand missing =
+      SourceCoreCompatibleDataPlaces.lower context signatures expression fuel view scope site assignment operator rhs
+        output next reasonAt invalidProjection invalidOperand missing := by
+  simp only [SourceCoreCompatibleDataPlaces.lower_of_plain plain, SourceCoreCompatibleDataPlaces.lowerRoute, described]
+
+/-- `bare_head` at a Source of which the compiler's is a metadata view: the view keeps the root binder, and
+the right side's node and type are the Source's. -/
+theorem bare_head_view (index : ActualBodyInvocation.Index compiled bodyRelation) {target : TypedSource}
+    (view : LambdaMetadataViews.MetadataView target index.compilerSource) (unique : NodeOccurrencesUnique target)
+    {fuel : Nat} {scope : SourceCoreLocalCell.Scope} {site : SourceCoreElaboration.ErrorSite}
+    {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
+    {output : Ty} {next code : Expr}
+    (receipt : AcceptedBareAssignmentReceipt.Receipt index.policy fuel index.compilerSource scope site assignment
+      operator rhs output next index.reasonAt code)
+    (targetType : receipt.binder.scheme.body = assignment.target.type)
+    {context : SourceSemantics.Context} (typed : SourceAssignmentHasType target context assignment operator rhs)
+    (administrative : Core.Context) :
+    ∃ head : GenericAssignmentStatements.Head (.initial compiled.compatible.checked) target context
+        (children index fuel) scope administrative compiled.indexed.layouts.definitions assignment operator rhs,
+      code = head.emit next output ∧ head.invalid = index.invalidOperand site assignment.target.root operator := by
+  have plain : SourceCoreCompatibleDataPlaces.takesElement assignment.target.projections = false := by
+    rw [receipt.bare]; rfl
+  have lowered := (lower_view plain (describe_view view
+    (fun _ member => by rw [receipt.bare] at member; cases member))).trans (index.assignment_lowered receipt.accepted)
+  obtain ⟨_, writable, rightTyped, profile⟩ := ScopedSourceForItemsAdmission.assignment_facts
+    ((congrFun view.rootBinder _).trans receipt.declaration) targetType receipt.bare receipt.sourceProfile typed
+  obtain ⟨_, rhsTyped, _⟩ := id rightTyped
+  obtain ⟨node, found, _, _⟩ := CellAwareInvocationAcceptedSourceFacts.expression_node unique rhsTyped
+  exact GenericAssignmentStatements.Head.of_lower_bare_with_token
+    (expression := fun fuel _ => index.policy.lowerExpression fuel index.compilerSource) receipt.bare unique writable
+    rightTyped profile (fun _ generated => ⟨node, found, generated⟩) lowered
+
+/-- `bitNot_head` at a Source of which the compiler's is a metadata view, which keeps the root binder. -/
+theorem bitNot_head_view (index : ActualBodyInvocation.Index compiled bodyRelation) {target : TypedSource}
+    (view : LambdaMetadataViews.MetadataView target index.compilerSource)
+    {fuel : Nat} {scope : SourceCoreLocalCell.Scope} {site : SourceCoreElaboration.ErrorSite}
+    {assignment : AssignmentResolution} {output : Ty} {next code : Expr}
+    (receipt : AcceptedBareBitNotReceipt.Receipt index.policy fuel index.compilerSource scope site assignment
+      output next index.reasonAt code)
+    (targetType : receipt.binder.scheme.body = assignment.target.type)
+    {context : SourceSemantics.Context} (typed : SourceBitNotAssignmentValid target context assignment) :
+    ∃ head : CompatibleBitNotStatements.Head context scope assignment,
+      code = head.emit next output ∧ head.invalid = index.invalidUnary site assignment.target.root := by
+  have lowered := index.bitNot_lowered receipt.selected receipt.accepted
+  obtain ⟨writable, profile⟩ := bitNot_facts ((congrFun view.rootBinder _).trans receipt.declaration) targetType
+    receipt.bare receipt.sourceProfile typed
+  rw [view.rootBinder] at writable
+  exact CompatibleBitNotStatements.Head.of_lower_with_token writable receipt.bare profile lowered
+
+/-- `projected_head` at a Source of which the compiler's is a metadata view. The view keeps the root binder;
+the keys' types, which it does not keep, come from the Source's own route of the root binder (`routed`),
+which with the compiler's (`route`) keeps the place's description. -/
+theorem projected_head_view (index : ActualBodyInvocation.Index compiled bodyRelation) {target : TypedSource}
+    (view : LambdaMetadataViews.MetadataView target index.compilerSource) (unique : NodeOccurrencesUnique target)
+    {fuel : Nat} {scope : SourceCoreLocalCell.Scope} {site : SourceCoreElaboration.ErrorSite}
+    {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
+    {output : Ty} {next code : Expr}
+    (receipt : AcceptedProjectedAssignmentReceipt.Receipt index.policy fuel index.compilerSource scope site
+      assignment operator rhs output next index.reasonAt code)
+    (route : AcceptedProjectedAssignmentRoute.Route index.compilerSource receipt.binder.scheme.body
+      assignment.target.projections assignment.target.type)
+    (routed : AcceptedProjectedAssignmentRoute.Route target receipt.binder.scheme.body
+      assignment.target.projections assignment.target.type)
+    {context : SourceSemantics.Context} (signatures : context.signatures = compiled.compatible.checked.signatures)
+    (typed : SourceAssignmentHasType target context assignment operator rhs)
+    (administrative : Core.Context) {result : Ty}
+    (native : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code result
+      compiled.indexed.layouts.definitions) :
+    ∃ head : GenericAssignmentStatements.Head (.initial compiled.compatible.checked) target context
+        (children index fuel) scope administrative compiled.indexed.layouts.definitions assignment operator rhs,
+      code = head.emit next output ∧ head.invalid = index.invalidOperand site assignment.target.root operator ∧
+      head.PreparedAt site fuel (index.invalidProjection site assignment.target.root)
+        (index.missingDefault site assignment.target.root) := by
+  have lowered := (lower_view (SourceCoreCompatibleDataPlaces.takesElement_of_free route.elementFree)
+    (describe_view view (route_keys routed route))).trans (index.assignment_lowered receipt.accepted)
+  have declaration := (congrFun view.rootBinder _).trans receipt.description.binding
+  obtain ⟨sourceTyped, writable, rightTyped, profile⟩ :=
+    ScopedSourceForItemsAdmission.projected_assignment_facts unique declaration routed receipt.sourceProfile typed
+  exact CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences
+    (expression := fun fuel _ => index.policy.lowerExpression fuel index.compilerSource) unique signatures
+    sourceTyped writable routed.elementFree rightTyped profile
+    (fun id _ member generated _ => by
+      rcases List.mem_cons.mp member with same | member
+      · subst id
+        obtain ⟨_, rhsTyped, _⟩ := id rightTyped
+        obtain ⟨node, found, _, _⟩ := CellAwareInvocationAcceptedSourceFacts.expression_node unique rhsTyped
+        exact ⟨node, found, generated⟩
+      · obtain ⟨node, found, _⟩ := routed.key_typed unique (sourceTyped _ declaration) member
+        exact ⟨node, found, generated⟩) lowered native
+
+/-- `projected_bitNot_head` at a Source of which the compiler's is a metadata view, with the Source's own
+route of the root binder, as `projected_head_view` has it. -/
+theorem projected_bitNot_head_view (index : ActualBodyInvocation.Index compiled bodyRelation) {target : TypedSource}
+    (view : LambdaMetadataViews.MetadataView target index.compilerSource) (unique : NodeOccurrencesUnique target)
+    {fuel : Nat} {scope : SourceCoreLocalCell.Scope} {site : SourceCoreElaboration.ErrorSite}
+    {assignment : AssignmentResolution} {output : Ty} {next code : Expr}
+    (receipt : AcceptedProjectedBitNotReceipt.Receipt index.policy fuel index.compilerSource scope site
+      assignment output next index.reasonAt code)
+    (route : AcceptedProjectedAssignmentRoute.Route index.compilerSource receipt.binder.scheme.body
+      assignment.target.projections assignment.target.type)
+    (routed : AcceptedProjectedAssignmentRoute.Route target receipt.binder.scheme.body
+      assignment.target.projections assignment.target.type)
+    {context : SourceSemantics.Context} (signatures : context.signatures = compiled.compatible.checked.signatures)
+    (typed : SourceBitNotAssignmentValid target context assignment)
+    (administrative : Core.Context) {result : Ty}
+    (native : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code result
+      compiled.indexed.layouts.definitions) :
+    ∃ head : CompatibleProjectedBitNotStatements.Head (.initial compiled.compatible.checked) target context
+        (children index fuel) scope administrative compiled.indexed.layouts.definitions assignment,
+      code = head.emit next output ∧ head.invalid = index.invalidUnary site assignment.target.root ∧
+      head.PreparedAt site fuel (index.invalidProjection site assignment.target.root)
+        (index.missingDefault site assignment.target.root) := by
+  have lowered := (lower_view (SourceCoreCompatibleDataPlaces.takesElement_of_free route.elementFree)
+    (describe_view view (route_keys routed route))).trans
+    (index.bitNot_lowered receipt.callbackSelected receipt.accepted)
+  have declaration := (congrFun view.rootBinder _).trans receipt.description.binding
+  obtain ⟨sourceTyped, writable⟩ := ScopedSourceForItemsAdmission.projected_bitNot_facts unique declaration routed typed
+  exact CallableIndexedOwnedPreparedNativeProjectedBitNotHeadCollectors.Head.of_lower_with_raw_occurrences
+    (expression := fun fuel _ => index.policy.lowerExpression fuel index.compilerSource) unique signatures
+    sourceTyped writable receipt.projected routed.elementFree (WideBitNotProfile.of_word_or_fixed receipt.sourceProfile)
+    (fun id _ member generated _ => by
+      obtain ⟨node, found, _⟩ := routed.key_typed unique (sourceTyped _ declaration) member
       exact ⟨node, found, generated⟩) lowered native
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedAssignments
@@ -1540,10 +1736,12 @@ fallthrough is admitted only at a Unit result, and a final bare value only at
 the declared result type of its original node. A nonfinal bare value in
 function mode has no Source rule and is outside this closure. Bare,
 projected and element assignments and bit-not updates are closed when the
-compiler view is the original Source, as for named rows. A match receipt is closed under the
-same view when its compilation context is `admitted`, and a generalized
-declaration when its inputs are `generalized` and its initializer is a direct
-lambda. -/
+compiler's source is a metadata view of the original Source, as a closure's
+body is compiled; a projected one also asks the original Source's route of
+its root binder, which has the keys' types a view does not keep. A match
+receipt is closed when the compiler view is the original Source, as for named
+rows, at an `admitted` compilation context, and a generalized declaration
+when its inputs are `generalized` and its initializer is a direct lambda. -/
 def Covered (semantic : TypedSource) (expected : TypeSystem.Ty)
     (admitted : SourceCoreCompatibleDataMatches.Context → Prop) (generalized : Prop)
     {mode : Bool} {escaped : Word} {fuel scope statements code}
@@ -1558,15 +1756,19 @@ def Covered (semantic : TypedSource) (expected : TypeSystem.Ty)
         Covered semantic expected admitted generalized remaining
   | .absent _ _ _ _ remaining _ => Covered semantic expected admitted generalized remaining
   | .assigned _ _ _ remaining _ _ =>
-      source = semantic ∧ Covered semantic expected admitted generalized remaining
+      LambdaMetadataViews.MetadataView semantic source ∧ Covered semantic expected admitted generalized remaining
   | .bitNotted _ _ _ remaining _ _ =>
-      source = semantic ∧ Covered semantic expected admitted generalized remaining
-  | .projectedAssigned _ _ _ remaining _ _ =>
-      source = semantic ∧ Covered semantic expected admitted generalized remaining
-  | .projectedBitNotted _ _ _ remaining _ _ =>
-      source = semantic ∧ Covered semantic expected admitted generalized remaining
+      LambdaMetadataViews.MetadataView semantic source ∧ Covered semantic expected admitted generalized remaining
+  | @Tree.projectedAssigned _ _ _ _ _ _ _ _ _ _ _ _ assignment _ _ _ _ _ _ _ remaining receipt _ =>
+      LambdaMetadataViews.MetadataView semantic source ∧
+        AcceptedProjectedAssignmentRoute.Route semantic receipt.binder.scheme.body assignment.target.projections
+          assignment.target.type ∧ Covered semantic expected admitted generalized remaining
+  | @Tree.projectedBitNotted _ _ _ _ _ _ _ _ _ _ _ _ assignment _ _ _ _ _ remaining receipt _ =>
+      LambdaMetadataViews.MetadataView semantic source ∧
+        AcceptedProjectedAssignmentRoute.Route semantic receipt.binder.scheme.body assignment.target.projections
+          assignment.target.type ∧ Covered semantic expected admitted generalized remaining
   | .elementAssigned _ _ _ remaining _ | .elementBitNotted _ _ _ remaining _ =>
-      source = semantic ∧ Covered semantic expected admitted generalized remaining
+      LambdaMetadataViews.MetadataView semantic source ∧ Covered semantic expected admitted generalized remaining
   | .discard _ _ _ _ _ tail => Covered semantic expected admitted generalized tail
   | .valueDiscard _ _ _ _ _ _ tail => mode = false ∧ Covered semantic expected admitted generalized tail
   | .block _ _ inner tail =>
@@ -1916,14 +2118,15 @@ theorem correct [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
   | @assigned mode escaped fuel scope id rest node stored assignment operator expression tail code
       read form statementType remaining receipt targetType tailIH =>
     intro covered reached control context final facts result signatures typed native
-    obtain ⟨sameSource, tailCovered⟩ := covered
+    obtain ⟨view, tailCovered⟩ := covered
+    rw [← sourceEq] at view
     have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)).reached read
     obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
     rw [form] at formTyped
     cases formTyped with
     | assignValue assignmentTyped =>
-    obtain ⟨head, emitted, invalid⟩ := CellAwareInvocationAcceptedAssignments.bare_head index
-      (sameSource.trans sourceEq.symm) unique receipt targetType (sourceEq ▸ assignmentTyped) administrative
+    obtain ⟨head, emitted, invalid⟩ := CellAwareInvocationAcceptedAssignments.bare_head_view index
+      view unique receipt targetType (sourceEq ▸ assignmentTyped) administrative
     obtain ⟨_, native⟩ := native
     have tailNative := TypedImperative.Native.execute_continuation (emitted ▸ native)
     have tailBounds := tailIH tailCovered (fun other member => reached other (List.mem_cons_of_mem _ member))
@@ -1948,15 +2151,16 @@ theorem correct [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
   | @projectedAssigned mode escaped fuel scope id rest node stored assignment operator expression tail code
       read form statementType remaining receipt route tailIH =>
     intro covered reached control context final facts result signatures typed native
-    obtain ⟨sameSource, tailCovered⟩ := covered
+    obtain ⟨view, routed, tailCovered⟩ := covered
+    rw [← sourceEq] at view routed
     have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)).reached read
     obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
     rw [form] at formTyped
     cases formTyped with
     | assignValue assignmentTyped =>
     obtain ⟨_, native⟩ := native
-    obtain ⟨head, emitted, invalid, preparedAt⟩ := CellAwareInvocationAcceptedAssignments.projected_head index
-      (sameSource.trans sourceEq.symm) unique receipt route signatures (sourceEq ▸ assignmentTyped) administrative native
+    obtain ⟨head, emitted, invalid, preparedAt⟩ := CellAwareInvocationAcceptedAssignments.projected_head_view index
+      view unique receipt route routed signatures (sourceEq ▸ assignmentTyped) administrative native
     have tailNative := TypedImperative.Native.execute_continuation (emitted ▸ native)
     have tailBounds := tailIH tailCovered (fun other member => reached other (List.mem_cons_of_mem _ member))
       result signatures restTyped ⟨_, tailNative⟩
@@ -1982,14 +2186,15 @@ theorem correct [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
   | @bitNotted mode escaped fuel scope id rest node stored assignment tail code
       read form statementType remaining receipt targetType tailIH =>
     intro covered reached control context final facts result signatures typed native
-    obtain ⟨sameSource, tailCovered⟩ := covered
+    obtain ⟨view, tailCovered⟩ := covered
+    rw [← sourceEq] at view
     have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)).reached read
     obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
     rw [form] at formTyped
     cases formTyped with
     | assignBitNot assignmentTyped =>
-    obtain ⟨head, emitted, invalid⟩ := CellAwareInvocationAcceptedAssignments.bitNot_head index
-      (sameSource.trans sourceEq.symm) receipt targetType (sourceEq ▸ assignmentTyped)
+    obtain ⟨head, emitted, invalid⟩ := CellAwareInvocationAcceptedAssignments.bitNot_head_view index
+      view receipt targetType (sourceEq ▸ assignmentTyped)
     obtain ⟨_, native⟩ := native
     have tailNative := TypedImperative.Native.execute_continuation (emitted ▸ native)
     have tailBounds := tailIH tailCovered (fun other member => reached other (List.mem_cons_of_mem _ member))
@@ -2010,15 +2215,16 @@ theorem correct [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
   | @projectedBitNotted mode escaped fuel scope id rest node stored assignment tail code
       read form statementType remaining receipt route tailIH =>
     intro covered reached control context final facts result signatures typed native
-    obtain ⟨sameSource, tailCovered⟩ := covered
+    obtain ⟨view, routed, tailCovered⟩ := covered
+    rw [← sourceEq] at view routed
     have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)).reached read
     obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
     rw [form] at formTyped
     cases formTyped with
     | assignBitNot assignmentTyped =>
     obtain ⟨_, native⟩ := native
-    obtain ⟨head, emitted, invalid, preparedAt⟩ := CellAwareInvocationAcceptedAssignments.projected_bitNot_head index
-      (sameSource.trans sourceEq.symm) unique receipt route signatures (sourceEq ▸ assignmentTyped) administrative native
+    obtain ⟨head, emitted, invalid, preparedAt⟩ := CellAwareInvocationAcceptedAssignments.projected_bitNot_head_view
+      index view unique receipt route routed signatures (sourceEq ▸ assignmentTyped) administrative native
     have tailNative := TypedImperative.Native.execute_continuation (emitted ▸ native)
     have tailBounds := tailIH tailCovered (fun other member => reached other (List.mem_cons_of_mem _ member))
       result signatures restTyped ⟨_, tailNative⟩
@@ -2047,14 +2253,15 @@ theorem correct [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
   | @elementAssigned mode escaped fuel scope id rest node stored assignment operator expression tail code
       read form statementType remaining receipt tailIH =>
     intro covered reached control context final facts result signatures typed native
-    obtain ⟨sameSource, tailCovered⟩ := covered
+    obtain ⟨view, tailCovered⟩ := covered
+    rw [← sourceEq] at view
     have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)).reached read
     obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
     rw [form] at formTyped
     cases formTyped with
     | assignValue assignmentTyped =>
     obtain ⟨head, emitted, invalidProjection, _, concrete⟩ := CellAwareInvocationAcceptedElementWrites.element_head
-      index (sameSource.trans sourceEq.symm) unique receipt (sourceEq ▸ assignmentTyped)
+      index view unique receipt (sourceEq ▸ assignmentTyped)
     obtain ⟨_, native⟩ := native
     have tailNative := CompatibleElementWrites.code_continuation (emitted ▸ native)
     have tailBounds := tailIH tailCovered (fun other member => reached other (List.mem_cons_of_mem _ member))
@@ -2082,15 +2289,16 @@ theorem correct [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
   | @elementBitNotted mode escaped fuel scope id rest node stored assignment tail code
       read form statementType remaining receipt tailIH =>
     intro covered reached control context final facts result signatures typed native
-    obtain ⟨sameSource, tailCovered⟩ := covered
+    obtain ⟨view, tailCovered⟩ := covered
+    rw [← sourceEq] at view
     have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)).reached read
     obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
     rw [form] at formTyped
     cases formTyped with
     | assignBitNot assignmentTyped =>
     obtain ⟨head, emitted, invalidProjection, _, concrete⟩ :=
-      CellAwareInvocationAcceptedElementWrites.element_bitNot_head index (sameSource.trans sourceEq.symm) unique
-        receipt (sourceEq ▸ assignmentTyped)
+      CellAwareInvocationAcceptedElementWrites.element_bitNot_head index view unique receipt
+        (sourceEq ▸ assignmentTyped)
     obtain ⟨_, native⟩ := native
     have tailNative := CompatibleElementWrites.code_continuation (emitted ▸ native)
     have tailBounds := tailIH tailCovered (fun other member => reached other (List.mem_cons_of_mem _ member))

@@ -574,6 +574,7 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
         statements code),
       tree.Ready → tree.MatchContexts admitted → Shape index.compilerSource expected child mode statements →
       Covered semantic expected admitted generalized tree := by
+  have view : LambdaMetadataViews.MetadataView semantic index.compilerSource := by subst sameSource; exact .refl _
   intro mode escaped fuel scope statements code tree
   induction tree with
   | nil =>
@@ -636,30 +637,30 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
     cases shape with
     | assigned found _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready contexts tail⟩
+      exact ⟨view, ih ready contexts tail⟩
     | projectedAssigned found _ _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready contexts tail⟩
+      exact ⟨view, ih ready contexts tail⟩
     | elementAssigned found _ _ _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready contexts tail⟩
+      exact ⟨view, ih ready contexts tail⟩
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
       clear ih ready contexts
       simp_all
-  | projectedAssigned read form _ _ _ _ ih =>
+  | projectedAssigned read form _ _ _ route ih =>
     intro ready contexts shape
     cases shape with
     | assigned found _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready contexts tail⟩
+      exact ⟨view, by subst sameSource; exact route, ih ready contexts tail⟩
     | projectedAssigned found _ _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready contexts tail⟩
+      exact ⟨view, by subst sameSource; exact route, ih ready contexts tail⟩
     | elementAssigned found _ _ _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready contexts tail⟩
+      exact ⟨view, by subst sameSource; exact route, ih ready contexts tail⟩
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
@@ -693,30 +694,30 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
     cases shape with
     | bitNotted found _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready contexts tail⟩
+      exact ⟨view, ih ready contexts tail⟩
     | projectedBitNotted found _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready contexts tail⟩
+      exact ⟨view, ih ready contexts tail⟩
     | elementBitNotted found _ _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready contexts tail⟩
+      exact ⟨view, ih ready contexts tail⟩
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
       clear ih ready contexts
       simp_all
-  | projectedBitNotted read form _ _ _ _ ih =>
+  | projectedBitNotted read form _ _ _ route ih =>
     intro ready contexts shape
     cases shape with
     | bitNotted found _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready contexts tail⟩
+      exact ⟨view, by subst sameSource; exact route, ih ready contexts tail⟩
     | projectedBitNotted found _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready contexts tail⟩
+      exact ⟨view, by subst sameSource; exact route, ih ready contexts tail⟩
     | elementBitNotted found _ _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready contexts tail⟩
+      exact ⟨view, by subst sameSource; exact route, ih ready contexts tail⟩
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
@@ -727,13 +728,13 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
     cases shape with
     | assigned found _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready contexts tail⟩
+      exact ⟨view, ih ready contexts tail⟩
     | projectedAssigned found _ _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready contexts tail⟩
+      exact ⟨view, ih ready contexts tail⟩
     | elementAssigned found _ _ _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready contexts tail⟩
+      exact ⟨view, ih ready contexts tail⟩
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
@@ -744,13 +745,13 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
     cases shape with
     | bitNotted found _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready contexts tail⟩
+      exact ⟨view, ih ready contexts tail⟩
     | projectedBitNotted found _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready contexts tail⟩
+      exact ⟨view, ih ready contexts tail⟩
     | elementBitNotted found _ _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
-      exact ⟨sameSource, ih ready contexts tail⟩
+      exact ⟨view, ih ready contexts tail⟩
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
