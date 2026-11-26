@@ -16,6 +16,7 @@ import Solcore.Test.SourceSemantics.CoreLowering.Selected.Profiles
 import Solcore.Test.SourceSemantics.CoreLowering.Selected.Projected
 import Solcore.Test.SourceSemantics.CoreLowering.LexicalFailureForward
 import Solcore.Test.SourceSemantics.CoreLowering.Selected.OperatorAlias
+import Solcore.Test.SourceSemantics.CoreLowering.Selected.MethodCalls
 import Solcore.Test.SourceSemantics.CoreLowering.Method.OriginEvidence
 import Solcore.Test.SourceSemantics.CoreLowering.Foundations.Execution
 import Solcore.Test.SourceSemantics.CoreLowering.Constructor
@@ -2164,6 +2165,7 @@ def main : IO UInt32 := do
   Tests.SourceCoreSelectedCapturedDirect.run
   Tests.SourceCoreCompilationScope.run
   Tests.SourceCoreSelectedOperatorAlias.run
+  Tests.SourceCoreSelectedMethodCalls.run
   Tests.SourceCoreSelectedCompilationProfile.run
   Tests.SourceCoreMethodOriginEvidence.SelectedSourceOutcomes.run
   Tests.SourceCoreGeneralizedExport.probe

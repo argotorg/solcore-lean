@@ -294,6 +294,8 @@ theorem of_covered {program : CheckedProgram}
           (operatorOwnedNode node visit.requirements) available operator
       | .binary _ operator _ => SourceCompilationPlan.checkedBinaryOperatorMethod program caller
           (operatorOwnedNode node visit.requirements) available operator
+      | .methodCall _ _ _ => SourceCompilationPlan.checkedMethodCallMethod program caller
+          (operatorOwnedNode node visit.requirements) available
       | _ => .error (.unsupportedRequirements visit.requirements)) = .ok visit.selection at accepted
     rw [nodeForm] at accepted
     exact unary_interface (program := program) (caller := caller)
@@ -306,6 +308,8 @@ theorem of_covered {program : CheckedProgram}
           (operatorOwnedNode node visit.requirements) available operator
       | .binary _ operator _ => SourceCompilationPlan.checkedBinaryOperatorMethod program caller
           (operatorOwnedNode node visit.requirements) available operator
+      | .methodCall _ _ _ => SourceCompilationPlan.checkedMethodCallMethod program caller
+          (operatorOwnedNode node visit.requirements) available
       | _ => .error (.unsupportedRequirements visit.requirements)) = .ok visit.selection at accepted
     rw [nodeForm] at accepted
     exact binary_interface (program := program) (caller := caller)

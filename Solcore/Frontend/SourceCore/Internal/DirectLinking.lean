@@ -158,6 +158,34 @@ inductive Error where
   | runtimeBinaryResultTypeMismatch
       (caller : SpecializationKey) (occurrence : ExpressionId)
       (expected actual : Core.Ty)
+  | methodCallRequirementCountMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (expected actual : Nat)
+  | duplicateMethodCallRequirement
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId)
+  | methodCallRequirementPredicateMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId)
+      (expected actual : ProgramPredicate)
+  | methodCallRequirementEvidenceGoalMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId)
+      (expected actual : ProgramPredicate)
+  | runtimeMethodCallEvidenceUnresolved
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (requirement : RequirementId) (predicate : ProgramPredicate)
+  /-- The primary requirement of a trait method called by its name proves
+  another trait than the call's. -/
+  | runtimeMethodCallTraitMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (expected actual : Resolved.DeclarationId)
+  | runtimeMethodCallInputTypesMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (expected actual : List Core.Ty)
+  | runtimeMethodCallResultTypeMismatch
+      (caller : SpecializationKey) (occurrence : ExpressionId)
+      (expected actual : Core.Ty)
   | coercionRequirementEvidenceGoalMismatch
       (caller : SpecializationKey) (occurrence : ExpressionId)
       (requirement : RequirementId)
@@ -861,6 +889,55 @@ private def exactRuntimeBinaryMethodEvidence (caller : SpecializedFunction)
       .runtimeBinaryEvidenceUnresolved caller.key node.id requirement predicate)
     (node.requirements.drop 1) predicates
 
+private def exactRuntimeMethodCallPrimaryEvidence
+    (caller : SpecializedFunction) (node : ExpressionNode)
+    (available : List PredicateEvidence) :
+    Except Error (RequirementId × ProgramPredicate ×
+      TypedTraitResolution.Evidence) := do
+  let requirement ← match node.requirements with
+    | requirement :: _ => pure requirement
+    | [] => throw (.methodCallRequirementCountMismatch caller.key node.id 1 0)
+  let solved ← exactSolvedRequirement caller node.id requirement
+  let goal := solved.evidence.goal
+  if goal != solved.predicate then
+    throw (.methodCallRequirementEvidenceGoalMismatch caller.key node.id
+      requirement solved.predicate goal)
+  let evidence ← actualRequirementEvidence caller node.id requirement
+    available solved.evidence
+  match evidence with
+  | .implementation implementation =>
+      pure (requirement, solved.predicate, implementation)
+  | .assumption predicate =>
+      throw (.runtimeMethodCallEvidenceUnresolved caller.key node.id
+        requirement predicate)
+
+private def exactRuntimeMethodCallMethodEvidence
+    (caller : SpecializedFunction) (node : ExpressionNode)
+    (available : List PredicateEvidence) (predicates : List ProgramPredicate) :
+    Except Error (List TypedTraitResolution.Evidence) := do
+  let expectedCount := predicates.length + 1
+  if node.requirements.length != expectedCount then
+    throw (.methodCallRequirementCountMismatch caller.key node.id expectedCount
+      node.requirements.length)
+  match firstDuplicateRequirement node.requirements with
+  | some requirement =>
+      throw (.duplicateMethodCallRequirement caller.key node.id requirement)
+  | none => pure ()
+  exactRuntimeMethodEvidenceRows caller node available
+    (fun expected actual =>
+      .methodCallRequirementCountMismatch caller.key node.id (expected + 1)
+        (actual + 1))
+    (fun requirement expected actual =>
+      .methodCallRequirementPredicateMismatch caller.key node.id requirement
+        expected actual)
+    (fun requirement expected actual =>
+      .methodCallRequirementEvidenceGoalMismatch caller.key node.id
+        requirement expected actual)
+    (fun requirement predicate =>
+      .runtimeMethodCallEvidenceUnresolved caller.key node.id requirement
+        predicate)
+    (node.requirements.drop 1) predicates
+
 private structure RuntimeBinaryProfile where
   traitName : String
   methodName : String
@@ -1063,6 +1140,77 @@ private def requiredBinaryPlan (program : CheckedProgram)
       let temporaries := freshTemporaries temporaryOwner temporaryBase 2
       let body := aliasInputs elaborated.inputs temporaries elaborated.resolved
       pure (bindValues (temporaries.zip [left, right]) body)
+  }
+
+/-- Turn one closed witness of a trait method called by its name into a
+checked, capture-free inline plan, for a trait of any number of parameters.
+The implementation method body is the runtime authority; the trait method's
+parameter and result types at the primary goal validate it. -/
+private def requiredMethodCallPlan (program : CheckedProgram)
+    (temporaryOwner : Resolved.DeclarationId) (temporaryBase : Nat)
+    (elaborateMethod : ExecutableMethodElaborator)
+    (caller : SpecializedFunction) (available : List PredicateEvidence)
+    (node : ExpressionNode) (callTrait : Resolved.DeclarationId)
+    (methodName : String) (arguments : List ExpressionId) :
+    Except Error (SourceCoreElaboration.RequiredMethodCallPlan Error) := do
+  let (_, predicate, evidence) ←
+    exactRuntimeMethodCallPrimaryEvidence caller node available
+  let traitId ← match predicate.trait with
+    | .declaration id => pure id
+    | .builtin id => throw (.executableImplMethod caller.key node.id
+        (.builtinTraitNotExecutable id))
+  if traitId != callTrait then
+    throw (.runtimeMethodCallTraitMismatch caller.key node.id callTrait traitId)
+  let trait ← match program.signatures.trait? traitId with
+    | some trait => pure trait
+    | none => throw (.executableImplMethod caller.key node.id
+        (.missingTrait traitId))
+  let arity := trait.parameters.length
+  let methodPredicates ← runtimeMethodPredicates caller node trait predicate
+    arity methodName
+  let methodEvidence ← exactRuntimeMethodCallMethodEvidence caller node
+    available methodPredicates
+  let method ←
+    (ExecutableImplMethods.checkMethodWithEvidenceAndArity program evidence
+      methodEvidence arity methodName).mapError fun error =>
+        .executableImplMethod caller.key node.id error
+  let elaborated ← elaborateMethod method
+  let substitution : ParameterSubstitution :=
+    trait.parameters.zip (predicate.subject :: predicate.arguments)
+  let expectedInputs ←
+    (method.traitMethod.parameterTypes.map substitution.apply).mapM fun type =>
+      (SourceCoreElaboration.lowerType (.occurrence node.id.occurrence)
+        type).mapError Error.sourceCore
+  if elaborated.inputs.values != expectedInputs then
+    throw (.runtimeMethodCallInputTypesMismatch caller.key node.id
+      expectedInputs elaborated.inputs.values)
+  if expectedInputs.length != arguments.length then
+    throw (.argumentArityMismatch node.id expectedInputs.length
+      arguments.length)
+  let expectedResult ←
+    (SourceCoreElaboration.lowerType (.occurrence node.id.occurrence)
+      (Ty.productMany (method.traitMethod.returnTypes.map
+        substitution.apply))).mapError Error.sourceCore
+  if elaborated.returnType != expectedResult then
+    throw (.runtimeMethodCallResultTypeMismatch caller.key node.id
+      expectedResult elaborated.returnType)
+  let nodeResult ←
+    (SourceCoreElaboration.lowerType (.occurrence node.id.occurrence)
+      node.type).mapError Error.sourceCore
+  if elaborated.returnType != nodeResult then
+    throw (.runtimeMethodCallResultTypeMismatch caller.key node.id nodeResult
+      elaborated.returnType)
+  pure {
+    argumentTypes := expectedInputs
+    consumedRequirements := node.requirements
+    build := fun loweredArguments => do
+      if loweredArguments.length != expectedInputs.length then
+        throw (.argumentArityMismatch node.id expectedInputs.length
+          loweredArguments.length)
+      let temporaries := freshTemporaries temporaryOwner temporaryBase
+        loweredArguments.length
+      let body := aliasInputs elaborated.inputs temporaries elaborated.resolved
+      pure (bindValues (temporaries.zip loweredArguments) body)
   }
 
 /-- Turn one closed `Coerce<From, To>` witness into a checked, capture-free
@@ -1423,6 +1571,10 @@ private def buildDetachedDraftFuel (program : CheckedProgram)
             requiredBinaryPlan program temporaryOwner temporaryBase
               (elaborateMethodAt node.id) specialized assumptionEvidence node
               operator)
+          (fun _ node trait method arguments =>
+            requiredMethodCallPlan program temporaryOwner temporaryBase
+              (elaborateMethodAt node.id) specialized assumptionEvidence node
+              trait method arguments)
           (fun _ node step =>
             coercionPlan program temporaryOwner temporaryBase
               (elaborateMethodAt node.id) specialized assumptionEvidence node
@@ -1588,6 +1740,11 @@ private def buildDraftFuel (program : CheckedProgram) (plan : Plan)
               (elaborateDetachedMethod program temporaryOwner temporaryBase
                 specialized visiting remaining node.id)
               specialized assumptionEvidence node operator)
+          (fun _ node trait method arguments =>
+            requiredMethodCallPlan program temporaryOwner temporaryBase
+              (elaborateDetachedMethod program temporaryOwner temporaryBase
+                specialized visiting remaining node.id)
+              specialized assumptionEvidence node trait method arguments)
           (fun _ node step =>
             coercionPlan program temporaryOwner temporaryBase
               (elaborateDetachedMethod program temporaryOwner temporaryBase

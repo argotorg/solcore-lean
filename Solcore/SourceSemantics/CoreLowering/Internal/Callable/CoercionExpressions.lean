@@ -33,7 +33,7 @@ operator methods use their separate compiler branches. -/
 def Delegates (node : ExpressionNode) (ordinary : List RequirementId) : Prop :=
   match node.form with
   | .call _ _ (.declaration _) | .reference _ (.declaration _) | .call _ _ (.indirect _) => False
-  | .unary .. | .binary .. => ordinary = []
+  | .unary .. | .binary .. | .methodCall .. => ordinary = []
   | _ => True
 
 structure Suffix (program : CheckedProgram) (project : Projector) (compilation : Context)
@@ -271,7 +271,7 @@ theorem delegated_of_accepted {ordinary : List RequirementId}
     exact accepted
   | methodCall trait method arguments =>
     simp only [Delegates, form] at delegates
-    simp [rawNode, found, form, ordinaryAccepted, bind, Except.bind, pure, Except.pure, throw, throwThe, MonadExceptOf.throw] at accepted ⊢
+    simp [rawNode, found, form, ordinaryAccepted, delegates, bind, Except.bind, pure, Except.pure, throw, throwThe, MonadExceptOf.throw] at accepted ⊢
     exact accepted
 
 /-- Direct acceptance exposes the real ordered child calls, global slot and raw

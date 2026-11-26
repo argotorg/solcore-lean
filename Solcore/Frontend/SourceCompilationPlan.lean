@@ -250,6 +250,24 @@ inductive RuntimeError where
       (caller : Key) (id : ExpressionId) (expected actual : Ty)
   | runtimeBinaryResultTypeMismatch
       (caller : Key) (id : ExpressionId) (expected actual : Ty)
+  /-- A trait method called by its name has no primary requirement, or not one
+  per `where` predicate of its method after it. -/
+  | methodCallRequirementCountMismatch
+      (caller : Key) (id : ExpressionId) (expected actual : Nat)
+  | duplicateMethodCallRequirement
+      (caller : Key) (id : ExpressionId) (requirement : RequirementId)
+  /-- The primary requirement of a trait method called by its name proves
+  another trait than the call's. -/
+  | runtimeMethodCallTraitMismatch
+      (caller : Key) (id : ExpressionId)
+      (expected actual : Resolved.DeclarationId)
+  | executableMethodCall
+      (caller : Key) (id : ExpressionId)
+      (error : ExecutableImplMethods.Error)
+  | runtimeMethodCallInputTypesMismatch
+      (caller : Key) (id : ExpressionId) (expected actual : List Ty)
+  | runtimeMethodCallResultTypeMismatch
+      (caller : Key) (id : ExpressionId) (expected actual : Ty)
   | operatorMethodWorklist
       (caller : Key) (id : ExpressionId)
       (error : SourceSpecializationWorklist.Error)
@@ -1337,6 +1355,27 @@ private def runtimeOperatorMethodPredicates
   pure (method.wherePredicates.map
     (ProgramPredicate.applyParameters substitution))
 
+/-- The `where` predicates of the method named `expectedName` of a trait of any
+number of parameters, at the primary goal's subject and arguments. -/
+private def runtimeTraitMethodPredicates
+    (trait : ProgramTraitSignature)
+    (goal : ProgramPredicate) (expectedName : String)
+    (wrap : ExecutableImplMethods.Error → RuntimeError) :
+    Except RuntimeError (List ProgramPredicate) := do
+  let goalArity := goal.arguments.length + 1
+  unless goalArity = trait.parameters.length do
+    throw (wrap (.evidenceGoalArityMismatch goal.trait trait.parameters.length
+      goalArity))
+  let method ← match trait.methods.filter fun method =>
+      method.name == expectedName with
+    | [] => throw (wrap (.missingTraitMethod trait.id expectedName))
+    | [method] => pure method
+    | methods => throw (wrap (.multipleTraitMethods trait.id methods.length))
+  let substitution : ParameterSubstitution :=
+    trait.parameters.zip (goal.subject :: goal.arguments)
+  pure (method.wherePredicates.map
+    (ProgramPredicate.applyParameters substitution))
+
 structure CheckedRuntimeOperatorMethod where
   primaryRequirement : RequirementId
   method : ExecutableImplMethods.CheckedMethod
@@ -1477,6 +1516,76 @@ def checkedBinaryOperatorMethod (program : CheckedProgram)
   unless node.rawType = expectedResult do
     throw (.runtimeBinaryResultTypeMismatch caller.key node.id expectedResult
       node.rawType)
+  pure { primaryRequirement, method }
+
+/-- The implementation method that a trait method called by its name selects.
+The node's first requirement proves the call's trait at all of its parameters,
+and the others prove the method's `where` predicates there, in order. The
+selected method takes the arguments at the trait method's parameter types and
+returns the product of its result types, at the same instantiation. -/
+def checkedMethodCallMethod (program : CheckedProgram)
+    (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (available : RuntimeEvidenceEnvironment) :
+    Except RuntimeError CheckedRuntimeOperatorMethod := do
+  let .methodCall callTrait methodName argumentIds := node.form
+    | throw (.unsupportedRequirements node.requirements)
+  let requirements ← match ordinaryOwnedRequirements? node with
+    | some requirements => pure requirements
+    | none => throw (.unsupportedRequirements node.requirements)
+  let primaryRequirement ← match requirements with
+    | requirement :: _ => pure requirement
+    | [] => throw (.methodCallRequirementCountMismatch caller.key node.id 1 0)
+  match firstDuplicateRequirement requirements with
+  | some requirement =>
+      throw (.duplicateMethodCallRequirement caller.key node.id requirement)
+  | none => pure ()
+  let solved ← exactCallSolvedRequirement caller node.id primaryRequirement
+  let predicate := solved.predicate
+  let primary ← exactRuntimeRequirementEvidence program caller node available
+    primaryRequirement predicate
+  let traitId ← match predicate.trait with
+    | .declaration id => pure id
+    | .builtin id => throw (.executableMethodCall caller.key node.id
+        (.builtinTraitNotExecutable id))
+  unless traitId = callTrait do
+    throw (.runtimeMethodCallTraitMismatch caller.key node.id callTrait traitId)
+  let trait ← match program.signatures.trait? traitId with
+    | some trait => pure trait
+    | none => throw (.executableMethodCall caller.key node.id
+        (.missingTrait traitId))
+  let methodPredicates ← runtimeTraitMethodPredicates trait predicate
+    methodName (RuntimeError.executableMethodCall caller.key node.id)
+  let expectedCount := methodPredicates.length + 1
+  unless requirements.length = expectedCount do
+    throw (.methodCallRequirementCountMismatch caller.key node.id expectedCount
+      requirements.length)
+  let methodEvidence ← exactRuntimeRequirementEvidenceList program caller node
+    available (requirements.drop 1) methodPredicates
+  let method ←
+    (ExecutableImplMethods.checkMethodWithEvidenceAndArity program primary
+      methodEvidence trait.parameters.length methodName).mapError fun error =>
+        .executableMethodCall caller.key node.id error
+  let substitution : ParameterSubstitution :=
+    trait.parameters.zip (predicate.subject :: predicate.arguments)
+  let expectedInputs := method.traitMethod.parameterTypes.map substitution.apply
+  let actualInputs := method.specialized.function.typedBody.inputs.map
+    fun binder => binder.scheme.body
+  unless actualInputs = expectedInputs do
+    throw (.runtimeMethodCallInputTypesMismatch caller.key node.id
+      expectedInputs actualInputs)
+  let arguments ← argumentIds.mapM (exactExpression caller.function.typedBody)
+  let argumentTypes := arguments.map (·.type)
+  unless argumentTypes = expectedInputs do
+    throw (.runtimeMethodCallInputTypesMismatch caller.key node.id
+      expectedInputs argumentTypes)
+  let expectedResult :=
+    Ty.productMany (method.traitMethod.returnTypes.map substitution.apply)
+  unless method.specialized.function.inferredBodyType = expectedResult do
+    throw (.runtimeMethodCallResultTypeMismatch caller.key node.id
+      expectedResult method.specialized.function.inferredBodyType)
+  unless node.rawType = expectedResult do
+    throw (.runtimeMethodCallResultTypeMismatch caller.key node.id
+      expectedResult node.rawType)
   pure { primaryRequirement, method }
 
 /-- Authenticate one retained `Coerce<From, To>` edge and recover the exact
@@ -2106,6 +2215,27 @@ private def validateBinaryOperatorRequirementLayout
         throw (.callRequirementEvidenceGoalMismatch specialized.key node.id
           requirement solved.predicate solved.evidence.goal)
 
+/-- A trait method called by its name owns a primary requirement and its
+method's `where` requirements, each distinct and solved at its own goal. -/
+private def validateMethodCallRequirementLayout
+    (specialized : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) : Except RuntimeError Unit := do
+  let requirements ← match ordinaryOwnedRequirements? node with
+    | some requirements => pure requirements
+    | none => throw (.unsupportedRequirements node.requirements)
+  if requirements.isEmpty then
+    throw (.methodCallRequirementCountMismatch specialized.key node.id 1 0)
+  match firstDuplicateRequirement requirements with
+  | some requirement =>
+      throw (.duplicateMethodCallRequirement specialized.key node.id
+        requirement)
+  | none => pure ()
+  for requirement in requirements do
+    let solved ← exactCallSolvedRequirement specialized node.id requirement
+    unless solved.evidence.goal = solved.predicate do
+      throw (.callRequirementEvidenceGoalMismatch specialized.key node.id
+        requirement solved.predicate solved.evidence.goal)
+
 private def validateExpressionMetadata
     (specialized : SourceSpecialization.SpecializedFunction)
     (node : ExpressionNode) : Except RuntimeError Unit := do
@@ -2156,6 +2286,8 @@ private def validateExpressionMetadata
       validateUnaryOperatorRequirementLayout specialized node operator
   | .binary _ operator _ =>
       validateBinaryOperatorRequirementLayout specialized node operator
+  | .methodCall _ _ _ =>
+      validateMethodCallRequirementLayout specialized node
   | _ =>
       match ordinaryOwnedRequirements? node with
       | some [] => pure ()
@@ -2367,10 +2499,13 @@ private def extendOperatorMethodPlan (program : CheckedProgram)
       | .binary _ operator _ =>
           checkedBinaryOperatorMethod program specialized ownedNode available
             operator
+      | .methodCall _ _ _ =>
+          checkedMethodCallMethod program specialized ownedNode available
       | _ => throw (.unsupportedRequirements requirements)
     let arguments ← match ownedNode.form with
       | .unary _ operand => pure [operand]
       | .binary left _ right => pure [left, right]
+      | .methodCall _ _ arguments => pure arguments
       | _ => throw (.unsupportedRequirements requirements)
     validateStagedCallBoundary specialized ownedNode arguments
       selection.method.specialized
@@ -2403,7 +2538,7 @@ private def validateSpecializationEvidenceAndExtend
     match sourceNode with
     | .expression node =>
         match node.form with
-        | .unary _ _ | .binary _ _ _ =>
+        | .unary _ _ | .binary _ _ _ | .methodCall _ _ _ =>
             extended ← extendOperatorMethodPlan program helperBudget extended
               specialized available node
         | _ => pure ()

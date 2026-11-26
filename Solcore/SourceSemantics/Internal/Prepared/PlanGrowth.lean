@@ -202,10 +202,13 @@ theorem operator_accepted {program : CheckedProgram}
               SourceCompilationPlan.checkedUnaryOperatorMethod program caller ownedNode available operator
           | .binary _ operator _ =>
               SourceCompilationPlan.checkedBinaryOperatorMethod program caller ownedNode available operator
+          | .methodCall _ _ _ =>
+              SourceCompilationPlan.checkedMethodCallMethod program caller ownedNode available
           | _ => throw (.unsupportedRequirements requirements)
         let arguments ← match ownedNode.form with
           | .unary _ operand => pure [operand]
           | .binary left _ right => pure [left, right]
+          | .methodCall _ _ arguments => pure arguments
           | _ => throw (.unsupportedRequirements requirements)
         SourceCompilationPlan.validateStagedCallBoundary caller ownedNode arguments
           selection.method.specialized

@@ -182,6 +182,71 @@ theorem binary_of_accepted {program : CheckedProgram} {caller : SourceSpecializa
       ⟨⟨roots, selected, by simpa only [same] using traitNameEq⟩⟩⟩
 
 
+/-- A trait method called by its name selects its method as an operator does,
+at the arity of the call's own trait and under that trait's name. -/
+theorem methodCall_of_accepted {program : CheckedProgram} {caller : SourceSpecialization.SpecializedFunction}
+    {node : ExpressionNode} {available : SourceTypedRuntime.RuntimeEvidenceEnvironment}
+    {selection : SourceCompilationPlan.CheckedRuntimeOperatorMethod}
+    (accepted : SourceCompilationPlan.checkedMethodCallMethod program caller node available = .ok selection) :
+    ∃ trait methodName arguments signature methodIds,
+      node.form = .methodCall trait methodName arguments ∧
+      program.signatures.trait? trait = some signature ∧
+      SourceCompilationPlan.ordinaryOwnedRequirements? node = some (selection.primaryRequirement :: methodIds) ∧
+      Nonempty (MethodCertificate program caller node available selection.primaryRequirement methodIds
+        signature.parameters.length signature.name methodName selection.method) := by
+  simp only [SourceCompilationPlan.checkedMethodCallMethod, bind, Except.bind, pure, Except.pure,
+    throw, throwThe, MonadExceptOf.throw] at accepted
+  split at accepted <;> try contradiction
+  rename_i callTrait methodName argumentIds form
+  split at accepted <;> try contradiction
+  rename_i requirements ordinary
+  cases requirements with
+  | nil => cases accepted
+  | cons primaryId methodIds =>
+    dsimp only at accepted
+    split at accepted <;> try contradiction
+    obtain ⟨row, rowFound, accepted⟩ := bind_ok accepted
+    obtain ⟨primary, primarySelected, accepted⟩ := bind_ok accepted
+    split at accepted <;> try contradiction
+    rename_i traitId goalTrait
+    obtain ⟨sameTrait, accepted⟩ := require_ok accepted
+    split at accepted <;> try contradiction
+    rename_i trait found
+    obtain ⟨predicates, predicatesFound, accepted⟩ := bind_ok accepted
+    obtain ⟨lengthEq, accepted⟩ := require_ok accepted
+    obtain ⟨methodEvidence, methodsSelected, accepted⟩ := bind_ok accepted
+    obtain ⟨method, methodChecked, accepted⟩ := bind_ok accepted
+    have checked := mapError_ok methodChecked
+    obtain ⟨inputTypes, accepted⟩ := require_ok accepted
+    obtain ⟨arguments, argumentsFound, accepted⟩ := bind_ok accepted
+    obtain ⟨argumentTypes, accepted⟩ := require_ok accepted
+    obtain ⟨resultType, accepted⟩ := require_ok accepted
+    obtain ⟨rawType, accepted⟩ := require_ok accepted
+    cases accepted
+    let roots := Roots.of_selected primarySelected methodsSelected checked
+    obtain ⟨selected⟩ := CallableCoercionMethodInstantiation.selection roots.checked
+    have goalEq : selected.goal = row.predicate := by
+      have matched := SourceCompilationPlan.exactRuntimeRequirementEvidence_success_goal _ _ _ _ _ _ _ primarySelected
+      change SourceCompilationPlan.runtimeEvidenceGoal roots.primary = row.predicate at matched
+      rw [selected.primaryShape] at matched
+      exact matched
+    have traitIdEq : selected.trait.id = traitId := by
+      have eq := selected.goalTrait
+      rw [goalEq, goalTrait] at eq
+      exact (ProgramTraitId.declaration.inj eq).symm
+    have selectedLookup := selected.traitLookup
+    have owner : selected.declaration.traitMethod.trait = selected.trait.id := by
+      unfold ProgramSignatures.trait? at selectedLookup
+      have eq := List.find?_some (p := fun trait : ProgramTraitSignature =>
+        decide (trait.id = selected.declaration.traitMethod.trait)) selectedLookup
+      exact (of_decide_eq_true eq).symm
+    rw [owner, traitIdEq] at selectedLookup
+    have same := Option.some.inj (selectedLookup.symm.trans found)
+    rw [sameTrait] at found
+    exact ⟨callTrait, methodName, argumentIds, trait, methodIds, form, found, ordinary,
+      ⟨⟨roots, selected, by rw [same]⟩⟩⟩
+
+
 open Core
 open CallableCoercionExpressionCertificates (Lowered Projector Specialized NativeCall Output rawNode)
 
@@ -266,6 +331,7 @@ structure Operator (program : CheckedProgram) (project : Projector) (caller : Sp
   selectedMethod : (match node.form with
     | .unary operator _ => SourceCompilationPlan.checkedUnaryOperatorMethod program caller (rawNode node requirements) available operator
     | .binary _ operator _ => SourceCompilationPlan.checkedBinaryOperatorMethod program caller (rawNode node requirements) available operator
+    | .methodCall _ _ _ => SourceCompilationPlan.checkedMethodCallMethod program caller (rawNode node requirements) available
     | _ => .error (.unsupportedRequirements requirements)) = .ok selection
   dictionary : SourceTypedRuntime.RuntimeEvidenceEnvironment
   materialized : SourceCompilationPlan.operatorMethodRuntimeEvidence program caller (rawNode node requirements) selection = .ok dictionary

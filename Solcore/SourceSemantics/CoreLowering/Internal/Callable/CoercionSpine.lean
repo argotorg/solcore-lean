@@ -710,10 +710,11 @@ theorem coercion_accepted {program : CheckedProgram} {caller : Specialized}
         extended, CallableCoercionPlanProvenance.complete_root extended⟩⟩⟩
 
 
-/-- Only the two forms traversed by the real operator preparation phase. -/
+/-- Only the forms traversed by the real operator preparation phase: the two
+operators and a trait method called by its name. -/
 def OperatorForm (node : ExpressionNode) : Prop :=
   match node.form with
-  | .unary _ _ | .binary _ _ _ => True
+  | .unary _ _ | .binary _ _ _ | .methodCall _ _ _ => True
   | _ => False
 
 def operatorOwnedNode (node : ExpressionNode) (requirements : List RequirementId) : ExpressionNode :=
@@ -738,11 +739,14 @@ structure OperatorVisit (program : CheckedProgram) (caller : Specialized)
         (operatorOwnedNode node requirements) available operator
     | .binary _ operator _ => SourceCompilationPlan.checkedBinaryOperatorMethod program caller
         (operatorOwnedNode node requirements) available operator
+    | .methodCall _ _ _ => SourceCompilationPlan.checkedMethodCallMethod program caller
+        (operatorOwnedNode node requirements) available
     | _ => throw (.unsupportedRequirements requirements)
     : Except SourceTypedRuntime.RuntimeError SourceCompilationPlan.CheckedRuntimeOperatorMethod) = .ok selection
   argumentsSelected : (match (operatorOwnedNode node requirements).form with
     | .unary _ operand => pure [operand]
     | .binary left _ right => pure [left, right]
+    | .methodCall _ _ arguments => pure arguments
     | _ => throw (.unsupportedRequirements requirements)
     : Except SourceTypedRuntime.RuntimeError (List ExpressionId)) = .ok arguments
   staged : SourceCompilationPlan.validateStagedCallBoundary caller (operatorOwnedNode node requirements)
@@ -798,10 +802,13 @@ theorem operator_accepted_with_visit {program : CheckedProgram} {caller : Specia
       | .binary _ operator _ =>
           SourceCompilationPlan.checkedBinaryOperatorMethod program caller ownedNode available
             operator
+      | .methodCall _ _ _ =>
+          SourceCompilationPlan.checkedMethodCallMethod program caller ownedNode available
       | _ => throw (.unsupportedRequirements requirements)
     let arguments ← match ownedNode.form with
       | .unary _ operand => pure [operand]
       | .binary left _ right => pure [left, right]
+      | .methodCall _ _ arguments => pure arguments
       | _ => throw (.unsupportedRequirements requirements)
     SourceCompilationPlan.validateStagedCallBoundary caller ownedNode arguments
       selection.method.specialized
@@ -906,10 +913,13 @@ theorem operator_accepted {program : CheckedProgram} {caller : Specialized}
       | .binary _ operator _ =>
           SourceCompilationPlan.checkedBinaryOperatorMethod program caller ownedNode available
             operator
+      | .methodCall _ _ _ =>
+          SourceCompilationPlan.checkedMethodCallMethod program caller ownedNode available
       | _ => throw (.unsupportedRequirements requirements)
     let arguments ← match ownedNode.form with
       | .unary _ operand => pure [operand]
       | .binary left _ right => pure [left, right]
+      | .methodCall _ _ arguments => pure arguments
       | _ => throw (.unsupportedRequirements requirements)
     SourceCompilationPlan.validateStagedCallBoundary caller ownedNode arguments
       selection.method.specialized

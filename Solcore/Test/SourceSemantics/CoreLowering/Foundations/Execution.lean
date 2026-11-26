@@ -3114,6 +3114,7 @@ private def testRequiredUnaryPolicy : IO Unit := do
         SourceCoreElaboration.rejectCalls
         (requiredWordUnaryPolicy [requirement])
         SourceCoreElaboration.rejectRequiredBinaries
+        SourceCoreElaboration.rejectRequiredMethodCalls
         SourceCoreElaboration.rejectCoercions required with
     | .ok draft => pure draft
     | .error error => throw (IO.userError
@@ -3129,6 +3130,7 @@ private def testRequiredUnaryPolicy : IO Unit := do
   match SourceCoreElaboration.lowerFunctionBodyWithRuntimePolicies id
       SourceCoreElaboration.rejectCalls (requiredWordUnaryPolicy [])
       SourceCoreElaboration.rejectRequiredBinaries
+      SourceCoreElaboration.rejectRequiredMethodCalls
       SourceCoreElaboration.rejectCoercions required with
   | .ok _ => throw (IO.userError
       "required unary policy accepted mismatched requirement identities")

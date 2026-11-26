@@ -157,6 +157,8 @@ def select (program : CheckedProgram) (caller : SourceSpecialization.Specialized
       program caller (rawNode node requirements) available operator
   | .binary _ operator _ => SourceCompilationPlan.checkedBinaryOperatorMethod
       program caller (rawNode node requirements) available operator
+  | .methodCall _ _ _ => SourceCompilationPlan.checkedMethodCallMethod
+      program caller (rawNode node requirements) available
   | _ => .error (.unsupportedRequirements requirements)
 
 def NodeReady (program : CheckedProgram) (caller : SourceSpecialization.SpecializedFunction)
@@ -476,6 +478,8 @@ def select (program : CheckedProgram) (caller : SourceSpecialization.Specialized
       program caller (rawNode node requirements) available operator
   | .binary _ operator _ => SourceCompilationPlan.checkedBinaryOperatorMethod
       program caller (rawNode node requirements) available operator
+  | .methodCall _ _ _ => SourceCompilationPlan.checkedMethodCallMethod
+      program caller (rawNode node requirements) available
   | _ => .error (.unsupportedRequirements requirements)
 
 def NodeReady (program : CheckedProgram) (caller : SourceSpecialization.SpecializedFunction)

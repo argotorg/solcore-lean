@@ -190,6 +190,19 @@ inductive Selection (program : CheckedProgram) (caller : Specialized)
       (evidence : (discard <| SourceCompilationPlan.operatorMethodRuntimeEvidence program caller
         { node with type := node.rawType, requirements, coercions := [] } selection) = .ok ()) :
       Selection program caller node available selection.method.specialized
+  | methodCall {requirements : List RequirementId} {trait : Resolved.DeclarationId} {method : String}
+      {arguments : List ExpressionId}
+      {selection : SourceCompilationPlan.CheckedRuntimeOperatorMethod}
+      (owned : SourceCompilationPlan.ordinaryOwnedRequirements? node = some requirements)
+      (nonempty : requirements ≠ []) (form : node.form = .methodCall trait method arguments)
+      (selected : SourceCompilationPlan.checkedMethodCallMethod program caller
+        { node with type := node.rawType, requirements, coercions := [] } available = .ok selection)
+      (boundary : SourceCompilationPlan.validateStagedCallBoundary caller
+        { node with type := node.rawType, requirements, coercions := [] } arguments
+        selection.method.specialized = .ok ())
+      (evidence : (discard <| SourceCompilationPlan.operatorMethodRuntimeEvidence program caller
+        { node with type := node.rawType, requirements, coercions := [] } selection) = .ok ()) :
+      Selection program caller node available selection.method.specialized
 
 structure Event (program : CheckedProgram) where
   before : Plan
@@ -350,10 +363,13 @@ private theorem operator_origins {program : CheckedProgram}
               SourceCompilationPlan.checkedUnaryOperatorMethod program caller ownedNode available operator
           | .binary _ operator _ =>
               SourceCompilationPlan.checkedBinaryOperatorMethod program caller ownedNode available operator
+          | .methodCall _ _ _ =>
+              SourceCompilationPlan.checkedMethodCallMethod program caller ownedNode available
           | _ => throw (.unsupportedRequirements requirements)
         let arguments ← match ownedNode.form with
           | .unary _ operand => pure [operand]
           | .binary left _ right => pure [left, right]
+          | .methodCall _ _ arguments => pure arguments
           | _ => throw (.unsupportedRequirements requirements)
         SourceCompilationPlan.validateStagedCallBoundary caller ownedNode arguments
           selection.method.specialized
@@ -403,6 +419,10 @@ private theorem operator_origins {program : CheckedProgram}
                   (by simpa only [form] using boundary)
                   (by simpa only [form] using evidence)
               | exact .binary owned (by simp) form
+                  (by simpa only [form] using selected)
+                  (by simpa only [form] using boundary)
+                  (by simpa only [form] using evidence)
+              | exact .methodCall owned (by simp) form
                   (by simpa only [form] using selected)
                   (by simpa only [form] using boundary)
                   (by simpa only [form] using evidence)
@@ -657,6 +677,9 @@ theorem selection_key_not_catalog {program : CheckedProgram}
       exact excluded _ receipt.selected.toSelection same.symm
   | binary _ _ _ selected _ _ =>
       obtain ⟨_, _, _, _, _, ⟨receipt⟩⟩ := CallablePreparedMethodSelection.binary_of_accepted selected
+      exact excluded _ receipt.selected.toSelection same.symm
+  | methodCall _ _ _ selected _ _ =>
+      obtain ⟨_, _, _, _, _, _, _, _, ⟨receipt⟩⟩ := CallablePreparedMethodSelection.methodCall_of_accepted selected
       exact excluded _ receipt.selected.toSelection same.symm
 
 private theorem exact_member_eq {plan : Plan} {key : SourceSpecialization.SpecializationKey}

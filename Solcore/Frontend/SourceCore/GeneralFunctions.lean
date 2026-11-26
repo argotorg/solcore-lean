@@ -2117,6 +2117,16 @@ def lowerWithProjector (program : CheckedProgram) (projectType : Projector)
           let key ← methodKey context raw selected.method
           let arguments ← [left, right].mapM fun argument => child fuel source scope argument reasonAt
           invoke projectType context scope raw key (SourceCoreCalls.packArguments arguments) callables
+    | .methodCall _ _ arguments => do
+        if ordinary.isEmpty then child fuel (withNode source raw) scope id reasonAt
+        else
+          let selected ← (SourceCompilationPlan.checkedMethodCallMethod program caller raw available)
+            |>.mapError SourceCoreBasic.Error.callPreparation
+          discard <| (SourceCompilationPlan.operatorMethodRuntimeEvidence program caller raw selected)
+            |>.mapError SourceCoreBasic.Error.callPreparation
+          let key ← methodKey context raw selected.method
+          let arguments ← arguments.mapM fun argument => child fuel source scope argument reasonAt
+          invoke projectType context scope raw key (SourceCoreCalls.packArguments arguments) callables
     | _ => child fuel (withNode source raw) scope id reasonAt
   SourceCoreBasic.ensureType (.occurrence id.occurrence) (← project projectType node node.rawType) result.type
   let result ← applyCoercions program projectType context caller available scope node callables result node.coercions

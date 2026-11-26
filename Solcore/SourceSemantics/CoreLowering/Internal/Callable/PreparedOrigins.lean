@@ -328,10 +328,13 @@ private theorem operator_origins {program : CheckedProgram}
               SourceCompilationPlan.checkedUnaryOperatorMethod program caller ownedNode available operator
           | .binary _ operator _ =>
               SourceCompilationPlan.checkedBinaryOperatorMethod program caller ownedNode available operator
+          | .methodCall _ _ _ =>
+              SourceCompilationPlan.checkedMethodCallMethod program caller ownedNode available
           | _ => throw (.unsupportedRequirements requirements)
         let arguments ← match ownedNode.form with
           | .unary _ operand => pure [operand]
           | .binary left _ right => pure [left, right]
+          | .methodCall _ _ arguments => pure arguments
           | _ => throw (.unsupportedRequirements requirements)
         SourceCompilationPlan.validateStagedCallBoundary caller ownedNode arguments
           selection.method.specialized
@@ -379,6 +382,9 @@ private theorem operator_origins {program : CheckedProgram}
                  exact CatalogOrigin.method certificate.selected.toSelection)
               | (obtain ⟨_, _, _, _, _, ⟨certificate⟩⟩ :=
                     CallablePreparedMethodSelection.binary_of_accepted selected
+                 exact CatalogOrigin.method certificate.selected.toSelection)
+              | (obtain ⟨_, _, _, _, _, _, _, _, ⟨certificate⟩⟩ :=
+                    CallablePreparedMethodSelection.methodCall_of_accepted selected
                  exact CatalogOrigin.method certificate.selected.toSelection)
             cases extended : extendCompletePlan program before selection.method.specialized
                 ⟨caller.key, node.id, selection.method.specialized.key⟩ budget with
@@ -579,6 +585,8 @@ private theorem operator_selected_receipt {program : CheckedProgram}
           program caller node available operator
       | .binary _ operator _ => SourceCompilationPlan.checkedBinaryOperatorMethod
           program caller node available operator
+      | .methodCall _ _ _ => SourceCompilationPlan.checkedMethodCallMethod
+          program caller node available
       | _ => throw (.unsupportedRequirements requirements)
       : Except SourceTypedRuntime.RuntimeError
           SourceCompilationPlan.CheckedRuntimeOperatorMethod) = .ok selection) :
@@ -592,9 +600,14 @@ private theorem operator_selected_receipt {program : CheckedProgram}
     obtain ⟨_, _, _, _, _, ⟨certificate⟩⟩ :=
       CallablePreparedMethodSelection.binary_of_accepted accepted
     exact of_method_selection certificate.selected.toSelection
+  case methodCall trait method arguments =>
+    obtain ⟨_, _, _, _, _, _, _, _, ⟨certificate⟩⟩ :=
+      CallablePreparedMethodSelection.methodCall_of_accepted accepted
+    exact of_method_selection certificate.selected.toSelection
 
 /-- The reached operator visit keeps its actual owned node and checked
-unary/binary selector; either branch supplies its genuine detached root. -/
+unary, binary or method-call selector; each branch supplies its genuine
+detached root. -/
 theorem of_operator_visit {program : CheckedProgram} {caller : Specialized}
     {available : SourceTypedRuntime.RuntimeEvidenceEnvironment}
     {node : ExpressionNode} {final : Plan}
@@ -793,10 +806,13 @@ private theorem operator_receipts {program : CheckedProgram}
               SourceCompilationPlan.checkedUnaryOperatorMethod program caller ownedNode available operator
           | .binary _ operator _ =>
               SourceCompilationPlan.checkedBinaryOperatorMethod program caller ownedNode available operator
+          | .methodCall _ _ _ =>
+              SourceCompilationPlan.checkedMethodCallMethod program caller ownedNode available
           | _ => throw (.unsupportedRequirements requirements)
         let arguments ← match ownedNode.form with
           | .unary _ operand => pure [operand]
           | .binary left _ right => pure [left, right]
+          | .methodCall _ _ arguments => pure arguments
           | _ => throw (.unsupportedRequirements requirements)
         SourceCompilationPlan.validateStagedCallBoundary caller ownedNode arguments
           selection.method.specialized
@@ -845,6 +861,10 @@ private theorem operator_receipts {program : CheckedProgram}
                    certificate.selected.toSelection)
               | (obtain ⟨_, _, _, _, _, ⟨certificate⟩⟩ :=
                     CallablePreparedMethodSelection.binary_of_accepted selected
+                 exact CallablePreparedSpecializationOrigins.of_method_selection
+                   certificate.selected.toSelection)
+              | (obtain ⟨_, _, _, _, _, _, _, _, ⟨certificate⟩⟩ :=
+                    CallablePreparedMethodSelection.methodCall_of_accepted selected
                  exact CallablePreparedSpecializationOrigins.of_method_selection
                    certificate.selected.toSelection)
             cases extended : extendCompletePlan program before selection.method.specialized

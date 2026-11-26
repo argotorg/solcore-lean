@@ -249,6 +249,8 @@ inductive ErrorReason where
       (expected actual : List RequirementId)
   | binaryRequirementsMismatch
       (expected actual : List RequirementId)
+  | methodCallRequirementsMismatch
+      (expected actual : List RequirementId)
   | identityCoercionStep
       (index : Nat) (requirement : RequirementId) (type : Ty)
   | coercionPathDiscontinuity
@@ -464,6 +466,23 @@ requirement reconciliation. -/
 abbrev RequiredBinaryElaborator (error : Type) :=
   Resolved.Context → ExpressionNode → ExpressionId → Syntax.BinaryOp →
   ExpressionId → Except error (RequiredBinaryPlan error)
+
+/-- A policy for a trait method called by its name declares the exact types at
+which Source Core must check its arguments, identifies the requirements it
+discharges, and combines the already recursively lowered arguments, in source
+order.  Like the binary builder, it cannot traverse source edges itself. -/
+structure RequiredMethodCallPlan (error : Type) where
+  argumentTypes : List Core.Ty
+  consumedRequirements : List RequirementId
+  build : List Resolved.Expr → Except error Resolved.Expr
+
+/-- A whole-program consumer may give runtime meaning to a trait method called
+by its name: the call's trait, the method's name and the arguments.  Source
+Core still owns argument lookup, left-to-right traversal, coercion-aware
+argument lowering, type checking, and requirement reconciliation. -/
+abbrev RequiredMethodCallElaborator (error : Type) :=
+  Resolved.Context → ExpressionNode → Resolved.DeclarationId → String →
+  List ExpressionId → Except error (RequiredMethodCallPlan error)
 
 /-- One executable coercion step declares both Core endpoints and the exact
 requirement discharge it owns before transforming an already lowered source
@@ -1725,6 +1744,7 @@ private def lowerExpressionNodeWith {error : Type} (lift : Error → error)
     (stagedValueArgument : StagedValueArgumentOracle error)
     (onRequiredUnary : RequiredUnaryElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
+    (onRequiredMethodCall : RequiredMethodCallElaborator error)
     (solvedRequirements : List SolvedRequirement)
     (source : TypedSource) (scope : Resolved.Context)
     (recurse : ExpressionId → Except error LoweredExpression)
@@ -1835,6 +1855,36 @@ private def lowerExpressionNodeWith {error : Type} (lift : Error → error)
                 loweredRight.consumedRequirements ++
                 plan.consumedRequirements
             }
+  | .methodCall trait method arguments => do
+      let plan ← onRequiredMethodCall scope node trait method arguments
+      if plan.consumedRequirements != node.requirements then
+        failWith lift (.occurrence id.occurrence)
+          (.methodCallRequirementsMismatch node.requirements
+            plan.consumedRequirements)
+      else if plan.argumentTypes.length != arguments.length then
+        failWith lift (.occurrence id.occurrence)
+          (.callArgumentArityMismatch plan.argumentTypes.length
+            arguments.length)
+      else
+        match lowerType (.occurrence id.occurrence) node.type with
+        | .error error => .error (lift error)
+        | .ok _ => do
+          let loweredArguments ←
+            (plan.argumentTypes.zip arguments).mapM fun pair => do
+              let argumentNode ←
+                (lookupExpression source pair.2).mapError lift
+              ensureTypeWith lift (.occurrence pair.2.occurrence)
+                pair.1 argumentNode.type
+              recurse pair.2
+          let resolved ← plan.build
+            (loweredArguments.map fun argument => argument.resolved)
+          pure {
+            resolved
+            consumedRequirements :=
+              loweredArguments.flatMap
+                (fun argument => argument.consumedRequirements) ++
+              plan.consumedRequirements
+          }
   | _ =>
       if !node.requirements.isEmpty then
         failWith lift (.occurrence id.occurrence)
@@ -1980,6 +2030,7 @@ private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
     (stagedValuePolicy : Option (RawStagedValueLoweringPolicy error))
     (onRequiredUnary : RequiredUnaryElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
+    (onRequiredMethodCall : RequiredMethodCallElaborator error)
     (onCoercion : CoercionElaborator error)
     (solvedRequirements : List SolvedRequirement)
     (fuel : Nat) (source : TypedSource) (scope : Resolved.Context)
@@ -2004,14 +2055,16 @@ private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
                 pure none
           | none => pure none
       let recurse := lowerExpressionFuelWith lift onCall onStagedIntegerCall
-        stagedValuePolicy onRequiredUnary onRequiredBinary onCoercion
+        stagedValuePolicy onRequiredUnary onRequiredBinary onRequiredMethodCall
+        onCoercion
         solvedRequirements fuel source scope environment stagedValueEnvironment
       let lowerOrdinary :=
         match node.coercions with
         | [] =>
             lowerExpressionNodeWith lift onCall stagedValueArgument
               onRequiredUnary
-              onRequiredBinary solvedRequirements source scope recurse node
+              onRequiredBinary onRequiredMethodCall
+              solvedRequirements source scope recurse node
         | first :: rest => do
             let prepared ← prepareCoercionPathWith lift node first rest
             let plans ← checkedCoercionPlansWith lift onCoercion scope node
@@ -2024,7 +2077,8 @@ private def lowerExpressionFuelWith {error : Type} (lift : Error → error)
             }
             let base ← lowerExpressionNodeWith lift onCall
               stagedValueArgument onRequiredUnary
-              onRequiredBinary solvedRequirements source scope recurse baseNode
+              onRequiredBinary onRequiredMethodCall
+              solvedRequirements source scope recurse baseNode
             applyCoercionPlans base.resolved base.consumedRequirements plans
       match node.form with
       | .call _ _ (.declaration instantiation) =>
@@ -2076,6 +2130,7 @@ private def lowerExpressionAsWith {error : Type} (lift : Error → error)
     (stagedValuePolicy : Option (RawStagedValueLoweringPolicy error))
     (onRequiredUnary : RequiredUnaryElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
+    (onRequiredMethodCall : RequiredMethodCallElaborator error)
     (onCoercion : CoercionElaborator error)
     (solvedRequirements : List SolvedRequirement)
     (fuel : Nat) (source : TypedSource) (scope : Resolved.Context)
@@ -2093,7 +2148,8 @@ private def lowerExpressionAsWith {error : Type} (lift : Error → error)
   | _ => pure ()
   ensureTypeWith lift (.occurrence id.occurrence) expected node.type
   lowerExpressionFuelWith lift onCall onStagedIntegerCall stagedValuePolicy
-    onRequiredUnary onRequiredBinary onCoercion solvedRequirements fuel source
+    onRequiredUnary onRequiredBinary onRequiredMethodCall
+    onCoercion solvedRequirements fuel source
     scope environment stagedValueEnvironment id
 
 private inductive MatchPatternLeaf where
@@ -2177,6 +2233,7 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
     (stagedValuePolicy : Option (RawStagedValueLoweringPolicy error))
     (onRequiredUnary : RequiredUnaryElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
+    (onRequiredMethodCall : RequiredMethodCallElaborator error)
     (onCoercion : CoercionElaborator error)
     (solvedRequirements : List SolvedRequirement) :
     Nat → TypedSource → Resolved.Context → StagedIntegerEnvironment →
@@ -2207,7 +2264,8 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
                   solvedRequirements source environment true fuel initializer
           let body ← lowerStatementsFuelWith lift onCall
             onStagedIntegerCall stagedValuePolicy onRequiredUnary
-            onRequiredBinary onCoercion solvedRequirements fuel source scope
+            onRequiredBinary onRequiredMethodCall
+            onCoercion solvedRequirements fuel source scope
             ({ binder, value := initializer.value } :: environment)
             stagedValueEnvironment expected fallthroughSite fallthroughReason
             rest
@@ -2228,11 +2286,13 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
           let lowerOrdinary : Except error LoweredExpression := do
             let initializer ← lowerExpressionAsWith lift onCall
               onStagedIntegerCall stagedValuePolicy onRequiredUnary
-              onRequiredBinary onCoercion solvedRequirements fuel source scope
+              onRequiredBinary onRequiredMethodCall
+              onCoercion solvedRequirements fuel source scope
               environment stagedValueEnvironment binderType initializerId
             let body ← lowerStatementsFuelWith lift onCall
               onStagedIntegerCall stagedValuePolicy onRequiredUnary
-              onRequiredBinary onCoercion solvedRequirements fuel source
+              onRequiredBinary onRequiredMethodCall
+              onCoercion solvedRequirements fuel source
               ((binder.id, binderType) :: scope) environment
               stagedValueEnvironment expected fallthroughSite fallthroughReason
               rest
@@ -2261,7 +2321,8 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
                     (.stagedValueTypeMismatch binder.scheme.body actualType)
                 let body ← lowerStatementsFuelWith lift onCall
                   onStagedIntegerCall stagedValuePolicy onRequiredUnary
-                  onRequiredBinary onCoercion solvedRequirements fuel source
+                  onRequiredBinary onRequiredMethodCall
+                  onCoercion solvedRequirements fuel source
                   ((binder.id, binderType) :: scope) environment
                   ({ binder, value := evaluated.value } ::
                     stagedValueEnvironment)
@@ -2292,7 +2353,8 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
                 failWith lift site (.typedNodeTypeMismatch expected .unit)
           | some value =>
               lowerExpressionAsWith lift onCall onStagedIntegerCall
-                stagedValuePolicy onRequiredUnary onRequiredBinary onCoercion
+                stagedValuePolicy onRequiredUnary onRequiredBinary onRequiredMethodCall
+                onCoercion
                 solvedRequirements fuel source scope environment
                 stagedValueEnvironment expected value
     | .ifThen condition thenBody elseBody => do
@@ -2305,16 +2367,19 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
               ensureTypeWith lift site expected node.type
               let condition ← lowerExpressionAsWith lift onCall
                 onStagedIntegerCall stagedValuePolicy onRequiredUnary
-                onRequiredBinary onCoercion solvedRequirements fuel source scope
+                onRequiredBinary onRequiredMethodCall
+                onCoercion solvedRequirements fuel source scope
                 environment stagedValueEnvironment .bool condition
               let thenBranch ← lowerStatementsFuelWith lift onCall
                 onStagedIntegerCall stagedValuePolicy onRequiredUnary
-                onRequiredBinary onCoercion solvedRequirements fuel source scope
+                onRequiredBinary onRequiredMethodCall
+                onCoercion solvedRequirements fuel source scope
                 environment stagedValueEnvironment expected site
                 (.conditionalBranchFallthrough .thenBranch) thenBody
               let elseBranch ← lowerStatementsFuelWith lift onCall
                 onStagedIntegerCall stagedValuePolicy onRequiredUnary
-                onRequiredBinary onCoercion solvedRequirements fuel source scope
+                onRequiredBinary onRequiredMethodCall
+                onCoercion solvedRequirements fuel source scope
                 environment stagedValueEnvironment expected site
                 (.conditionalBranchFallthrough .elseBranch) elseBody
               pure {
@@ -2330,7 +2395,8 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
         else
           ensureTypeWith lift site expected node.type
           lowerStatementsFuelWith lift onCall onStagedIntegerCall
-            stagedValuePolicy onRequiredUnary onRequiredBinary onCoercion
+            stagedValuePolicy onRequiredUnary onRequiredBinary onRequiredMethodCall
+            onCoercion
             solvedRequirements fuel source scope environment
             stagedValueEnvironment expected site .blockFallthrough body
     | .matchWith resolution => do
@@ -2352,7 +2418,8 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
               scrutineeNode.type).mapError lift
           let scrutinee ← lowerExpressionAsWith lift onCall
             onStagedIntegerCall stagedValuePolicy onRequiredUnary
-            onRequiredBinary onCoercion solvedRequirements fuel source scope
+            onRequiredBinary onRequiredMethodCall
+            onCoercion solvedRequirements fuel source scope
             environment stagedValueEnvironment scrutineeCoreType
             resolution.scrutinee
           let expectedRequirements := resolution.cases.flatMap fun arm =>
@@ -2366,7 +2433,8 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
                 scrutineeNode.type arm.pattern
               let branch ← lowerStatementsFuelWith lift onCall
                 onStagedIntegerCall stagedValuePolicy onRequiredUnary
-                onRequiredBinary onCoercion solvedRequirements fuel source scope
+                onRequiredBinary onRequiredMethodCall
+                onCoercion solvedRequirements fuel source scope
                 environment stagedValueEnvironment expected site
                 .blockFallthrough arm.body
               pure { pattern, branch }
@@ -2375,7 +2443,8 @@ private def lowerStatementsFuelWith {error : Type} (lift : Error → error)
               | some body => do
                   let lowered ← lowerStatementsFuelWith lift onCall
                     onStagedIntegerCall stagedValuePolicy onRequiredUnary
-                    onRequiredBinary onCoercion solvedRequirements fuel source
+                    onRequiredBinary onRequiredMethodCall
+                    onCoercion solvedRequirements fuel source
                     scope environment stagedValueEnvironment expected site
                     .blockFallthrough body
                   pure (some lowered)
@@ -2558,6 +2627,18 @@ def rejectRequiredBinaries : RequiredBinaryElaborator Error :=
     fail (.occurrence node.id.occurrence)
       (.requirementsPresent node.requirements)
 
+/-- Preserve the evidence-free profile's refusal of a trait method called by
+its name, whose requirements it cannot discharge. -/
+private def rejectRequiredMethodCallsWith {error : Type}
+    (lift : Error → error) : RequiredMethodCallElaborator error :=
+  fun _ node _ _ _ =>
+    failWith lift (.occurrence node.id.occurrence)
+      (.requirementsPresent node.requirements)
+
+/-- The same refusal at elaboration's own error type. -/
+def rejectRequiredMethodCalls : RequiredMethodCallElaborator Error :=
+  rejectRequiredMethodCallsWith (fun error => error)
+
 /-- Preserve the original evidence-free profile for requirement-bearing unary
 expressions. -/
 def rejectRequiredUnaries : RequiredUnaryElaborator Error :=
@@ -2582,7 +2663,7 @@ def lowerExpression (fuel : Nat) (source : TypedSource)
     Except Error LoweredExpression :=
   lowerExpressionFuelWith (fun error => error) (fun _ => rejectCalls)
     rejectStagedIntegerCalls none rejectRequiredUnaries rejectRequiredBinaries
-    rejectCoercions [] fuel source scope [] [] id
+    rejectRequiredMethodCalls rejectCoercions [] fuel source scope [] [] id
 
 private theorem lookupExpression_of_found
     {source : TypedSource} {id : ExpressionId} {node : ExpressionNode}
@@ -3546,6 +3627,7 @@ private def lowerFunctionBodyWithRawStagedValuePolicy {error : Type}
     (stagedValuePolicy : Option (RawStagedValueLoweringPolicy error))
     (onRequiredUnary : RequiredUnaryElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
+    (onRequiredMethodCall : RequiredMethodCallElaborator error)
     (onCoercion : CoercionElaborator error)
     (initialStagedValueEnvironment : StagedValueEnvironment)
     (function : CheckedFunction) :
@@ -3568,7 +3650,8 @@ private def lowerFunctionBodyWithRawStagedValuePolicy {error : Type}
       | some statement => ErrorSite.occurrence statement.occurrence
       | none => ErrorSite.declaration function.declaration
     let lowered ← lowerStatementsFuelWith lift onCall onStagedIntegerCall
-      stagedValuePolicy onRequiredUnary onRequiredBinary onCoercion
+      stagedValuePolicy onRequiredUnary onRequiredBinary onRequiredMethodCall
+      onCoercion
       function.solvedRequirements (source.nodes.length + 1) source inputs []
       initialStagedValueEnvironment expected fallthroughSite
       .statementListFallthrough roots
@@ -3595,11 +3678,13 @@ def lowerFunctionBodyWithRuntimeAndStagedPolicies {error : Type}
     (onStagedIntegerCall : StagedIntegerCallElaborator error)
     (onRequiredUnary : RequiredUnaryElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
+    (onRequiredMethodCall : RequiredMethodCallElaborator error)
     (onCoercion : CoercionElaborator error)
     (function : CheckedFunction) :
     Except error BodyDraft :=
   lowerFunctionBodyWithRawStagedValuePolicy lift (fun _ => onCall)
-    onStagedIntegerCall none onRequiredUnary onRequiredBinary onCoercion []
+    onStagedIntegerCall none onRequiredUnary onRequiredBinary onRequiredMethodCall
+    onCoercion []
     function
 
 /-- Lower one exact, call-site-specific specialization while exposing only a
@@ -3613,6 +3698,7 @@ def lowerSpecializedFunctionBodyWithKnownStagedInputsAndRuntimePolicies
     (stagedValuePolicy : StagedValueLoweringPolicy error)
     (onRequiredUnary : RequiredUnaryElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
+    (onRequiredMethodCall : RequiredMethodCallElaborator error)
     (onCoercion : CoercionElaborator error)
     (knownInputs : KnownStagedValueInputs)
     (specialized : SourceSpecialization.SpecializedFunction) :
@@ -3663,7 +3749,8 @@ def lowerSpecializedFunctionBodyWithKnownStagedInputsAndRuntimePolicies
           environment id
     }
     lowerFunctionBodyWithRawStagedValuePolicy lift onCall
-      onStagedIntegerCall rawPolicy onRequiredUnary onRequiredBinary onCoercion
+      onStagedIntegerCall rawPolicy onRequiredUnary onRequiredBinary onRequiredMethodCall
+      onCoercion
       initialStagedValueEnvironment function
 
 /-- Compatibility wrapper for a reusable runtime draft with no concrete input
@@ -3676,12 +3763,13 @@ def lowerSpecializedFunctionBodyWithRuntimeAndStagedPolicies
     (stagedValuePolicy : StagedValueLoweringPolicy error)
     (onRequiredUnary : RequiredUnaryElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
+    (onRequiredMethodCall : RequiredMethodCallElaborator error)
     (onCoercion : CoercionElaborator error)
     (specialized : SourceSpecialization.SpecializedFunction) :
     Except error BodyDraft :=
   lowerSpecializedFunctionBodyWithKnownStagedInputsAndRuntimePolicies lift
     (fun _ => onCall) onStagedIntegerCall stagedValuePolicy onRequiredUnary
-    onRequiredBinary onCoercion
+    onRequiredBinary onRequiredMethodCall onCoercion
     (specialized.function.typedBody.inputs.map fun _ => none) specialized
 
 /-- Compatibility wrapper retaining the previous closed staged-call boundary
@@ -3690,11 +3778,12 @@ def lowerFunctionBodyWithRuntimePolicies {error : Type} (lift : Error → error)
     (onCall : CallElaborator error)
     (onRequiredUnary : RequiredUnaryElaborator error)
     (onRequiredBinary : RequiredBinaryElaborator error)
+    (onRequiredMethodCall : RequiredMethodCallElaborator error)
     (onCoercion : CoercionElaborator error)
     (function : CheckedFunction) :
     Except error BodyDraft :=
   lowerFunctionBodyWithRuntimeAndStagedPolicies lift onCall
-    (rejectStagedIntegerCallsWith lift) onRequiredUnary onRequiredBinary
+    (rejectStagedIntegerCallsWith lift) onRequiredUnary onRequiredBinary onRequiredMethodCall
     onCoercion function
 
 /-- Compatibility entry point for call, required-binary, and coercion
@@ -3710,7 +3799,7 @@ def lowerFunctionBodyWithAllPolicies {error : Type} (lift : Error → error)
     (fun _ node _ _ =>
       failWith lift (.occurrence node.id.occurrence)
         (.requirementsPresent node.requirements))
-    onRequiredBinary onCoercion function
+    onRequiredBinary (rejectRequiredMethodCallsWith lift) onCoercion function
 
 /-- Compatibility entry point for call and required-binary consumers.  It
 retains the previous explicit coercion rejection until a consumer opts into
@@ -5579,7 +5668,7 @@ def lower (solved : List SolvedRequirement) (source : TypedSource)
     (expected : Core.Ty) (site : ErrorSite) (reason : ErrorReason)
     (statements : List StatementId) : Except Error LoweredExpression :=
   lowerStatementsFuelWith id (fun _ => rejectCalls) rejectStagedIntegerCalls none
-    rejectRequiredUnaries rejectRequiredBinaries rejectCoercions solved fuel source
+    rejectRequiredUnaries rejectRequiredBinaries rejectRequiredMethodCalls rejectCoercions solved fuel source
     scope environment [] expected site reason statements
 
 abbrev contains := StagedIntegerEnvironment.contains
@@ -5659,7 +5748,7 @@ theorem let_of_accepted {solved : List SolvedRequirement} {source : TypedSource}
       | ok initial =>
         simp only [initialEq] at accepted
         cases bodyEq : lowerStatementsFuelWith id (fun _ => rejectCalls) rejectStagedIntegerCalls none
-            rejectRequiredUnaries rejectRequiredBinaries rejectCoercions solved fuel source scope
+            rejectRequiredUnaries rejectRequiredBinaries rejectRequiredMethodCalls rejectCoercions solved fuel source scope
             ({binder, value := initial.value} :: environment) [] expected site reason rest with
         | error error => simp [bodyEq] at accepted
         | ok body =>
@@ -5756,14 +5845,14 @@ def expression (solved : List SolvedRequirement) (source : TypedSource)
     (scope : Resolved.Context) (environment : Environment) (fuel : Nat)
     (expressionId : ExpressionId) : Except Error LoweredExpression :=
   lowerExpressionFuelWith id (fun _ => rejectCalls) rejectStagedIntegerCalls none
-    rejectRequiredUnaries rejectRequiredBinaries rejectCoercions solved fuel source
+    rejectRequiredUnaries rejectRequiredBinaries rejectRequiredMethodCalls rejectCoercions solved fuel source
     scope environment [] expressionId
 
 def asType (solved : List SolvedRequirement) (source : TypedSource)
     (scope : Resolved.Context) (environment : Environment) (fuel : Nat)
     (expected : Core.Ty) (expressionId : ExpressionId) : Except Error LoweredExpression :=
   lowerExpressionAsWith id (fun _ => rejectCalls) rejectStagedIntegerCalls none
-    rejectRequiredUnaries rejectRequiredBinaries rejectCoercions solved fuel source
+    rejectRequiredUnaries rejectRequiredBinaries rejectRequiredMethodCalls rejectCoercions solved fuel source
     scope environment [] expected expressionId
 
 /-- A finite syntax restriction, not an execution or typing assumption. Integer
