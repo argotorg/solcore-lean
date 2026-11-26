@@ -195,7 +195,10 @@ section
 -- leanmerge: from Solcore.SourceSemantics.CoreLowering.CellAwarePhysicalFunctionOrigins
 /-! Positive callable leaves for heaps containing generalized descriptors.
 A materialized local keeps its actual read wrapper and Source instantiation;
-there is no projection of that branch to an older lexical closure history. -/
+there is no projection of that branch to an older lexical closure history.
+A closure an accepted lambda site formed keeps its actual code, at the named
+policy of its row's compilation, with its captured slots; no leaf admits an
+erased closure. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.CellAwarePhysicalFunctionOrigins
@@ -205,6 +208,38 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {headers : List (Header compiled (Program.ofChecked compiled.sourceProgram))}
   {keys : List (Key compiled (Program.ofChecked compiled.sourceProgram))}
   {bodyRegistry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+
+/-- The accepted route's receipt of a closure's code: the code is the lambda's
+lowering at the named policy of its row's compilation, at the row's own Source,
+and the closure has runtime parameters and result. -/
+structure AcceptedCode {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context}
+    (code : CallableIndexedLambdaValues.Code compiled.indexed function scope administrative) where
+  caller : Header compiled (Program.ofChecked compiled.sourceProgram)
+  diagnostics : SourceCoreDataPlaceFaultSites.Program
+  namedCode : Expr
+  generation : CallableIndexedNamedGeneration.Compilation compiled.indexed caller.named diagnostics namedCode
+  rootFuel : Nat
+  policy : code.policy = GeneralizedLocalInitializerCompilation.namedPolicy generation rootFuel
+  lowerBody : code.lowerBody = GeneralizedLocalInitializerCompilation.namedLowerBody generation
+  compilation : code.compilation = CallableIndexedNamedGeneration.context compiled.indexed caller.named
+  active : code.active = []
+  view : code.view = CallableIndexedNamedGeneration.source caller.named
+  source : function.source = CallableIndexedNamedGeneration.source caller.named
+  unique : NodeOccurrencesUnique function.source
+  runtimeParameters : ∀ parameter ∈ function.parameters,
+    parameter.comptime = false ∧ ¬ Staging.ComptimeOnlyType parameter.scheme.body
+  runtimeResult : ¬ Staging.ComptimeOnlyType function.resultType
+
+/-- The closure's Source is its row's planned Source. -/
+theorem AcceptedCode.source_receipt {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context}
+    {code : CallableIndexedLambdaValues.Code compiled.indexed function scope administrative}
+    (site : AcceptedCode code) :
+    LambdaSourceAlignment.SourceReceipt compiled.sourceProgram compiled.indexed.base.plan
+      code.compilation.owner code.active function.source := by
+  rw [site.compilation, site.active, site.source]
+  exact .original (CallableIndexedActualNamedSourceReceipts.header_record compiled site.caller)
 
 inductive FunctionOrigins
     (headers : List (Header compiled (Program.ofChecked compiled.sourceProgram)))
@@ -223,6 +258,29 @@ inductive FunctionOrigins
       FunctionOrigins headers keys bodyRegistry faults mapping world
         (FunctionValues.sourceType function) (.closure function) native
         (CallableContract.functionType parameter result)
+  /-- A closure an accepted lambda site formed: its captures, actual code and
+  history, the accepted receipt of the code, and the captured slots of its
+  owner's frame, as an ordinary prepared closure has them. -/
+  | accepted {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {actual : Environment}
+      (owner : OwnedKey keys)
+      (captured : CallableIndexedLambdaValues.Captures compiled.indexed mapping world scope function.captured actual)
+      (code : CallableIndexedLambdaValues.Code compiled.indexed function scope captured.administrative)
+      (history : CallableIndexedLambdaValues.History code) (site : AcceptedCode code)
+      (prefixContext : captured.administrative = RecursiveNamedLambdaFormationHeads.nativePrefix
+        (values := .initial compiled.compatible.checked) site.caller)
+      (globals : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
+        (values := .initial compiled.compatible.checked) (program := Program.ofChecked compiled.sourceProgram)
+        headers owner.key.locations 1 scope captured.canonical owner.key.frameLocation)
+      (referenceIndex : code.referenceIndex = scope.length + 1 + compiled.indexed.base.globals.length)
+      (typed : RuntimeValueHasType world
+        (CallableIndexedLambdaValues.value code captured.embedding history.native actual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore)
+        compiled.indexed.layouts.definitions)
+      (slots : CallableIndexedOwnedPhysicalGlobals.Slots compiled 1 scope captured.canonical) :
+      FunctionOrigins headers keys bodyRegistry faults mapping world
+        (FunctionValues.sourceType function) (.closure function)
+        (CallableIndexedLambdaValues.value code captured.embedding history.native actual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore)
 
 def functions (headers : List (Header compiled (Program.ofChecked compiled.sourceProgram)))
     (keys : List (Key compiled (Program.ofChecked compiled.sourceProgram)))
@@ -238,6 +296,7 @@ def functions (headers : List (Header compiled (Program.ofChecked compiled.sourc
       exact (CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry faults profile).projection
         (registry := registry) retained
     | generalized member _ _ => exact member.projection
+    | accepted _ _ code => exact code.projection
   runtime_hasType := by
     intro registry mapping world sourceType source native type related
     cases related with
@@ -245,6 +304,7 @@ def functions (headers : List (Header compiled (Program.ofChecked compiled.sourc
       exact (CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry faults profile).runtime_hasType
         (registry := registry) retained
     | generalized member _ _ => exact member.runtime_hasType
+    | accepted _ _ _ _ _ _ _ _ typed => exact typed
   source_function := by
     intro registry mapping world sourceType source native type related
     cases related with
@@ -252,6 +312,7 @@ def functions (headers : List (Header compiled (Program.ofChecked compiled.sourc
       exact (CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry faults profile).source_function
         (registry := registry) retained
     | generalized => exact .closure _
+    | accepted => exact .closure _
   extend := by
     intro registry futureRegistry mapping futureMapping world futureWorld sourceType source native type
       related registries maps worlds
@@ -261,6 +322,9 @@ def functions (headers : List (Header compiled (Program.ofChecked compiled.sourc
         retained registries maps worlds)
     | generalized member owner framed =>
       exact .generalized (member.extend maps worlds) owner (by cases member; exact framed)
+    | accepted owner captured code history site prefixContext globals referenceIndex typed slots =>
+      exact .accepted owner (captured.extend maps worlds) code history site prefixContext globals referenceIndex
+        (typed.weaken worlds) slots
 
 theorem includes_prepared (profile : compiled.compatible.checked.catalog.callableContracts = true) :
     (CallableIndexedOwnedPreparedPhysicalCellOrigins.functions headers keys bodyRegistry faults profile).Includes
@@ -272,6 +336,7 @@ theorem runtime_views (profile : compiled.compatible.checked.catalog.callableCon
   cases related with
   | ordinary retained => exact CallableIndexedOwnedPreparedPhysicalCellOrigins.runtime_views profile (registry := registry) retained
   | generalized => exact (Dynamic.ValueRuntimeType.closure _).matches
+  | accepted => exact (Dynamic.ValueRuntimeType.closure _).matches
 
 theorem observations (profile : compiled.compatible.checked.catalog.callableContracts = true) :
     FunctionObservations compiled.compatible.checked.catalog (functions headers keys bodyRegistry faults profile)
@@ -282,6 +347,9 @@ theorem observations (profile : compiled.compatible.checked.catalog.callableCont
   | generalized member _ _ =>
     cases member with
     | viewed material view typed => exact .contractedAnonymous _ _ _ _ _ profile
+  | accepted _ captured code history _ _ _ _ typed =>
+    exact CallableIndexedLambdaValues.observations compiled.indexed profile (registry := registry)
+      (.lambda captured code history typed)
 
 theorem builtin (profile : compiled.compatible.checked.catalog.callableContracts = true)
     {registry : SourceCoreRawMetadata.Registry} {mapping : LocationMap} {world : StoreTyping}
@@ -301,6 +369,7 @@ theorem builtin (profile : compiled.compatible.checked.catalog.callableContracts
     | ordinary retained =>
       exact SelectedCompilationBuiltinFunctionOrigins.prepared_builtin profile (.function retained)
     | generalized => intro function impossible; cases impossible
+    | accepted => intro function impossible; cases impossible
   | compatible same _ ih =>
     intro function selected
     exact .compatible same (ih function selected)
@@ -324,6 +393,11 @@ theorem stage_origin (profile : compiled.compatible.checked.catalog.callableCont
     cases related with
     | ordinary retained => exact SelectedCompilationCallableOrigins.prepared_origin profile (registry := registry) (.function retained) shape
     | generalized member _ _ => exact member.stage_origin
+    | accepted _ _ code _ site =>
+      have prepared := RecursiveNamedPreparedStageContracts.of_compiled compiled
+        compiled.indexed.ancestry.graph.inputs.callableSelected
+      exact CompatibleAmbientStageOrigins.actual_lambda_origin prepared.accepted code.descriptor
+        site.source_receipt code.viewOfSource site.unique code.found (code.form.trans code.sourceForm) _
   | compatible _ _ ih => exact ih
   | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue | arrayRef | arraySlice | memref =>
     intro impossible; cases impossible
