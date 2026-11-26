@@ -21,7 +21,7 @@ declares a local mapping, complements `table[value]` in place and returns it, `b
 `for (let go: bool = true; go; go = false) { continue; }` before it does, `tripled` returns
 `(value, value, value)`, a tuple beyond pairs, and `boxed` returns `.Item(value)`, an application of
 the constructor of the program's enum `Box`. Runtime checks place
-every expression node of the twenty-two rows among the nested sites that call `identity`'s
+every expression node of the twenty-three rows among the nested sites that call `identity`'s
 instantiation or their callees, and each statement list in the supported
 shape. With the complete inventory the rows make a family and give
 the admitted callee's static receipts. The original Source executions of
@@ -45,11 +45,12 @@ represents the Source fault.
 
 Of the memory array rows, `filled` returns the length of `new Word[](uint256(value))`, `listed` the element of
 `[value, value, value]` at `value`, `sliced` the element of the slice `[value, value, value][uint256(value):]`
-at `value`, `copied` the element of `toArray([value, value, value][:])` at `value`, and `referenced` stores its
+at `value`, `copied` the element of `toArray([value, value, value][:])` at `value`, `referenced` stores its
 parameter through `lidx(a, value)` into its local `a`, the literal `[value, value, value]`, and returns
-`CanStore.load(lidx(a, value))`. The call root's reflection applies to them at every word: from `2^251 − 1`
-`new` panics with `0x41`; a read outside its array or slice, a slice's start outside its array, or a memref's
-index outside its array panics with `0x32`.
+`CanStore.load(lidx(a, value))`, and `bumped` writes `a[value]` of such a local by `a[value] = value`,
+`a[value] += value` and `a[value] ~=;` and returns it. The call root's reflection applies to them at every word:
+from `2^251 − 1` `new` panics with `0x41`; a read outside its array or slice, a slice's start outside its array,
+or a memref's or a write's index outside its array panics with `0x32`.
 
 Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.twice_source`,
@@ -92,7 +93,7 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 -/
 
 section
-/-! The program and the declarative typing of its twenty-two functions, constructed
+/-! The program and the declarative typing of its twenty-three functions, constructed
 from checked source observations. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -132,7 +133,9 @@ def workspace : Workspace.RawWorkspace := {
     "function sliced(value: Word) returns (Word) { return [value, value, value][uint256(value):][value]; }",
     "function copied(value: Word) returns (Word) { return toArray([value, value, value][:])[value]; }",
     "function referenced(value: Word) returns (Word) { let a: Word[] = [value, value, value]; " ++
-      "CanStore.store(lidx(a, value), value); return CanStore.load(lidx(a, value)); }" ]}] }
+      "CanStore.store(lidx(a, value), value); return CanStore.load(lidx(a, value)); }",
+    "function bumped(value: word) returns (word) { let a: word[] = [value, value, value]; a[value] = value; " ++
+      "a[value] += value; a[value] ~=; return a[value]; }" ]}] }
 
 def options : SourceCoreCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
@@ -2954,6 +2957,296 @@ def observeReferenced (function : CheckedFunction) (signature : ProgramFunctionS
   return ⟨parts, parameters, inputTypes, returns, binderRequirements, targetScheme, targetRequirements, targetOwner,
     targetDistinct, initializedType, storedType, returnedType⟩
 
+/-- The nodes of `bumped`'s body: its local `a` initialized by a literal of three reads of its parameter,
+`a[value] = value`, `a[value] += value` and `a[value] ~=;`, each through the element of `a` at a read of the
+parameter, the first two with a read of it on the right, and the return of `a[value]`, the element of a read of
+`a` at one more read, found by following the statement graph. -/
+structure BumpedParts (source : TypedSource) where
+  binder : TypedBinder
+  target : TypedBinder
+  initialized : StatementNode
+  assigned : StatementNode
+  added : StatementNode
+  flip : StatementNode
+  returned : StatementNode
+  assignedResolution : AssignmentResolution
+  addedResolution : AssignmentResolution
+  flipResolution : AssignmentResolution
+  inputs : source.inputs = [binder]
+  roots : source.roots = [.statement initialized.id, .statement assigned.id, .statement added.id,
+    .statement flip.id, .statement returned.id]
+  initializedFound : source.lookupStatement? initialized.id = some initialized
+  assignedFound : source.lookupStatement? assigned.id = some assigned
+  addedFound : source.lookupStatement? added.id = some added
+  flipFound : source.lookupStatement? flip.id = some flip
+  returnedFound : source.lookupStatement? returned.id = some returned
+  first : Tests.SourceCoreNamedBranch.Read source binder .word
+  second : Tests.SourceCoreNamedBranch.Read source binder .word
+  third : Tests.SourceCoreNamedBranch.Read source binder .word
+  literal : Tests.SourceCoreOperatorCalls.TypedNode source (TypeSystem.Ty.array .word)
+  literalForm : literal.node.form = .arrayLiteral .word [first.node.id, second.node.id, third.node.id]
+  initializedForm : initialized.form = .letDecl target (some literal.node.id)
+  assignedKey : Tests.SourceCoreNamedBranch.Read source binder .word
+  assignedValue : Tests.SourceCoreNamedBranch.Read source binder .word
+  assignedForm : assigned.form = .assignValue assignedResolution .equal assignedValue.node.id
+  assignedRoot : assignedResolution.target.root = target.id
+  assignedProjections : assignedResolution.target.projections = [.element assignedKey.node.id]
+  assignedTargetType : assignedResolution.target.type = .word
+  addedKey : Tests.SourceCoreNamedBranch.Read source binder .word
+  addedValue : Tests.SourceCoreNamedBranch.Read source binder .word
+  addedForm : added.form = .assignValue addedResolution .add addedValue.node.id
+  addedRoot : addedResolution.target.root = target.id
+  addedProjections : addedResolution.target.projections = [.element addedKey.node.id]
+  addedTargetType : addedResolution.target.type = .word
+  flipKey : Tests.SourceCoreNamedBranch.Read source binder .word
+  flipForm : flip.form = .assignBitNot flipResolution
+  flipRoot : flipResolution.target.root = target.id
+  flipProjections : flipResolution.target.projections = [.element flipKey.node.id]
+  flipTargetType : flipResolution.target.type = .word
+  readArray : Tests.SourceCoreNamedBranch.Read source target (TypeSystem.Ty.array .word)
+  readIndex : Tests.SourceCoreNamedBranch.Read source binder .word
+  read : Tests.SourceCoreOperatorCalls.TypedNode source .word
+  readForm : read.node.form = .arrayIndex readArray.node.id readIndex.node.id
+  returnedForm : returned.form = .returnStmt (some read.node.id)
+
+def observeBumpedParts (source : TypedSource) : IO (BumpedParts source) := do
+  let [binder] := source.inputs | throw (IO.userError "bumped input")
+  let [.statement initializedId, .statement assignedId, .statement addedId, .statement flipId,
+      .statement returnedId] := source.roots
+    | throw (IO.userError "bumped roots")
+  let some initialized := source.lookupStatement? initializedId | throw (IO.userError "bumped let")
+  let some assigned := source.lookupStatement? assignedId | throw (IO.userError "bumped assignment")
+  let some added := source.lookupStatement? addedId | throw (IO.userError "bumped compound assignment")
+  let some flip := source.lookupStatement? flipId | throw (IO.userError "bumped flip")
+  let some returned := source.lookupStatement? returnedId | throw (IO.userError "bumped return")
+  let .letDecl target (some literalId) := initialized.form | throw (IO.userError "bumped let form")
+  let .assignValue assignedResolution .equal assignedValueId := assigned.form
+    | throw (IO.userError "bumped assignment form")
+  let .assignValue addedResolution .add addedValueId := added.form
+    | throw (IO.userError "bumped compound assignment form")
+  let .assignBitNot flipResolution := flip.form | throw (IO.userError "bumped flip form")
+  let .returnStmt (some readId) := returned.form | throw (IO.userError "bumped return form")
+  let [.element assignedKeyId] := assignedResolution.target.projections
+    | throw (IO.userError "bumped assignment projections")
+  let [.element addedKeyId] := addedResolution.target.projections
+    | throw (IO.userError "bumped compound assignment projections")
+  let [.element flipKeyId] := flipResolution.target.projections | throw (IO.userError "bumped flip projections")
+  let some literalNode := source.lookupExpression? literalId | throw (IO.userError "bumped literal")
+  let .arrayLiteral _ [firstId, secondId, thirdId] := literalNode.form | throw (IO.userError "bumped literal form")
+  let some firstNode := source.lookupExpression? firstId | throw (IO.userError "bumped first")
+  let some secondNode := source.lookupExpression? secondId | throw (IO.userError "bumped second")
+  let some thirdNode := source.lookupExpression? thirdId | throw (IO.userError "bumped third")
+  let some assignedKeyNode := source.lookupExpression? assignedKeyId | throw (IO.userError "bumped assignment key")
+  let some assignedValueNode := source.lookupExpression? assignedValueId
+    | throw (IO.userError "bumped assignment value")
+  let some addedKeyNode := source.lookupExpression? addedKeyId | throw (IO.userError "bumped compound key")
+  let some addedValueNode := source.lookupExpression? addedValueId | throw (IO.userError "bumped compound value")
+  let some flipKeyNode := source.lookupExpression? flipKeyId | throw (IO.userError "bumped flip key")
+  let some readNode := source.lookupExpression? readId | throw (IO.userError "bumped read")
+  let .arrayIndex readArrayId readIndexId := readNode.form | throw (IO.userError "bumped read form")
+  let some readArrayNode := source.lookupExpression? readArrayId | throw (IO.userError "bumped read array")
+  let some readIndexNode := source.lookupExpression? readIndexId | throw (IO.userError "bumped read index")
+  let first ← Tests.SourceCoreNamedBranch.observeRead source binder firstNode .word
+  let second ← Tests.SourceCoreNamedBranch.observeRead source binder secondNode .word
+  let third ← Tests.SourceCoreNamedBranch.observeRead source binder thirdNode .word
+  let literal ← Tests.SourceCoreOperatorCalls.observeNode source literalNode (TypeSystem.Ty.array .word)
+  let ⟨literalForm⟩ ← observed (literal.node.form = .arrayLiteral .word [first.node.id, second.node.id, third.node.id])
+    "bumped literalForm"
+  let assignedKey ← Tests.SourceCoreNamedBranch.observeRead source binder assignedKeyNode .word
+  let assignedValue ← Tests.SourceCoreNamedBranch.observeRead source binder assignedValueNode .word
+  let addedKey ← Tests.SourceCoreNamedBranch.observeRead source binder addedKeyNode .word
+  let addedValue ← Tests.SourceCoreNamedBranch.observeRead source binder addedValueNode .word
+  let flipKey ← Tests.SourceCoreNamedBranch.observeRead source binder flipKeyNode .word
+  let readArray ← Tests.SourceCoreNamedBranch.observeRead source target readArrayNode (TypeSystem.Ty.array .word)
+  let readIndex ← Tests.SourceCoreNamedBranch.observeRead source binder readIndexNode .word
+  let read ← Tests.SourceCoreOperatorCalls.observeNode source readNode .word
+  let ⟨readForm⟩ ← observed (read.node.form = .arrayIndex readArray.node.id readIndex.node.id) "bumped readForm"
+  let ⟨inputs⟩ ← observed (source.inputs = [binder]) "bumped inputs"
+  let ⟨roots⟩ ← observed (source.roots = [.statement initialized.id, .statement assigned.id, .statement added.id,
+    .statement flip.id, .statement returned.id]) "bumped roots shape"
+  let ⟨initializedFound⟩ ← observed (source.lookupStatement? initialized.id = some initialized)
+    "bumped initializedFound"
+  let ⟨assignedFound⟩ ← observed (source.lookupStatement? assigned.id = some assigned) "bumped assignedFound"
+  let ⟨addedFound⟩ ← observed (source.lookupStatement? added.id = some added) "bumped addedFound"
+  let ⟨flipFound⟩ ← observed (source.lookupStatement? flip.id = some flip) "bumped flipFound"
+  let ⟨returnedFound⟩ ← observed (source.lookupStatement? returned.id = some returned) "bumped returnedFound"
+  let ⟨initializedForm⟩ ← observed (initialized.form = .letDecl target (some literal.node.id))
+    "bumped initializedForm"
+  let ⟨assignedForm⟩ ← observed (assigned.form = .assignValue assignedResolution .equal assignedValue.node.id)
+    "bumped assignedForm"
+  let ⟨assignedRoot⟩ ← observed (assignedResolution.target.root = target.id) "bumped assignedRoot"
+  let ⟨assignedProjections⟩ ← observed (assignedResolution.target.projections = [.element assignedKey.node.id])
+    "bumped assignedProjections"
+  let ⟨assignedTargetType⟩ ← observed (assignedResolution.target.type = .word) "bumped assignedTargetType"
+  let ⟨addedForm⟩ ← observed (added.form = .assignValue addedResolution .add addedValue.node.id) "bumped addedForm"
+  let ⟨addedRoot⟩ ← observed (addedResolution.target.root = target.id) "bumped addedRoot"
+  let ⟨addedProjections⟩ ← observed (addedResolution.target.projections = [.element addedKey.node.id])
+    "bumped addedProjections"
+  let ⟨addedTargetType⟩ ← observed (addedResolution.target.type = .word) "bumped addedTargetType"
+  let ⟨flipForm⟩ ← observed (flip.form = .assignBitNot flipResolution) "bumped flipForm"
+  let ⟨flipRoot⟩ ← observed (flipResolution.target.root = target.id) "bumped flipRoot"
+  let ⟨flipProjections⟩ ← observed (flipResolution.target.projections = [.element flipKey.node.id])
+    "bumped flipProjections"
+  let ⟨flipTargetType⟩ ← observed (flipResolution.target.type = .word) "bumped flipTargetType"
+  let ⟨returnedForm⟩ ← observed (returned.form = .returnStmt (some read.node.id)) "bumped returnedForm"
+  return ⟨binder, target, initialized, assigned, added, flip, returned, assignedResolution, addedResolution,
+    flipResolution, inputs, roots, initializedFound, assignedFound, addedFound, flipFound, returnedFound, first,
+    second, third, literal, literalForm, initializedForm, assignedKey, assignedValue, assignedForm, assignedRoot,
+    assignedProjections, assignedTargetType, addedKey, addedValue, addedForm, addedRoot, addedProjections,
+    addedTargetType, flipKey, flipForm, flipRoot, flipProjections, flipTargetType, readArray, readIndex, read,
+    readForm, returnedForm⟩
+
+/-- `bumped`'s body: `let a: word[] = [value, value, value]`, `a[value] = value`, `a[value] += value` and
+`a[value] ~=;` through the local's element, and the return of `a[value]`. -/
+structure BumpedShape (function : CheckedFunction) (signature : ProgramFunctionSignature) where
+  parts : BumpedParts function.typedBody
+  parameters : signature.scheme.parameters = []
+  inputTypes : signature.parameterTypes = [.word]
+  returns : signature.returnTypes = [.word]
+  binderRequirements : parts.binder.schemeRequirements = []
+  targetScheme : parts.target.scheme = .mono (TypeSystem.Ty.array .word)
+  targetRequirements : parts.target.schemeRequirements = []
+  targetOwner : parts.target.id.owner = function.typedBody.owner
+  targetDistinct : parts.target.id ≠ parts.binder.id
+  initializedType : parts.initialized.type = .unit
+  assignedType : parts.assigned.type = .unit
+  addedType : parts.added.type = .unit
+  flipType : parts.flip.type = .unit
+  returnedType : parts.returned.type = .word
+  assignedRequirements : parts.assignedResolution.requirements = []
+  addedRequirements : parts.addedResolution.requirements = []
+  flipRequirements : parts.flipResolution.requirements = []
+
+theorem BumpedShape.statementTyping {function : CheckedFunction} {signature : ProgramFunctionSignature}
+    (shape : BumpedShape function signature) (signatures : ProgramSignatures) :
+    CheckedBodyStatementsHaveType signatures signature function := by
+  intro statements roots
+  have same : statements = [shape.parts.initialized.id, shape.parts.assigned.id, shape.parts.added.id,
+      shape.parts.flip.id, shape.parts.returned.id] :=
+    statementRoots_injective (roots.symm.trans shape.parts.roots)
+  subst statements
+  rw [shape.returns]
+  let facts : StatementFacts := {type := .word, hasValue := true, sawReturn := true, control := .returned}
+  let ordinary : StatementFacts := {type := .unit, hasValue := false, sawReturn := false, control := .ordinary .unit}
+  refine ⟨BodyFacts.cons ordinary (BodyFacts.cons ordinary (BodyFacts.cons ordinary (BodyFacts.cons ordinary
+    (BodyFacts.singleton facts)))), rfl, ?_⟩
+  intro lexical extension
+  rw [shape.parts.inputs, shape.inputTypes] at extension
+  cases extension with
+  | cons scheme head tail =>
+    cases tail
+    have binders : TypeParameterBindersWellFormed lexical := by
+      rw [TypeParameterBindersWellFormed, head.context_fields.2.2.1]
+      simp [checkedBodyContext, declarationContext, Context.ofSignatures, Context.forDeclaration,
+        Context.withAssumptions, Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.parameters]
+    have word : TypeAdmissible lexical .word := ⟨binders, .builtin .word⟩
+    have array : TypeAdmissible lexical (TypeSystem.Ty.array .word) := ⟨binders, .array (.builtin .word)⟩
+    have literalTyped := shape.parts.literal.ordinary array (by
+      rw [shape.parts.literalForm]
+      exact .arrayLiteral word
+        (.cons (shape.parts.first.typed scheme shape.binderRequirements word head.local_self
+            head.local_scheme_requirements_self)
+          (.cons (shape.parts.second.typed scheme shape.binderRequirements word head.local_self
+              head.local_scheme_requirements_self)
+            (.cons (shape.parts.third.typed scheme shape.binderRequirements word head.local_self
+                head.local_scheme_requirements_self) (.nil _)))))
+    let locals := lexical.withLocal shape.parts.target.id shape.parts.target.scheme shape.parts.target.schemeRequirements
+    have targetExtended : BinderExtends function.typedBody.owner lexical shape.parts.target locals := by
+      apply BinderExtends.intro
+      · exact {
+          owned := shape.targetOwner
+          scheme := shape.targetScheme.symm ▸ SchemeWellFormed.monoAdmissible array
+          quantified_fresh := by rw [shape.targetScheme]; simp [SchemeQuantifiersFresh, TypeSystem.Scheme.mono]
+          monomorphic_requirements_empty := fun _ => shape.targetRequirements }
+      · cases head
+        simp [LocalFresh, Context.withLocal, checkedBodyContext, declarationContext,
+          Context.ofSignatures, Context.forDeclaration, Context.withAssumptions,
+          Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.targetDistinct]
+    have initializedTyped : StatementHasType function.typedBody ⟨.word, 0⟩ lexical
+        shape.parts.initialized.id locals ordinary := by
+      apply StatementHasType.letInitialized (lookupStatement?_sound shape.parts.initializedFound)
+        shape.parts.initializedForm
+      · simpa only [shape.targetScheme, TypeSystem.Scheme.mono] using literalTyped
+      · rw [shape.targetScheme]; rfl
+      · rw [shape.targetScheme]; rfl
+      · exact targetExtended
+      · exact shape.initializedType
+    have localWord : TypeAdmissible locals .word := ⟨binders, .builtin .word⟩
+    have localArray : TypeAdmissible locals (TypeSystem.Ty.array .word) := ⟨binders, .array (.builtin .word)⟩
+    have parameterLookup : locals.LocalLookup shape.parts.binder.id shape.parts.binder.scheme :=
+      .tail shape.targetDistinct head.local_self
+    have parameterRequirements :
+        locals.LocalSchemeRequirementsLookup shape.parts.binder.id shape.parts.binder.schemeRequirements :=
+      .tail shape.targetDistinct head.local_scheme_requirements_self
+    have writable : WritableLocal locals shape.parts.target.id (TypeSystem.Ty.array .word) :=
+      .intro targetExtended.local_self (shape.targetScheme.symm ▸ SchemeWellFormed.monoAdmissible localArray)
+        (by rw [shape.targetScheme]; rfl) (by rw [shape.targetScheme]; rfl)
+    -- The element of the local at a typed index is a `word` place.
+    have place : ∀ {resolution : AssignmentResolution} {key : ExpressionId},
+        resolution.target.root = shape.parts.target.id → resolution.target.projections = [.element key] →
+        resolution.target.type = .word → ExpressionHasType function.typedBody locals key .word →
+        SourcePlaceHasType function.typedBody locals resolution.target .word := by
+      intro resolution key root projections type keyTyped
+      refine .intro (rootType := TypeSystem.Ty.array .word) (by rw [root]; exact writable) ?_ type
+      rw [projections]
+      exact .element keyTyped (.nil _)
+    have assignedKeyTyped := shape.parts.assignedKey.typed scheme shape.binderRequirements localWord parameterLookup
+      parameterRequirements
+    have assignedValueTyped := shape.parts.assignedValue.typed scheme shape.binderRequirements localWord
+      parameterLookup parameterRequirements
+    have assignedTyped : StatementHasType function.typedBody ⟨.word, 0⟩ locals shape.parts.assigned.id locals
+        ordinary :=
+      .assignValue (lookupStatement?_sound shape.parts.assignedFound) shape.parts.assignedForm
+        (.equal (place shape.parts.assignedRoot shape.parts.assignedProjections shape.parts.assignedTargetType
+          assignedKeyTyped) assignedValueTyped shape.assignedRequirements) shape.assignedType
+    have addedKeyTyped := shape.parts.addedKey.typed scheme shape.binderRequirements localWord parameterLookup
+      parameterRequirements
+    have addedValueTyped := shape.parts.addedValue.typed scheme shape.binderRequirements localWord parameterLookup
+      parameterRequirements
+    have addedTyped : StatementHasType function.typedBody ⟨.word, 0⟩ locals shape.parts.added.id locals ordinary :=
+      .assignValue (lookupStatement?_sound shape.parts.addedFound) shape.parts.addedForm
+        (.wordCompound .add (place shape.parts.addedRoot shape.parts.addedProjections shape.parts.addedTargetType
+          addedKeyTyped) addedValueTyped shape.addedRequirements) shape.addedType
+    have flipKeyTyped := shape.parts.flipKey.typed scheme shape.binderRequirements localWord parameterLookup
+      parameterRequirements
+    have flipTyped : StatementHasType function.typedBody ⟨.word, 0⟩ locals shape.parts.flip.id locals ordinary :=
+      .assignBitNot (lookupStatement?_sound shape.parts.flipFound) shape.parts.flipForm
+        (.intro (place shape.parts.flipRoot shape.parts.flipProjections shape.parts.flipTargetType flipKeyTyped)
+          .word shape.flipRequirements) shape.flipType
+    have readArrayTyped := shape.parts.readArray.typed shape.targetScheme shape.targetRequirements localArray
+      targetExtended.local_self targetExtended.local_scheme_requirements_self
+    have readIndexTyped := shape.parts.readIndex.typed scheme shape.binderRequirements localWord parameterLookup
+      parameterRequirements
+    have readTyped := shape.parts.read.ordinary localWord (by
+      rw [shape.parts.readForm]
+      exact .arrayIndex readArrayTyped (.array .word) readIndexTyped .word)
+    exact ⟨_, .cons initializedTyped (.cons assignedTyped (.cons addedTyped (.cons flipTyped (.singleton
+      (.returnValue (lookupStatement?_sound shape.parts.returnedFound) shape.parts.returnedForm readTyped
+        shape.returnedType)))))⟩
+
+def observeBumped (function : CheckedFunction) (signature : ProgramFunctionSignature) :
+    IO (BumpedShape function signature) := do
+  let parts ← observeBumpedParts function.typedBody
+  let ⟨parameters⟩ ← observed (signature.scheme.parameters = []) "bumped parameters"
+  let ⟨inputTypes⟩ ← observed (signature.parameterTypes = [.word]) "bumped inputTypes"
+  let ⟨returns⟩ ← observed (signature.returnTypes = [.word]) "bumped returns"
+  let ⟨binderRequirements⟩ ← observed (parts.binder.schemeRequirements = []) "bumped binderRequirements"
+  let ⟨targetScheme⟩ ← observed (parts.target.scheme = .mono (TypeSystem.Ty.array .word)) "bumped targetScheme"
+  let ⟨targetRequirements⟩ ← observed (parts.target.schemeRequirements = []) "bumped targetRequirements"
+  let ⟨targetOwner⟩ ← observed (parts.target.id.owner = function.typedBody.owner) "bumped targetOwner"
+  let ⟨targetDistinct⟩ ← observed (parts.target.id ≠ parts.binder.id) "bumped targetDistinct"
+  let ⟨initializedType⟩ ← observed (parts.initialized.type = .unit) "bumped initializedType"
+  let ⟨assignedType⟩ ← observed (parts.assigned.type = .unit) "bumped assignedType"
+  let ⟨addedType⟩ ← observed (parts.added.type = .unit) "bumped addedType"
+  let ⟨flipType⟩ ← observed (parts.flip.type = .unit) "bumped flipType"
+  let ⟨returnedType⟩ ← observed (parts.returned.type = .word) "bumped returnedType"
+  let ⟨assignedRequirements⟩ ← observed (parts.assignedResolution.requirements = []) "bumped assignedRequirements"
+  let ⟨addedRequirements⟩ ← observed (parts.addedResolution.requirements = []) "bumped addedRequirements"
+  let ⟨flipRequirements⟩ ← observed (parts.flipResolution.requirements = []) "bumped flipRequirements"
+  return ⟨parts, parameters, inputTypes, returns, binderRequirements, targetScheme, targetRequirements, targetOwner,
+    targetDistinct, initializedType, assignedType, addedType, flipType, returnedType, assignedRequirements,
+    addedRequirements, flipRequirements⟩
+
 /-- Two members of a list of signatures whose ids are distinct are equal when
 their ids are. -/
 private theorem signature_of_id {signatures : List ProgramFunctionSignature}
@@ -2982,11 +3275,11 @@ def observeWellFormed {program : CheckedProgram}
   | [identityFunction, relayFunction, twiceFunction, narrowFunction, roundTripFunction, doubledFunction,
       shiftedFunction, flippedFunction, tailedFunction, storedFunction, summedFunction, zeroedFunction,
       invertedFunction, brokenFunction, countedFunction, tripledFunction, boxedFunction,
-      filledFunction, listedFunction, slicedFunction, copiedFunction, referencedFunction],
+      filledFunction, listedFunction, slicedFunction, copiedFunction, referencedFunction, bumpedFunction],
     [identitySignature, relaySignature, twiceSignature, narrowSignature, roundTripSignature, doubledSignature,
       shiftedSignature, flippedSignature, tailedSignature, storedSignature, summedSignature, zeroedSignature,
       invertedSignature, brokenSignature, countedSignature, tripledSignature, boxedSignature,
-      filledSignature, listedSignature, slicedSignature, copiedSignature, referencedSignature] =>
+      filledSignature, listedSignature, slicedSignature, copiedSignature, referencedSignature, bumpedSignature] =>
     let identityShape ← Tests.SourceCoreOperatorCalls.observeIdentity identityFunction identitySignature
     let relayShape ← observeRelay relayFunction relaySignature identitySignature
     let twiceShape ← observeTwice twiceFunction twiceSignature identitySignature
@@ -3009,6 +3302,7 @@ def observeWellFormed {program : CheckedProgram}
     let slicedShape ← observeSliced slicedFunction slicedSignature
     let copiedShape ← observeCopied copiedFunction copiedSignature
     let referencedShape ← observeReferenced referencedFunction referencedSignature
+    let bumpedShape ← observeBumped bumpedFunction bumpedSignature
     let ⟨methods⟩ ← observed (program.methods = []) "calls methods"
     let ⟨identityDeclaration⟩ ← observed (identityFunction.declaration = identitySignature.id)
       "calls identityDeclaration"
@@ -3043,6 +3337,8 @@ def observeWellFormed {program : CheckedProgram}
       "calls copiedDeclaration"
     let ⟨referencedDeclaration⟩ ← observed (referencedFunction.declaration = referencedSignature.id)
       "calls referencedDeclaration"
+    let ⟨bumpedDeclaration⟩ ← observed (bumpedFunction.declaration = bumpedSignature.id)
+      "calls bumpedDeclaration"
     let ⟨distinct⟩ ← observed ((program.signatures.functions.map (·.id)).Nodup) "calls distinct signatures"
     let deep : CheckedProgramBodiesHaveStatementTyping program options.checkingFuel := {
       functions := by
@@ -3053,7 +3349,7 @@ def observeWellFormed {program : CheckedProgram}
           signature_of_id distinct candidateMember signatureMember (declared.symm.trans same)
         simp only [functions, List.mem_cons, List.not_mem_nil, or_false] at member
         rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
-          | rfl | rfl | rfl | rfl | rfl | rfl
+          | rfl | rfl | rfl | rfl | rfl | rfl | rfl
         · obtain rfl := selects (by simp [signatures]) identityDeclaration
           exact identityShape.statementTyping program.signatures
         · obtain rfl := selects (by simp [signatures]) relayDeclaration
@@ -3098,6 +3394,8 @@ def observeWellFormed {program : CheckedProgram}
           exact copiedShape.statementTyping program.signatures
         · obtain rfl := selects (by simp [signatures]) referencedDeclaration
           exact referencedShape.statementTyping program.signatures
+        · obtain rfl := selects (by simp [signatures]) bumpedDeclaration
+          exact bumpedShape.statementTyping program.signatures
       methods := by intro method member; simp only [methods, List.not_mem_nil] at member }
     return ⟨programWellFormed_ofCheckProgram_statements checked deep⟩
   | _, _ => throw (IO.userError "calls declaration count")
@@ -3106,7 +3404,7 @@ end Tests.SourceCoreAcceptedOneCall
 end
 
 section
-/-! The cache rows of the twenty-two functions and their original Source
+/-! The cache rows of the twenty-three functions and their original Source
 executions: `identity` returns its parameter, `relay` returns the direct call
 of `identity` with its parameter, `twice` returns the direct call of
 `identity` with that call, `tailed` ends in the direct call of `identity` with
@@ -3118,7 +3416,8 @@ their parameter after their loops, `counted`'s after one iteration, `tripled` re
 parameter, `boxed` returns `Item` applied to it, `filled` returns the length of a new array of its parameter's
 length, `listed` its literal's element at its parameter, `sliced` its literal's slice's element there,
 `copied` the element of its whole slice's copy there, `referenced` the element it stored through a memref into
-its local literal,
+its local literal, `bumped` the element its three writes left in its local literal there, the complement of twice
+its parameter,
 `narrow` returns the conversion of its parameter,
 and `roundTrip` the word of that value, at a word canonical for `uint8`. Each call's global application is
 a given body invocation. At a word not canonical for `uint8` the conversions of `narrow`, `doubled`,
@@ -3485,6 +3784,16 @@ structure ReferencedBody (source : TypedSource) where
 def observeReferencedBody (source : TypedSource) : IO (ReferencedBody source) := do
   let parts ← observeReferencedParts source
   let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "referenced row binderScheme"
+  return ⟨parts, binderScheme⟩
+
+/-- `bumped`'s cache row: the nodes of its body and its `word` parameter. -/
+structure BumpedBody (source : TypedSource) where
+  parts : BumpedParts source
+  binderScheme : parts.binder.scheme = .mono .word
+
+def observeBumpedBody (source : TypedSource) : IO (BumpedBody source) := do
+  let parts ← observeBumpedParts source
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "bumped row binderScheme"
   return ⟨parts, binderScheme⟩
 
 /-- The read of a parameter at the next cell of a heap. -/
@@ -4148,7 +4457,7 @@ end
 
 section
 /-! The accepted-body public theorems at the call root. Runtime checks place
-every expression node of the twenty-two rows among the nested sites or their callees
+every expression node of the twenty-three rows among the nested sites or their callees
 and each statement list in the supported shape; the complete inventory turns
 them into the rows of a family and gives the admitted callee's static
 receipts. The original Source executions of `relay`, `twice`, `tailed`, `stored`, `summed`, `zeroed`,
@@ -5720,7 +6029,29 @@ def runReferenced (observed : Observed) : IO Unit := do
     let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
     expect result.val entry.2 "referenced"
 
-/-- The memory array rows `filled`, `listed`, `sliced`, `copied` and `referenced`. -/
+/-- At `bumped`, `a[value] = value`, `a[value] += value` and `a[value] ~=;` on the literal `a`, then the return of
+`a[value]`: below 3 the actual resumption returns the complement of twice the parameter, and from 3 the first
+write's index is outside the array and panics with `0x32`. The call root's reflection applies at every word. -/
+def runBumped (observed : Observed) : IO Unit := do
+  let bumped ← observeRow observed.fixture "bumped"
+  let bumpedBody ← observeBumpedBody bumped.original.function.typedBody
+  let cases : List (Word × Except UInt8 Word) :=
+    [(Word.zero, .ok Word.zero.bitNot), (Word.ofNatModulo 1, .ok (Word.ofNatModulo 2).bitNot),
+     (Word.ofNatModulo 2, .ok (Word.ofNatModulo 4).bitNot),
+     (Word.ofNatModulo 3, .error SourceCorePanics.outOfBounds),
+     (Word.ofNatModulo 7, .error SourceCorePanics.outOfBounds)]
+  for entry in cases do
+    let started ← observeStarted observed.fixture bumped.original.key [.word entry.1]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole bumped),
+        Nonempty (AcceptedReflection selected entry.1 started) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select bumped
+      exact ⟨whole, selected, accepted_reflection selected observed.calls entry.1 observed.wellFormed started
+        observed.callableProfile bumpedBody.parts.inputs bumpedBody.binderScheme⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    expect result.val entry.2 "bumped"
+
+/-- The memory array rows `filled`, `listed`, `sliced`, `copied`, `referenced` and `bumped`. -/
 def run : IO Unit := do
   let observed ← observe
   runFilled observed
@@ -5728,6 +6059,7 @@ def run : IO Unit := do
   runSliced observed
   runCopied observed
   runReferenced observed
+  runBumped observed
   IO.println "ACCEPTED_ARRAY_PUBLIC_PASS"
 
 end AcceptedArrayRuntime
