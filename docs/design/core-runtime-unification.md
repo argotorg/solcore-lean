@@ -260,10 +260,20 @@ Direct calls are in [AcceptedCalls](../../Solcore/SourceSemantics/CoreLowering/A
   compiler sites whose parameter substitution is closed (`ConstructorSite`). So are the memory
   array forms (`Nested.array`, over `ArraySite`), `lidx(a, i)` among them wherever it stands,
   and a load or a store through a `lidx` made on the spot (`Nested.memrefLoad`,
-  `Nested.memrefStore`, over `MemrefSite`).
+  `Nested.memrefStore`, over `MemrefSite`). So are a named function used as a value
+  (`Nested.namedValue`, over `ValueSite`), whose header's port is an input like a direct call's
+  (`valuePorts`, from the same complete inventory; a row with no reference edge in the plan,
+  `NamedValuesOf`, asks nothing), and an uncoerced indirect call (`Nested.indirect`, over
+  `IndirectSite`). An indirect site carries three whole-program facts: the family admits every
+  planned instantiation (`CoversPlan`), the callable table records no lambda (`NoLambdas`), and
+  every planned contract has runtime parameters and an unstaged result (`RuntimeContracts`).
+  Its heads (`AcceptedIndirectCalls`) take the callee's application as an input, which the
+  family gives at the root model: a builtin applies as a packed builtin, a named function as
+  its header's direct-call application, and no closure is a function value.
 - **Authority.** `CellAwareInvocationAcceptedCallAuthority` derives `Ports` from a complete
   inventory: a call receipt's global slot names an indexed function, and the inventory's header for
-  that index gives the `Port`.
+  that index gives the `Port`. `CellAwareNamedValuePorts.ports` derives `ValuePorts` from the
+  same inventory.
 - **The public root.** `CellAwareInvocationAcceptedCallEntry` is the body-trace counterpart of the
   row lemma in both directions (`preserves_selected`, `reflects_selected`), packaged as the root's
   `NamedResultAt` with the restored caller's post-admission. In
@@ -378,13 +388,25 @@ program.
   `constructorMetadataFault`. The last mirrors the Source's constructor metadata fault, and the
   constructor heads refute it from the metadata's validity. A match lifts to the staged `Match`
   from its scrutinee's and its selected body's liftings, a selected arm or default being one
-  of the match's own (`selected_body`).
+  of the match's own (`selected_body`). The liftings carry the functions a Source state stores
+  (`CellAwareInvocationAcceptedStoredFunctions`): every function value in the starting state is
+  a builtin or a named function at an instantiation the plan records, with an empty
+  dictionary, and no cell holds a generalized closure. A data-only start meets it, and every
+  supported form keeps it. Under its guard only a family with an indirect call asks it
+  (`FamilyIndirect`). An indirect call lifts to the staged `applied`: its guard accepts through
+  the scope's ledger frame and the plan's runtime contract (`IndirectFacts`, discharged at the
+  stages registry by `ClosuresFramed.stages` and `Aligned.of_wellFormed`), a builtin callee
+  applies as a builtin and a named callee through its body's lifting.
 - **Fault lifting.** `CellAwareInvocationAcceptedFaultLifting`, in the same file, lifts the
   original fault executions of the same bodies with the same reason and heap (`body_fault`). The
   staged traces express every reason but a type mismatch and a missing declaration
   (`Expressible`). The direct calls must have plain callee nodes (`CalleesPlain`, a finite
   check), because the Source's fault rule after a call's arguments does not record its callee.
   A loop's condition, body, header items and later iterations fault as the staged loop rules do.
+  It takes families without an indirect site: `CalleesPlain` also excludes an indirect call.
+  The staged guard pairs a named value's contract parameters with the call's arguments, and the
+  lifting carries no Source typing to give a stored value's arity. So an indirect row has its
+  values in both directions, and its faults from a Core run back to the Source only.
 
 ### Instances
 
@@ -438,6 +460,18 @@ program.
   from `relay`'s original execution. A call's callee is an expression node of its own: the check
   admits it as a declaration reference with no plan reference edge, which the named compiler cannot
   lower on its own (`CellAwareInvocationAcceptedCallSubsetCheck.reference_rejected`).
+- **Indirect calls.** The test
+  [Accepted/Indirect](../../Solcore/Test/SourceSemantics/CoreLowering/Accepted/Indirect.lean)
+  compiles a second program, whose family admits every planned instantiation. `viaLocal` reads
+  the named function `identity` from a local, `let f: function(word) returns (word) = identity;`,
+  and returns `f(value)`; `viaBuiltin` reads the word opcode `add` of `std.opcodes` from a local
+  and returns `plus(value, value)`. Each has the call root's theorems in both directions from
+  its original Source execution (`accepted_call`, `accepted_reflection`). The rows hold for
+  programs without a lambda in any planned source and whose planned functions all have runtime
+  parameters and a runtime result (`RuntimeContracts`): a function returning `integer`, a
+  comptime-only type, excludes the program. The lambda premise goes with closures as the values
+  of indirect calls, which come next, and both would narrow to the callee's type once the
+  lifting carries Source typing.
 
 ## Remaining work for the second goal
 
@@ -466,8 +500,9 @@ On the accepted-body route above, the next connected steps are:
     conversion, `Typedef.rep` of a conversion, an index read after a write through the same
     index, a call of an integer closure, a call of an imported opcode, a triple and a constructor
     application instantiates both directions.
-  - Next come the array forms, then indirect calls, methods, generalized reads, closures and
-    coercions.
+  - The memory array forms, named functions as values and uncoerced indirect calls are nested
+    sites too. Next come closures as the values of indirect calls, then methods, generalized
+    reads and coercions.
   - Expressions of contextual closures need the relation between the compiler view and the Source
     that their writes and matches also need.
 - **Strengthen the named-row public connection.**

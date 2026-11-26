@@ -302,11 +302,14 @@ below come from running upstream's own test programs through Lean's native front
   - a compound assignment at a program's own type or at a type variable runs the operator's
     trait method, with its place evaluated once;
   - a trait method is called by its name, with upstream's lookup order: a local, a function
-    or builtin, the method, then a same-name constructor;
+    or builtin, the method, then a same-name constructor. The Source's form and its rules are
+    built (`ExpressionForm.methodCall`); inference produces the form next;
   - a trait method's own type parameters, with their `where` predicates, are instantiated at
-    each call.
-
-  `case .true` and `case .false` wait for a case of the Source's pattern relation.
+    each call;
+  - `case .true` and `case .false` are the boolean patterns at a `bool` scrutinee, with a case
+    of the Source's pattern relation;
+  - an operator's type is its trait method's result, one product where the method has several,
+    with the method's parameters still the operand's type twice.
 - **Lean keeps its own rule:**
   - mutually recursive data is accepted, as directly recursive data is;
   - an operator's trait is the one declared with its name, so a trait imported as `Add` under
@@ -339,14 +342,16 @@ below come from running upstream's own test programs through Lean's native front
   at a comptime local, where upstream evaluates it while staged. Lean's staging also defers
   a constructor of compile-time values at a comptime parameter, where upstream evaluates it
   while staged, and a local assigned later wherever it is assigned, where upstream follows
-  the value assigned to it. An operator whose trait method does not have the operator's own
-  shape is refused, a method written `returns (a, b)` at a pair among them, where upstream
-  calls the method whatever it returns.
+  the value assigned to it. An operator whose trait method takes a second parameter of
+  another type, or whose trait has two parameters, is refused, where upstream types the
+  operator as a call of the method; that waits for the trait method calls.
 - **Forms Lean's native frontend lacks,** in the order planned after the rules above:
-  `struct` declarations with field reads and writes; the `Int` trait at a program's own types
-  and in `where`; two-parameter operator traits, for shifts on declared types; std's errors
-  and reverts; std's own types and traits; strings and bytes; `#[derive]`; inline assembly;
-  and contracts, with storage, dispatch and the ABI.
+  `struct` declarations with field reads, and with field writes at every place Lean's
+  assignments take, where upstream writes a field only at a contract's storage variable
+  (`SC0201`); the `Int` trait at a program's own types and in `where`; two-parameter operator
+  traits, for shifts on declared types; std's errors and reverts; std's own types and traits;
+  strings and bytes; `#[derive]`; inline assembly; and contracts, with storage, dispatch and
+  the ABI.
 - **The integer types stay builtin for now.** Upstream defines them in std, over `word` and
   the opcode functions. Whether Lean takes them from std's code is decided by differential
   testing, once the forms that std's integers need are in: a native mode with std's integers
