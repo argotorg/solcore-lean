@@ -869,13 +869,18 @@ private theorem route_receipts {capacity next : Nat} {owner : Key} {source : Typ
       · change (Except.error _ : Except SourceCoreCompatibleDataPlaceFaultSites.Error _) = .ok outcome at ran
         cases ran
 
+/-- The receipt of a concrete projected target, and of a concrete write to an element, whose one fault word is
+its place's. -/
 private def AssignmentReceipt (context : SourceCoreCompatibleDataPlaceFaultSites.Context)
     (owner : Key) (source : TypedSource) (node : StatementNode) (assignment : AssignmentResolution)
     (places : List SourceCoreDataPlaceFaultSites.Site) (missing : List MissingSite) : Prop :=
-  ∀ route, concrete source assignment = true →
+  (∀ route, concrete source assignment = true →
     SourceCoreCompatibleDataPlaces.describe context context.checked.signatures source
       (.occurrence node.id.occurrence) assignment = .ok route →
-    route.steps ≠ [] → Receipt owner node assignment places missing
+    route.steps ≠ [] → Receipt owner node assignment places missing) ∧
+  (concrete source assignment = true →
+    SourceCoreCompatibleDataPlaces.takesElement assignment.target.projections = true →
+    Receipt owner node assignment places missing)
 
 private def NodeReceipt (context : SourceCoreCompatibleDataPlaceFaultSites.Context)
     (owner : Key) (source : TypedSource) (retained : Node)
@@ -896,8 +901,9 @@ private theorem AssignmentReceipt.grows {context : SourceCoreCompatibleDataPlace
     (receipt : AssignmentReceipt context owner source node assignment places missing)
     (growth : Growth places later missing more) :
     AssignmentReceipt context owner source node assignment later more := by
-  intro route concrete described nonempty
-  exact (receipt route concrete described nonempty).grows growth
+  obtain ⟨projected, written⟩ := receipt
+  exact ⟨fun route concrete described nonempty => (projected route concrete described nonempty).grows growth,
+    fun concrete element => (written concrete element).grows growth⟩
 
 private theorem NodeReceipt.grows {context : SourceCoreCompatibleDataPlaceFaultSites.Context}
     {owner : Key} {source : TypedSource} {retained : Node}
@@ -949,9 +955,9 @@ private theorem expression_growth {next : Nat} {owner : Key} {source : TypedSour
   · change (Except.error _ : Except SourceCoreCompatibleDataPlaceFaultSites.Error _) = .ok outcome at ran
     cases ran
 
-/-- Every actual concrete projected target has the real first None-place
-entry retained by the accepted producer. -/
-theorem prepare_coverage {context : SourceCoreCompatibleDataPlaceFaultSites.Context}
+/-- The accepted producer's receipt for every assignment target of an actual statement: the first None-place
+entry of a concrete projected target and of a concrete write to an element. -/
+private theorem prepare_receipt {context : SourceCoreCompatibleDataPlaceFaultSites.Context}
     {plan : Plan} {root : Key} {sources : List (Key × TypedSource)}
     {program : SourceCoreCompatibleDataPlaceFaultSites.Program context}
     (accepted : SourceCoreCompatibleDataPlaceFaultSites.prepare context plan root sources = .ok program)
@@ -959,17 +965,8 @@ theorem prepare_coverage {context : SourceCoreCompatibleDataPlaceFaultSites.Cont
     (collected : (owner, source) ∈ plan.specializations.map (fun specialized =>
       (specialized.key, specialized.function.typedBody)) ++ sources)
     {node : StatementNode} (statement : .statement node ∈ source.nodes)
-    {assignment : AssignmentResolution} (target : assignment ∈ targets node)
-    (gate : concrete source assignment = true)
-    {route : SourceCoreCompatibleDataPlaces.Route}
-    (described : SourceCoreCompatibleDataPlaces.describe context context.checked.signatures source
-      (.occurrence node.id.occurrence) assignment = .ok route)
-    (nonempty : route.steps ≠ []) :
-    ∃ entry, entry ∈ program.program.places ∧ entry.missingType = none ∧
-      program.program.places.find? (fun previous => decide
-        (previous.owner = owner ∧ previous.location = .occurrence node.id.occurrence ∧
-          previous.binder = assignment.target.root ∧ previous.missingType = none)) = some entry ∧
-      program.program.placeReason owner (.occurrence node.id.occurrence) assignment.target.root none = entry.reason := by
+    {assignment : AssignmentResolution} (target : assignment ∈ targets node) :
+    AssignmentReceipt context owner source node assignment program.program.places program.missing := by
   unfold SourceCoreCompatibleDataPlaceFaultSites.prepare at accepted
   obtain ⟨base, _baseAccepted, accepted⟩ := bind_ok accepted
   obtain ⟨state, loop, accepted⟩ := bind_ok accepted
@@ -1056,24 +1053,32 @@ theorem prepare_coverage {context : SourceCoreCompatibleDataPlaceFaultSites.Cont
                 split at ran
                 · rename_i visited
                   split at ran
-                  · -- A plain write to an element of a memory array has no route, so no route receipt.
+                  · -- A plain write to an element of a memory array has no route: its one entry is its place's.
                     rename_i element
                     split at ran
-                    · refine ⟨_, (Except.ok.inj ran).symm, Growth.refl _ _, ?_⟩
+                    · rename_i present
+                      refine ⟨_, (Except.ok.inj ran).symm, Growth.refl _ _, ?_, fun _ _ => receipt_of_any present⟩
                       intro requested _concrete described _nonempty
                       simp [CompatiblePlaceCompilerCertificates.describe_takesElement described] at element
                     · obtain ⟨reason, _generated, ran⟩ := bind_ok ran
                       try dsimp only [pure, Except.pure, bind, Except.bind] at ran
-                      refine ⟨_, (Except.ok.inj ran).symm, Growth.mk ⟨[_], rfl⟩ ⟨[], (List.append_nil _).symm⟩, ?_⟩
+                      have created : Receipt owner node assignment (places ++ [⟨owner,
+                        .occurrence node.id.occurrence, assignment.target.root, none, reason,
+                        ⟨.invalidPlaceProjection, .occurrence node.id.occurrence, some node.span⟩⟩]) missing := by
+                        apply receipt_of_any
+                        simp [List.any_append, selects]
+                      refine ⟨_, (Except.ok.inj ran).symm, Growth.mk ⟨[_], rfl⟩ ⟨[], (List.append_nil _).symm⟩, ?_,
+                        fun _ _ => created⟩
                       intro requested _concrete described _nonempty
                       simp [CompatiblePlaceCompilerCertificates.describe_takesElement described] at element
-                  · obtain ⟨route, actualDescription, ran⟩ := bind_ok ran
+                  · rename_i notElement
+                    obtain ⟨route, actualDescription, ran⟩ := bind_ok ran
                     split at ran
                     · rename_i skippedPlace
                       obtain ⟨updated, stepsLoop, finished⟩ := bind_ok ran
                       have growth := route_receipts (owner := owner) (source := source)
                         (node := node) (assignment := assignment) (steps := route.steps) stepsLoop
-                      refine ⟨_, (Except.ok.inj finished).symm, growth, ?_⟩
+                      refine ⟨_, (Except.ok.inj finished).symm, growth, ?_, fun _ element => absurd element notElement⟩
                       intro requested _concrete described nonempty
                       rw [described] at actualDescription
                       have same := Except.ok.inj actualDescription
@@ -1091,7 +1096,8 @@ theorem prepare_coverage {context : SourceCoreCompatibleDataPlaceFaultSites.Cont
                       have growth := route_receipts (owner := owner) (source := source)
                         (node := node) (assignment := assignment) (steps := route.steps) stepsLoop
                       refine ⟨_, (Except.ok.inj finished).symm,
-                        (Growth.mk ⟨[_], rfl⟩ ⟨[], (List.append_nil _).symm⟩).trans growth, ?_⟩
+                        (Growth.mk ⟨[_], rfl⟩ ⟨[], (List.append_nil _).symm⟩).trans growth, ?_,
+                        fun _ element => absurd element notElement⟩
                       intro requested _concrete described _nonempty
                       rw [described] at actualDescription
                       have same := Except.ok.inj actualDescription
@@ -1103,18 +1109,26 @@ theorem prepare_coverage {context : SourceCoreCompatibleDataPlaceFaultSites.Cont
                         simp [List.any_append, selects]
                       exact created.grows growth
                 · rename_i skipped
-                  refine ⟨_, (Except.ok.inj ran).symm, Growth.refl _ _, ?_⟩
-                  intro route required
                   change concrete source assignment ≠ true at skipped
-                  exact False.elim (skipped required)
+                  exact ⟨_, (Except.ok.inj ran).symm, Growth.refl _ _,
+                    fun _ required => False.elim (skipped required), fun required => False.elim (skipped required)⟩
             exact ⟨_, (Except.ok.inj finished).symm, assignments.1, assignments.2⟩
       exact ⟨_, (Except.ok.inj finished).symm, nodes.1, nodes.2⟩
   obtain ⟨extra, _extraAccepted, finished⟩ := bind_ok accepted
   have same := Except.ok.inj finished
   subst program
   obtain ⟨next, indices, places, missing, fixed⟩ := state
-  have receipt := generated (owner, source) collected (.statement node) statement assignment target
-    route gate described nonempty
+  exact generated (owner, source) collected (.statement node) statement assignment target
+
+/-- A retained receipt names the entry that the program's place reason selects. -/
+private theorem coverage_of_receipt {program : SourceCoreDataPlaceFaultSites.Program} {owner : Key}
+    {node : StatementNode} {assignment : AssignmentResolution} {missing : List MissingSite}
+    (receipt : Receipt owner node assignment program.places missing) :
+    ∃ entry, entry ∈ program.places ∧ entry.missingType = none ∧
+      program.places.find? (fun previous => decide
+        (previous.owner = owner ∧ previous.location = .occurrence node.id.occurrence ∧
+          previous.binder = assignment.target.root ∧ previous.missingType = none)) = some entry ∧
+      program.placeReason owner (.occurrence node.id.occurrence) assignment.target.root none = entry.reason := by
   obtain ⟨entry, found⟩ := receipt.retained
   have selected := of_decide_eq_true (List.find?_some
     (p := fun previous : SourceCoreDataPlaceFaultSites.Site => decide
@@ -1122,9 +1136,54 @@ theorem prepare_coverage {context : SourceCoreCompatibleDataPlaceFaultSites.Cont
         previous.binder = assignment.target.root ∧ previous.missingType = none)) found)
   exact ⟨entry, List.mem_of_find?_eq_some found, selected.2.2.2, found, by
     unfold SourceCoreDataPlaceFaultSites.Program.placeReason
-    change (match places.find? (selects owner node assignment) with
+    change (match program.places.find? (selects owner node assignment) with
       | some candidate => candidate.reason | none => Word.zero) = entry.reason
     rw [found]⟩
+
+/-- Every actual concrete projected target has the real first None-place
+entry retained by the accepted producer. -/
+theorem prepare_coverage {context : SourceCoreCompatibleDataPlaceFaultSites.Context}
+    {plan : Plan} {root : Key} {sources : List (Key × TypedSource)}
+    {program : SourceCoreCompatibleDataPlaceFaultSites.Program context}
+    (accepted : SourceCoreCompatibleDataPlaceFaultSites.prepare context plan root sources = .ok program)
+    {owner : Key} {source : TypedSource}
+    (collected : (owner, source) ∈ plan.specializations.map (fun specialized =>
+      (specialized.key, specialized.function.typedBody)) ++ sources)
+    {node : StatementNode} (statement : .statement node ∈ source.nodes)
+    {assignment : AssignmentResolution} (target : assignment ∈ targets node)
+    (gate : concrete source assignment = true)
+    {route : SourceCoreCompatibleDataPlaces.Route}
+    (described : SourceCoreCompatibleDataPlaces.describe context context.checked.signatures source
+      (.occurrence node.id.occurrence) assignment = .ok route)
+    (nonempty : route.steps ≠ []) :
+    ∃ entry, entry ∈ program.program.places ∧ entry.missingType = none ∧
+      program.program.places.find? (fun previous => decide
+        (previous.owner = owner ∧ previous.location = .occurrence node.id.occurrence ∧
+          previous.binder = assignment.target.root ∧ previous.missingType = none)) = some entry ∧
+      program.program.placeReason owner (.occurrence node.id.occurrence) assignment.target.root none = entry.reason := by
+  obtain ⟨projected, _⟩ := prepare_receipt accepted collected statement target
+  exact coverage_of_receipt (projected route gate described nonempty)
+
+/-- Every actual concrete write to an element of a memory array has the real first None-place entry retained by
+the accepted producer: such a write has no route, and its one fault word is its place's. -/
+theorem element_coverage {context : SourceCoreCompatibleDataPlaceFaultSites.Context}
+    {plan : Plan} {root : Key} {sources : List (Key × TypedSource)}
+    {program : SourceCoreCompatibleDataPlaceFaultSites.Program context}
+    (accepted : SourceCoreCompatibleDataPlaceFaultSites.prepare context plan root sources = .ok program)
+    {owner : Key} {source : TypedSource}
+    (collected : (owner, source) ∈ plan.specializations.map (fun specialized =>
+      (specialized.key, specialized.function.typedBody)) ++ sources)
+    {node : StatementNode} (statement : .statement node ∈ source.nodes)
+    {assignment : AssignmentResolution} (target : assignment ∈ targets node)
+    (gate : concrete source assignment = true)
+    (element : SourceCoreCompatibleDataPlaces.takesElement assignment.target.projections = true) :
+    ∃ entry, entry ∈ program.program.places ∧ entry.missingType = none ∧
+      program.program.places.find? (fun previous => decide
+        (previous.owner = owner ∧ previous.location = .occurrence node.id.occurrence ∧
+          previous.binder = assignment.target.root ∧ previous.missingType = none)) = some entry ∧
+      program.program.placeReason owner (.occurrence node.id.occurrence) assignment.target.root none = entry.reason := by
+  obtain ⟨_, written⟩ := prepare_receipt accepted collected statement target
+  exact coverage_of_receipt (written gate element)
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceProjectionDiagnosticCoverage
 end

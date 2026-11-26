@@ -67,10 +67,22 @@ def UnaryReady : Prop :=
       (initial : protocol.State initialIndex),
     head.ReachedErrors functions protocol environment initial faults (registry := registry)
 
-/-- Both operation families use the same genuine receiving authority. -/
+/-- A concrete write to an element of a memory array at an actual statement: its place's word is the fault of a
+root not yet initialized, at any location. -/
+def ElementReady : Prop :=
+  ∀ {node : StatementNode} {assignment : AssignmentResolution},
+    .statement node ∈ source.nodes →
+    assignment ∈ CompatiblePlaceMissingPreparationCoverage.targets node →
+    CompatiblePlaceMissingPreparationCoverage.concrete source assignment = true →
+    SourceCoreCompatibleDataPlaces.takesElement assignment.target.projections = true →
+    ∀ location, faults (.uninitializedLocation location)
+      (invalidProjection (.occurrence node.id.occurrence) assignment.target.root)
+
+/-- Both operation families, and the writes to an element, use the same genuine receiving authority. -/
 structure Ready : Prop where
   assignment : AssignmentReady functions protocol source invalidProjection missingDefault registry faults
   unary : UnaryReady functions protocol source invalidProjection missingDefault registry faults
+  element : ElementReady source invalidProjection faults
 
 section Sites
 variable {functions protocol source invalidProjection missingDefault registry faults}
@@ -456,6 +468,38 @@ private theorem SourcePort.unary_ready_for
     rw [error]
     exact .projectedUninitialized location
 
+/-- The same original source, its successful preparation and the actual receiving registry decode the place word
+of every concrete write to an element as a root not yet initialized. -/
+private theorem SourcePort.element_ready_for
+    (port : SourcePort compiled source invalidProjection missingDefault)
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+    (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
+      completion.result.extension completion.result.diagnostics)
+    {faults : FunctionCalls.FaultRep}
+    (included : ∀ reason token, CallableIndexedOwnedPublicDecodedStagedCallFaults.faults
+      completion.result.diagnostics (.semantic reason) token → faults reason token) :
+    PreparedAssignmentReachedDiagnostics.ElementReady source invalidProjection faults := by
+  intro node assignment statement target concrete element location
+  obtain ⟨root, sources, issued⟩ :=
+    CallableIndexedOwnedPublicDiagnosticReceipts.compiled_diagnostics compiled port.present
+  have collected := List.mem_append_left sources port.collected
+  have receiverCopy := receiver
+  obtain ⟨table, rebuilt, _tableEq⟩ := receiverCopy
+  rw [port.present] at rebuilt
+  obtain ⟨entry, member, kind, _first, reason⟩ :=
+    CompatiblePlaceProjectionDiagnosticCoverage.element_coverage issued collected statement target concrete element
+  obtain ⟨decoded, error⟩ := CompatiblePlaceProjectionDiagnosticPreparation.table_diagnostic issued member kind rebuilt
+  have same : invalidProjection (.occurrence node.id.occurrence) assignment.target.root = entry.reason :=
+    (port.invalidToken _ _).trans reason
+  have received := CallableIndexedOwnedReceivingPreparedShapeInterpretations.receiver_lookup
+    compiled receiver port.present rebuilt decoded
+  apply included
+  apply CallableIndexedOwnedPublicDecodedStagedCallFaults.of_semantic
+  apply CallableIndexedOwnedPublicDecodedCallFaults.of_assignment
+  apply CallableIndexedOwnedPublicDecodedAssignmentFaults.of_decoded (same.symm ▸ received)
+  rw [error]
+  exact .projectedUninitialized location
+
 private theorem SourcePort.ready_for
     (port : SourcePort compiled source invalidProjection missingDefault)
     {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
@@ -470,7 +514,7 @@ private theorem SourcePort.ready_for
     PreparedAssignmentReachedDiagnostics.Ready (values := .initial compiled.compatible.checked) functions protocol source invalidProjection missingDefault
       completion.result.context.registry faults := by
   exact ⟨port.assignment_ready_for receiver functions protocol included,
-    port.unary_ready_for receiver functions protocol included⟩
+    port.unary_ready_for receiver functions protocol included, port.element_ready_for receiver included⟩
 
 /-- The actual receiver closes both reached diagnostic phases. -/
 theorem SourcePort.ready
