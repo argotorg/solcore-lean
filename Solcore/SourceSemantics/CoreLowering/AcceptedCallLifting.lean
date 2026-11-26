@@ -11,9 +11,9 @@ Original Source executions of call-containing bodies are staged executions.
 The lifting of `CellAwareInvocationAcceptedStatementLifting` runs over sized
 derivations, and a direct call's callee body, whose derivation is smaller than
 the call's, is lifted by one strong induction on the size across bodies, as is
-the body of a named function an indirect call applies. Their fault executions
-are staged fault executions with the same reason, for every reason the staged
-traces express, in families without an indirect call.
+the body of a named function or of a stored closure an indirect call applies.
+Their fault executions are staged fault executions with the same reason, for
+every reason the staged traces express, in families without an indirect call.
 
 Main declarations:
 - `CellAwareInvocationAcceptedStoredFunctions.Kept`, the stored functions of a
@@ -25,12 +25,13 @@ Main declarations:
 - `CellAwareInvocationAcceptedCallLifting.nested_value` and
   `CellAwareInvocationAcceptedCallLifting.nested_roots`, the value execution of
   every nested site, given the facts an indirect call reads (`IndirectFacts`):
-  the guard frame of its scope (`Framed`), the arity of the plan's named
-  contracts (`Aligned`) and that the mode stores no closure;
+  the guard frame of its scope (`Framed`) and the arity of the plan's named
+  contracts (`Aligned`);
 - `CellAwareInvocationAcceptedCallLifting.bodies` and
   `CellAwareInvocationAcceptedCallLifting.body`, the induction across bodies and
   the staged trace of a call-containing body, given the static receipts of the
-  admitted callees (`Callees`) and the frames of the registry's closure scopes
+  admitted callees (`Callees`) and of the closures the mode stores
+  (`StoredClosure`) and the frames of the registry's closure scopes
   (`ClosuresFramed`), with `ClosuresFramed.stages` and `Aligned.of_wellFormed`
   for a compilation's stages registry and a well-formed program;
 - `CellAwareInvocationAcceptedFaultLifting.nested_fault`,
@@ -1322,20 +1323,22 @@ tuple's original rule packs its elements' values as the staged rule does, and
 an array form's original rules evaluate its children in the order of the
 staged rule and take its step. A named function value is the staged atomic
 value, and an uncoerced indirect call applies its callee's value as the staged
-rule does: the mode holds in a Source with one, so the value is a builtin or a
-named function at a planned instantiation with the empty dictionary, whose body
-the induction lifts and whose runtime contract the scope's guard frame accepts
-at the call's arity, and not a closure, which the mode does not yet store
-(`IndirectFacts`).
+rule does: the mode holds in a Source with one, so the value is a builtin, a
+named function at a planned instantiation with the empty dictionary or a
+closure that the mode stores, whose body the induction lifts and whose runtime
+contract the scope's guard frame accepts at the call's arity (`IndirectFacts`).
 Inside one
 body, a nested site is lifted by induction on the site, over the sized
 derivations of its operands, branches, elements and arguments. The admitted
 callees are static inputs (`Callees`): the registry scope of each callee's
 global view at the empty dictionary and the shape of its body, whose
-expressions are nested sites of its own cache row. Every lifting keeps the
-stored functions of a mode (`CellAwareInvocationAcceptedStoredFunctions.Kept`),
-as no nested site makes a closure. Fault executions are lifted by
-`CellAwareInvocationAcceptedFaultLifting`. -/
+expressions are nested sites of its own cache row; so are, in the mode, the
+closures a heap stores (`StoredClosure`): a registry scope of each closure, the
+shape of its body, whose expressions are nested sites of a row function's, and
+a runtime contract (`RuntimeClosure`). Every lifting keeps the stored functions
+of a mode (`CellAwareInvocationAcceptedStoredFunctions.Kept`), as no nested
+site makes a closure and a closure application copies stored cells. Fault
+executions are lifted by `CellAwareInvocationAcceptedFaultLifting`. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -1388,12 +1391,36 @@ def Callees : Prop :=
       NodeOccurrencesUnique bodyInstance.source ∧
       Shape bodyInstance.source expected (Nested prepared named bodyInstance.source called) true roots
 
+/-- A closure whose every parameter is runtime, not marked comptime and of a
+type that is not comptime-only, and whose result type is not comptime-only: the
+call guard accepts every call of it at its arity. -/
+def RuntimeClosure (function : Dynamic.Closure) : Prop :=
+  (∀ parameter ∈ function.parameters, parameter.comptime = false ∧ ¬ Staging.ComptimeOnlyType parameter.scheme.body) ∧
+    ¬ Staging.ComptimeOnlyType function.resultType
+
+/-- In the mode, every closure that the mode stores has a runtime contract, and
+its original body derivation below a size is a staged execution in a registry
+scope of the closure, which keeps the stored functions of the mode. -/
+def ClosuresLift (bound : Nat) (plan : SourceCompilationPlan.Plan) (closures : Dynamic.Closure → Prop) (guard : Prop) :
+    Prop :=
+  guard → ∀ {function : Dynamic.Closure}, closures function → RuntimeClosure function ∧
+    ∃ child : Staging.Recursive.Scope, registry.Closure function child ∧
+      ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+        {before after : Dynamic.Heap} {finalContext : SourceSemantics.Context} {outcome : Dynamic.ControlOutcome},
+        size < bound →
+        SourceExecutionSize.FunctionStatementsExecute program size context function.evidence function.source
+          environment before function.body finalContext outcome after →
+        Kept plan closures guard before → Kept plan closures guard after ∧ KeptOutcome plan closures guard outcome ∧
+        Staging.Recursive.StatementsIn program registry true child context environment before function.body
+          finalContext (control outcome) after
+
 /-- Every admitted callee's original body derivation below a size is a staged
 execution in the registry scope of its global view, which keeps the stored
-functions of a mode. -/
+functions of a mode, and so are the bodies of the closures the mode stores
+(`ClosuresLift`). -/
 def BodiesLift (bound : Nat) (plan : SourceCompilationPlan.Plan) (closures : Dynamic.Closure → Prop) (guard : Prop) :
     Prop :=
-  ∀ {instantiation : DeclarationInstantiation} {bodyInstance : Dynamic.BodyInstance} {roots : List StatementId},
+  (∀ {instantiation : DeclarationInstantiation} {bodyInstance : Dynamic.BodyInstance} {roots : List StatementId},
     called instantiation → Dynamic.FunctionInstantiates program instantiation bodyInstance →
     Dynamic.StatementRoots bodyInstance.source.roots roots →
     ∃ child : Staging.Recursive.Scope,
@@ -1405,7 +1432,8 @@ def BodiesLift (bound : Nat) (plan : SourceCompilationPlan.Plan) (closures : Dyn
           roots finalContext outcome after →
         Kept plan closures guard before → Kept plan closures guard after ∧ KeptOutcome plan closures guard outcome ∧
         Staging.Recursive.StatementsIn program registry true child context environment before roots finalContext
-          (control outcome) after
+          (control outcome) after) ∧
+    ClosuresLift program registry bound plan closures guard
 
 /-- A direct call without requirements or coercions to a monomorphic
 instantiation passes the empty dictionary. -/
@@ -1443,12 +1471,20 @@ def Aligned (plan : SourceCompilationPlan.Plan) (program : Program) : Prop :=
     contract.parameters.length = bodyInstance.source.inputs.length
 
 /-- The facts an indirect call of a scope's Source reads, asked only when the
-Source has one: the mode, the scope's frame, the alignment of the plan with
-the program, and that the mode stores no closure, as the lifting does not yet
-apply one. -/
-def IndirectFacts (plan : SourceCompilationPlan.Plan) (program : Program) (closures : Dynamic.Closure → Prop)
-    (guard : Prop) (scope : Staging.Recursive.Scope) : Prop :=
-  HasIndirect scope.source → guard ∧ Framed plan scope ∧ Aligned plan program ∧ ∀ function, ¬ closures function
+Source has one: the mode, the scope's frame and the alignment of the plan with
+the program. -/
+def IndirectFacts (plan : SourceCompilationPlan.Plan) (program : Program) (guard : Prop)
+    (scope : Staging.Recursive.Scope) : Prop :=
+  HasIndirect scope.source → guard ∧ Framed plan scope ∧ Aligned plan program
+
+/-- The static receipts of a closure the mode stores: a registry scope of it, the
+uniqueness of the nodes of its Source, a supported shape of its body whose
+expressions are nested sites of a row function's, and a runtime contract. -/
+def StoredClosure (function : Dynamic.Closure) : Prop :=
+  ∃ (child : Staging.Recursive.Scope) (named : SourceCoreGeneralFunctions.Function),
+    registry.Closure function child ∧ NodeOccurrencesUnique function.source ∧
+    Shape function.source function.resultType (Nested prepared named function.source called) true function.body ∧
+    RuntimeClosure function
 
 /-- Every closure scope of the stages registry of a compilation is framed by its
 plan: it is the scope of a sidecar the plan prepares. -/
@@ -1628,21 +1664,58 @@ private theorem values_length : ∀ {ids : List ExpressionId} {size : Nat} {cont
     cases evaluated with
     | cons _ tail => exact congrArg Nat.succ (values_length tail)
 
+/-- An allocation of binders binds one value to each binder. -/
+private theorem allocate_arity {environment final : Dynamic.Environment} {heap bound : Dynamic.Heap}
+    {binders : List TypedBinder} {values : List Dynamic.Value}
+    (allocate : Dynamic.BindersAllocate environment heap binders values final bound) :
+    binders.length = values.length := by
+  induction allocate with
+  | nil => rfl
+  | cons _ _ ih => exact congrArg Nat.succ ih
+
 /-- A body invocation binds one argument to each of the body's inputs. -/
 private theorem invokes_arity {size : Nat} {bodyInstance : Dynamic.BodyInstance}
     {evidence : Dynamic.EvidenceEnvironment} {before after : Dynamic.Heap} {arguments : List Dynamic.Value}
     {result : Dynamic.Value}
     (invokes : SourceExecutionSize.BodyInvokes program size bodyInstance evidence before arguments result after) :
     bodyInstance.source.inputs.length = arguments.length := by
-  have binders : ∀ {environment final : Dynamic.Environment} {heap bound : Dynamic.Heap}
-      {binders : List TypedBinder} {values : List Dynamic.Value},
-      Dynamic.BindersAllocate environment heap binders values final bound → binders.length = values.length := by
-    intro environment final heap bound binders values allocate
-    induction allocate with
-    | nil => rfl
-    | cons _ _ ih => exact congrArg Nat.succ ih
   cases invokes with
-  | returned _ _ _ allocate | unit _ _ _ _ allocate => exact binders allocate
+  | returned _ _ _ allocate | unit _ _ _ _ allocate => exact allocate_arity allocate
+
+/-- Runtime parameters accept, unforced, every argument list of their length. -/
+private theorem runtime_arguments {frame : Staging.CallGuard.Frame} :
+    ∀ {index : Nat} {parameters : List TypedBinder} {arguments : List ExpressionId},
+      (∀ parameter ∈ parameters, parameter.comptime = false ∧ ¬ Staging.ComptimeOnlyType parameter.scheme.body) →
+      parameters.length = arguments.length → Staging.CallGuard.ArgumentsAccept frame false index parameters arguments
+  | index, [], [], _, _ => .nil index
+  | _, [], _ :: _, _, lengths => by simp at lengths
+  | _, _ :: _, [], _, lengths => by simp at lengths
+  | _, parameter :: _, _ :: _, runtime, lengths =>
+    .cons (.ordinary fun required => by
+        obtain ⟨plain, notOnly⟩ := runtime parameter List.mem_cons_self
+        rcases required with forced | marked | only
+        · cases forced
+        · rw [plain] at marked
+          cases marked
+        · exact notOnly only)
+      (runtime_arguments (fun other member => runtime other (List.mem_cons_of_mem _ member)) (by simpa using lengths))
+
+/-- The guard frame of a framed scope accepts a call of a closure with a runtime
+contract at its arity: the ledger binds the closure to its own parameters and
+an unstaged result, an effectful caller bypasses the guard, and otherwise every
+argument and the result are ordinary. -/
+private theorem closure_guard {scope : Staging.Recursive.Scope} (framed : Framed plan scope)
+    {function : Dynamic.Closure} (runtime : RuntimeClosure function) {call : ExpressionId}
+    {arguments : List ExpressionId} (arity : function.parameters.length = arguments.length) :
+    Staging.CallBoundary.GuardAccepts scope.guards call arguments (.closure function) := by
+  obtain ⟨sidecar, _, guards⟩ := framed
+  rw [guards]
+  refine .contract (contract := ⟨function.parameters, false⟩) (CallableLedger.Binds.closure rfl
+    (iff_of_false (fun same => nomatch same) runtime.2)) ?_
+  classical
+  by_cases effectful : Staging.CallGuard.Effectful (CallableLedger.frame sidecar).stages
+  · exact .effectful effectful
+  · exact .ordinary effectful (runtime_arguments runtime.1 arity) (.ordinary rfl)
 
 /-- The value executions of nested arguments are staged executions. -/
 private theorem arguments_value {scope : Staging.Recursive.Scope} {bound : Nat} :
@@ -1729,16 +1802,17 @@ private theorem reference_value {named : SourceCoreGeneralFunctions.Function} {s
 
 /-- The value execution of an uncoerced indirect call is the staged application
 of its callee's value, given those of its callee and its arguments, the lifting
-of the admitted callee bodies below a bound of its size and the facts its call
-reads. The mode holds, so the callee's value is stored: a builtin applies as
-the staged builtin, and a named function is at a planned instantiation with the
-empty dictionary, which `covers` admits, so its body lifts below the call, and
-the scope's guard frame accepts its runtime contract at the call's arity; the
-mode stores no closure. -/
+of the admitted callee bodies and of the stored closures' bodies below a bound
+of its size and the facts its call reads. The mode holds, so the callee's value
+is stored: a builtin applies as the staged builtin, and a named function is at a
+planned instantiation with the empty dictionary, which `covers` admits, so its
+body lifts below the call, and the scope's guard frame accepts its runtime
+contract at the call's arity; likewise a closure the mode stores, whose body
+runs in its registry scope after the copy of its captured cells. -/
 private theorem indirect_value {named : SourceCoreGeneralFunctions.Function} {scope : Staging.Recursive.Scope}
     (unique : NodeOccurrencesUnique scope.source) {bound : Nat}
     (bodies : BodiesLift program registry called bound prepared.base.plan closures guard)
-    (indirect : IndirectFacts prepared.base.plan program closures guard scope)
+    (indirect : IndirectFacts prepared.base.plan program guard scope)
     {id callee : ExpressionId} {ids : List ExpressionId} {metadata : IndirectCallResolution}
     (site : CellAwareInvocationAcceptedIndirectSites.IndirectSite prepared named scope.source id callee ids metadata)
     (covers : CellAwareInvocationAcceptedIndirectPremises.CoversPlan prepared.base.plan called)
@@ -1766,7 +1840,7 @@ private theorem indirect_value {named : SourceCoreGeneralFunctions.Function} {sc
       Kept prepared.base.plan closures guard after ∧ KeptValue prepared.base.plan closures guard value ∧
       Staging.Recursive.Expression program registry scope context environment before id (.value value) after := by
   intro size context environment before after value within trace kept
-  obtain ⟨active, framed, aligned, noClosures⟩ := indirect ⟨id, site.node, site.found, callee, ids, metadata, site.form⟩
+  obtain ⟨active, framed, aligned⟩ := indirect ⟨id, site.node, site.found, callee, ids, metadata, site.form⟩
   have contains := lookupExpression?_sound site.found
   have occurrence : Staging.Recursive.Occurrence scope id (.call callee ids (.indirect metadata)) :=
     ⟨site.node, contains, site.form, site.requirements, site.coercions⟩
@@ -1815,7 +1889,7 @@ private theorem indirect_value {named : SourceCoreGeneralFunctions.Function} {sc
           subst empty
           cases invokes with
           | returned _ rootsEq parameters allocate execute returned =>
-            obtain ⟨child, closure, lifts⟩ := bodies (covers _ key target) instantiates rootsEq
+            obtain ⟨child, closure, lifts⟩ := bodies.1 (covers _ key target) instantiates rootsEq
             have ran := lifts (by
               simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within ⊢
               omega) execute (passed.1.binders passed.2.1 allocate)
@@ -1824,7 +1898,7 @@ private theorem indirect_value {named : SourceCoreGeneralFunctions.Function} {sc
             exact .applied occurrence site.uncoerced lifted.2.2 accepted passed.2.2 sourceArity
               (.global instantiates covered rootsEq closure parameters allocate ran.2.2 .returned)
           | unit _ resultUnit rootsEq parameters allocate execute fellThrough =>
-            obtain ⟨child, closure, lifts⟩ := bodies (covers _ key target) instantiates rootsEq
+            obtain ⟨child, closure, lifts⟩ := bodies.1 (covers _ key target) instantiates rootsEq
             have ran := lifts (by
               simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within ⊢
               omega) execute (passed.1.binders passed.2.1 allocate)
@@ -1833,18 +1907,42 @@ private theorem indirect_value {named : SourceCoreGeneralFunctions.Function} {sc
             exact .applied occurrence site.uncoerced lifted.2.2 accepted passed.2.2 sourceArity
               (.global instantiates covered rootsEq closure parameters allocate ran.2.2
                 (by rw [resultUnit]; exact .unit))
-      | closure | closureUnit =>
+      | closure _ frame parametersExtend copy allocate execute returned =>
         cases lifted.2.1 active with
-        | closure stored => exact absurd stored (noClosures _)
+        | closure stored =>
+          obtain ⟨contract, child, selected, lifts⟩ := bodies.2 active stored
+          have accepted := closure_guard (call := id) framed contract
+            ((allocate_arity allocate).trans (values_length argumentsEvaluate))
+          have ran := lifts (by
+            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within ⊢
+            omega) execute ((passed.1.copies copy).binders passed.2.1 allocate)
+          subst returned
+          refine ⟨ran.1, ran.2.1, ?_⟩
+          exact .applied occurrence site.uncoerced lifted.2.2 accepted passed.2.2 sourceArity
+            (.closure selected frame parametersExtend copy allocate ran.2.2 .returned)
+      | closureUnit _ frame resultUnit parametersExtend copy allocate execute fellThrough =>
+        cases lifted.2.1 active with
+        | closure stored =>
+          obtain ⟨contract, child, selected, lifts⟩ := bodies.2 active stored
+          have accepted := closure_guard (call := id) framed contract
+            ((allocate_arity allocate).trans (values_length argumentsEvaluate))
+          have ran := lifts (by
+            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within ⊢
+            omega) execute ((passed.1.copies copy).binders passed.2.1 allocate)
+          obtain ⟨finalEnvironment, rfl⟩ := fellThrough
+          refine ⟨ran.1, fun _ => .unit, ?_⟩
+          exact .applied occurrence site.uncoerced lifted.2.2 accepted passed.2.2 sourceArity
+            (.closure selected frame parametersExtend copy allocate ran.2.2 (by rw [resultUnit]; exact .unit))
 
 /-- A sized value execution of a nested site is a staged execution with the
-same value and heap, given the lifting of the admitted callee bodies below a
-bound of its size and, in a Source with an indirect call, the facts its calls
-read. It keeps the stored functions, and its value is stored. -/
+same value and heap, given the lifting of the admitted callee bodies and of the
+stored closures' bodies below a bound of its size and, in a Source with an
+indirect call, the facts its calls read. It keeps the stored functions, and its
+value is stored. -/
 theorem nested_value {named : SourceCoreGeneralFunctions.Function} {scope : Staging.Recursive.Scope}
     (unique : NodeOccurrencesUnique scope.source) {bound : Nat}
     (bodies : BodiesLift program registry called bound prepared.base.plan closures guard)
-    (indirect : IndirectFacts prepared.base.plan program closures guard scope)
+    (indirect : IndirectFacts prepared.base.plan program guard scope)
     {id : ExpressionId} (nested : Nested prepared named scope.source called id) :
     ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
       {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
@@ -2007,7 +2105,7 @@ theorem nested_value {named : SourceCoreGeneralFunctions.Function} {scope : Stag
         | global instantiates invocationEq covers invokes =>
           cases invokes with
           | returned _ rootsEq parameters allocate execute returned =>
-            obtain ⟨child, closure, lifts⟩ := bodies selected instantiates rootsEq
+            obtain ⟨child, closure, lifts⟩ := bodies.1 selected instantiates rootsEq
             have ran := lifts (by
               simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within ⊢
               omega) execute (argumentsLifted.1.binders argumentsLifted.2.1 allocate)
@@ -2018,7 +2116,7 @@ theorem nested_value {named : SourceCoreGeneralFunctions.Function} {scope : Stag
               ⟨_, calleeContains, calleeForm, calleeRequirements, calleeCoercions⟩ valid stagedArguments produced
               (.global instantiates covers rootsEq closure parameters allocate staged .returned)
           | unit _ resultUnit rootsEq parameters allocate execute fellThrough =>
-            obtain ⟨child, closure, lifts⟩ := bodies selected instantiates rootsEq
+            obtain ⟨child, closure, lifts⟩ := bodies.1 selected instantiates rootsEq
             have ran := lifts (by
               simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within ⊢
               omega) execute (argumentsLifted.1.binders argumentsLifted.2.1 allocate)
@@ -2284,27 +2382,51 @@ the callee bodies below it and the facts the Source's indirect calls read. -/
 theorem nested_roots {named : SourceCoreGeneralFunctions.Function} {scope : Staging.Recursive.Scope}
     (unique : NodeOccurrencesUnique scope.source) {bound : Nat}
     (bodies : BodiesLift program registry called bound prepared.base.plan closures guard)
-    (indirect : IndirectFacts prepared.base.plan program closures guard scope) :
+    (indirect : IndirectFacts prepared.base.plan program guard scope) :
     ChildLifts program registry scope (Nested prepared named scope.source called) bound prepared.base.plan closures
       guard := by
   intro id nested size context environment before after value below trace
   exact nested_value prepared unique bodies indirect nested (Nat.le_of_lt below) trace
 
-/-- Every admitted callee's original body derivation is a staged execution at
-every size: one strong induction on the size across bodies, given, for a body
-with an indirect call, the mode, the frames of the registry's closure scopes,
-the alignment of the plan with the program and that the mode stores no
-closure. -/
+/-- Every admitted callee's original body derivation, and every stored
+closure's, is a staged execution at every size: one strong induction on the size
+across bodies, given, for a body with an indirect call, the mode, the frames of
+the registry's closure scopes and the alignment of the plan with the program,
+and, in the mode, the same frames and alignment and the receipts of the closures
+the mode stores. -/
 theorem bodies (callees : Callees prepared program registry called)
     (indirect : ∀ {instantiation : DeclarationInstantiation} {bodyInstance : Dynamic.BodyInstance},
       called instantiation → Dynamic.FunctionInstantiates program instantiation bodyInstance →
       HasIndirect bodyInstance.source →
-      guard ∧ ClosuresFramed prepared.base.plan registry ∧ Aligned prepared.base.plan program ∧
-        ∀ function, ¬ closures function)
+      guard ∧ ClosuresFramed prepared.base.plan registry ∧ Aligned prepared.base.plan program)
+    (stored : guard → ClosuresFramed prepared.base.plan registry ∧ Aligned prepared.base.plan program ∧
+      ∀ {function : Dynamic.Closure}, closures function → StoredClosure prepared registry called function)
     (bound : Nat) :
     BodiesLift program registry called bound prepared.base.plan closures guard := by
   induction bound using Nat.strongRecOn with
   | ind bound ih =>
+    have closureBodies : ClosuresLift program registry bound prepared.base.plan closures guard := by
+      intro active function kept
+      obtain ⟨framedAll, aligned, receipts⟩ := stored active
+      obtain ⟨child, named, selected, unique, shape, runtime⟩ := receipts kept
+      refine ⟨runtime, child, selected, ?_⟩
+      intro size context environment before after finalContext outcome below trace
+      have sourceEq : child.source = function.source := registry.source selected
+      have evidenceEq : child.evidence = function.evidence := registry.evidence selected
+      have childUnique : NodeOccurrencesUnique child.source := sourceEq ▸ unique
+      have childShape : Shape child.source function.resultType (Nested prepared named child.source called) true
+          function.body := by
+        rw [sourceEq]
+        exact shape
+      have lift : ChildLifts program registry child (Nested prepared named child.source called) size
+          prepared.base.plan closures guard :=
+        nested_roots prepared childUnique (ih size below) fun _ => ⟨active, framedAll selected, aligned⟩
+      refine CellAwareInvocationAcceptedSizedLifting.statements childUnique lift childShape (Nat.le_refl size) ?_
+      show SourceExecutionSize.FunctionStatementsExecute program size context child.evidence child.source
+        environment before function.body finalContext outcome after
+      rw [sourceEq, evidenceEq]
+      exact trace
+    refine ⟨?_, closureBodies⟩
     intro instantiation bodyInstance statements admitted instantiates rootsEq
     obtain ⟨child, named, expected, closure, unique, shape⟩ := callees admitted instantiates rootsEq
     refine ⟨child, closure, ?_⟩
@@ -2315,7 +2437,7 @@ theorem bodies (callees : Callees prepared program registry called)
     have childShape : Shape child.source expected (Nested prepared named child.source called) true statements := by
       rw [sourceEq]
       exact shape
-    have facts : IndirectFacts prepared.base.plan program closures guard child := fun indirectAt =>
+    have facts : IndirectFacts prepared.base.plan program guard child := fun indirectAt =>
       have read := indirect admitted instantiates (sourceEq ▸ indirectAt)
       ⟨read.1, read.2.1 closure, read.2.2⟩
     have lift : ChildLifts program registry child (Nested prepared named child.source called) size prepared.base.plan
@@ -2331,9 +2453,9 @@ theorem bodies (callees : Callees prepared program registry called)
 are nested sites is a staged execution with the same context, outcome and
 heap, at any scope with the execution's Source and evidence, given the static
 receipts of the admitted callees and, in a family with an indirect call, the
-stored functions of its starting heap, which hold no closure, the frames of its
-scope and of the registry's closure scopes and the alignment of the plan with
-the program. -/
+stored functions of its starting heap, whose closures have the static receipts
+of `StoredClosure`, the frames of its scope and of the registry's closure
+scopes and the alignment of the plan with the program. -/
 theorem body {scope : Staging.Recursive.Scope} {source : TypedSource} {evidence : Dynamic.EvidenceEnvironment}
     (sourceEq : scope.source = source) (evidenceEq : scope.evidence = evidence)
     (unique : NodeOccurrencesUnique source) (callees : Callees prepared program registry called)
@@ -2344,7 +2466,8 @@ theorem body {scope : Staging.Recursive.Scope} {source : TypedSource} {evidence 
     (shape : Shape source expected (Nested prepared named source called) true statements)
     {context : SourceSemantics.Context} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
     {finalContext : SourceSemantics.Context} {outcome : Dynamic.ControlOutcome}
-    (kept : Kept prepared.base.plan (fun _ => False) (FamilyIndirect program called source) before)
+    (kept : Kept prepared.base.plan (StoredClosure prepared registry called) (FamilyIndirect program called source)
+      before)
     (trace : Dynamic.FunctionStatementsExecute program context evidence source environment before statements
       finalContext outcome after) :
     ∃ size, Staging.Recursive.Size.Statements program registry size scope context environment before statements
@@ -2352,12 +2475,13 @@ theorem body {scope : Staging.Recursive.Scope} {source : TypedSource} {evidence 
   subst sourceEq evidenceEq
   obtain ⟨size, sized⟩ := SourceExecutionSize.FunctionStatementsExecute.has_size trace
   have lift : ChildLifts program registry scope (Nested prepared named scope.source called) size prepared.base.plan
-      (fun _ => False) (FamilyIndirect program called scope.source) :=
+      (StoredClosure prepared registry called) (FamilyIndirect program called scope.source) :=
     nested_roots prepared unique
       (bodies prepared callees (fun admitted instantiates indirect =>
         have family : FamilyIndirect program called scope.source := Or.inr ⟨_, _, admitted, instantiates, indirect⟩
-        ⟨family, closures family, aligned family, fun _ none => none⟩) size)
-      (fun indirect => ⟨Or.inl indirect, framed (Or.inl indirect), aligned (Or.inl indirect), fun _ none => none⟩)
+        ⟨family, closures family, aligned family⟩)
+        (fun family => ⟨closures family, aligned family, fun stored => stored⟩) size)
+      (fun indirect => ⟨Or.inl indirect, framed (Or.inl indirect), aligned (Or.inl indirect)⟩)
   exact Staging.Recursive.Size.Statements.of_trace
     (CellAwareInvocationAcceptedSizedLifting.statements unique lift shape (Nat.le_refl size) sized kept).2.2
 
@@ -2968,7 +3092,7 @@ theorem nested_fault {named : SourceCoreGeneralFunctions.Function} {scope : Stag
           exact .directApplied callOccurrence calleeOccurrence valid stagedArguments produced
             (.global instantiates covers rootsEq closure parameters allocate staged .fault)
         | controlEscape rootsEq parameters allocate execute escaped =>
-          obtain ⟨child, closure, lifts⟩ := bodies selected instantiates rootsEq
+          obtain ⟨child, closure, lifts⟩ := bodies.1 selected instantiates rootsEq
           have staged := (lifts (by
             simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
             omega) execute (argumentsLifted.1.binders argumentsLifted.2.1 allocate)).2.2
@@ -5043,9 +5167,10 @@ theorem statements_fault (unique : NodeOccurrencesUnique scope.source) {child : 
 
 /-- Every admitted callee's original body fault is a staged fault execution
 at every size: the strong induction on the size across bodies that lifts
-their values, given that their direct calls have plain callees. -/
+their values, given that their direct calls have plain callees, out of the
+mode. -/
 theorem bodies_fault (callees : Callees prepared program registry called)
-    (plain : CalleesFault program called) (bound : Nat) :
+    (plain : CalleesFault program called) (off : ¬ guard) (bound : Nat) :
     BodiesFaultLift program registry called bound prepared.base.plan closures guard := by
   induction bound using Nat.strongRecOn with
   | ind bound ih =>
@@ -5062,7 +5187,8 @@ theorem bodies_fault (callees : Callees prepared program registry called)
       exact shape
     have values : BodiesLift program registry called size prepared.base.plan closures guard :=
       CellAwareInvocationAcceptedCallLifting.bodies prepared callees
-        (fun admitted instantiates indirect => ((plain admitted instantiates).no_indirect indirect).elim) size
+        (fun admitted instantiates indirect => ((plain admitted instantiates).no_indirect indirect).elim)
+        (fun active => (off active).elim) size
     refine statements_fault childUnique
       (CellAwareInvocationAcceptedCallLifting.nested_roots prepared childUnique values
         (fun indirect => (childPlain.no_indirect indirect).elim))
@@ -5096,14 +5222,19 @@ theorem body_fault {scope : Staging.Recursive.Scope} {source : TypedSource} {evi
       finalContext (.fault (.semantic reason)) after := by
   subst sourceEq evidenceEq
   obtain ⟨size, sized⟩ := SourceExecutionSize.FunctionStatementsFault.has_size trace
+  have off : ¬ FamilyIndirect program called scope.source := by
+    rintro (indirect | ⟨_, _, admitted, instantiates, indirect⟩)
+    · exact plain.no_indirect indirect
+    · exact (calleesPlain admitted instantiates).no_indirect indirect
   have values : BodiesLift program registry called size prepared.base.plan closures
       (FamilyIndirect program called scope.source) :=
     CellAwareInvocationAcceptedCallLifting.bodies prepared callees
-      (fun admitted instantiates indirect => ((calleesPlain admitted instantiates).no_indirect indirect).elim) size
+      (fun admitted instantiates indirect => ((calleesPlain admitted instantiates).no_indirect indirect).elim)
+      (fun family => (off family).elim) size
   exact Staging.Recursive.Size.Statements.of_trace
     (statements_fault unique (CellAwareInvocationAcceptedCallLifting.nested_roots prepared unique values
         (fun indirect => (plain.no_indirect indirect).elim))
-      (nested_fault_roots prepared unique plain values (bodies_fault prepared callees calleesPlain size)) shape
+      (nested_fault_roots prepared unique plain values (bodies_fault prepared callees calleesPlain off size)) shape
       (Nat.le_refl size) signatures expressible sized kept)
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedFaultLifting
