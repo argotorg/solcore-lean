@@ -303,7 +303,9 @@ below come from running upstream's own test programs through Lean's native front
     trait method, with its place evaluated once;
   - a trait method is called by its name, with upstream's lookup order: a local, a function
     or builtin, the method, then a same-name constructor. The Source's form and its rules are
-    built (`ExpressionForm.methodCall`); inference produces the form next;
+    built (`ExpressionForm.methodCall`), and both compilers lower it: the native compiler calls
+    the implementation method that its primary requirement selects, and direct linking inlines
+    it. Inference produces the form next;
   - a trait method's own type parameters, with their `where` predicates, are instantiated at
     each call;
   - `case .true` and `case .false` are the boolean patterns at a `bool` scrutinee, with a case

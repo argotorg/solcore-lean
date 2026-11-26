@@ -125,10 +125,13 @@ These theorems keep explicit premises:
 - **`Covered`** admits returns, final values, discards, `break`/`continue`, blocks, conditionals,
   `while` and `for` loops, monomorphic initialized or uninitialized declarations, and bare,
   projected and element assignments and bit-not updates (an element of a local memory array:
-  `a[i] = v`, `a[i] op= v`, `a[i] ~=;`) when the compiler view is the original Source, as for
-  named rows. It excludes writes and matches under contextual metadata views, and it requires a
-  function-mode fallthrough to have Unit result and a final bare value to have the declared result
-  type.
+  `a[i] = v`, `a[i] op= v`, `a[i] ~=;`) when the compiler's source is a metadata view of the
+  original Source (`LambdaMetadataViews.MetadataView`): the Source itself for a named row, a view
+  for a closure's body. It requires a function-mode fallthrough to have Unit result and a final
+  bare value to have the declared result type. A view keeps the root binders
+  (`MetadataView.rootBinder`) but not expression types, so a projected write, in a statement or a
+  `for` header, also asks the original Source's route of its root binder
+  (`AcceptedProjectedAssignmentRoute.Route`), which has its keys' types.
   - Write heads come from the tree's assignment receipts, the compiler's own key and right-hand
     lowerings and the body's actual assignment policy
     (`ActualBodyInvocation.Index.assignment_policy` and `bitNot_policy`).
@@ -140,7 +143,8 @@ These theorems keep explicit premises:
   - `for` headers are closed over the compiler's header items
     (`CellAwareInvocationAcceptedForItems`), with their declarations authenticated by the original
     compilation receipt.
-  - Matches are closed under the same Source view (`CellAwareInvocationAcceptedMatches`).
+  - Matches are closed along the same view (`CellAwareInvocationAcceptedMatches`), with the
+    scrutinee's node type from the original Source.
     `Covered` requires a match receipt's compilation context to be admitted (`Admitted`: the
     checked catalog's initial values, the body's own allocator and definitions extended by the
     indexed layouts). `AcceptedNamedBodyFlow.Tree.refine_matches` refines a tree with every
@@ -274,6 +278,13 @@ Direct calls are in [AcceptedCalls](../../Solcore/SourceSemantics/CoreLowering/A
   inventory: a call receipt's global slot names an indexed function, and the inventory's header for
   that index gives the `Port`. `CellAwareNamedValuePorts.ports` derives `ValuePorts` from the
   same inventory.
+- **The function model.** The root model (`CellAwarePhysicalFunctionOrigins.FunctionOrigins`) has
+  a leaf for a closure that an accepted lambda site formed (`FunctionOrigins.accepted`): its
+  captures, its actual code and history, the owner's captured slots, and the accepted receipt of
+  the code in place of the older body support (`AcceptedCode`), so no leaf admits an erased
+  closure. No theorem's text changed with it. A theorem that takes a represented value, heap or
+  step now covers such a closure, and one that concludes representation concludes it under the
+  model with that leaf. Nothing forms the leaf yet.
 - **The public root.** `CellAwareInvocationAcceptedCallEntry` is the body-trace counterpart of the
   row lemma in both directions (`preserves_selected`, `reflects_selected`), packaged as the root's
   `NamedResultAt` with the restored caller's post-admission. In
@@ -390,13 +401,16 @@ program.
   from its scrutinee's and its selected body's liftings, a selected arm or default being one
   of the match's own (`selected_body`). The liftings carry the functions a Source state stores
   (`CellAwareInvocationAcceptedStoredFunctions`): every function value in the starting state is
-  a builtin or a named function at an instantiation the plan records, with an empty
-  dictionary, and no cell holds a generalized closure. A data-only start meets it, and every
-  supported form keeps it. Under its guard only a family with an indirect call asks it
-  (`FamilyIndirect`). An indirect call lifts to the staged `applied`: its guard accepts through
-  the scope's ledger frame and the plan's runtime contract (`IndirectFacts`, discharged at the
-  stages registry by `ClosuresFramed.stages` and `Aligned.of_wellFormed`), a builtin callee
-  applies as a builtin and a named callee through its body's lifting.
+  a builtin, a named function at an instantiation the plan records with an empty dictionary, or
+  a stored closure, one with its registry scope, a supported body and runtime parameters and
+  result (`StoredClosure`); and no cell holds a generalized closure. A data-only start meets
+  it, and every supported form keeps it. A stored closure is applied at an indirect call
+  through the guard of its own contract, and its body is lifted in the same induction as the
+  callees'. Under its guard only a family with an indirect call asks it (`FamilyIndirect`).
+  An indirect call lifts to the staged `applied`: its guard accepts through the scope's ledger
+  frame and the plan's runtime contract (`IndirectFacts`, discharged at the stages registry by
+  `ClosuresFramed.stages` and `Aligned.of_wellFormed`), a builtin callee applies as a builtin
+  and a named callee through its body's lifting.
 - **Fault lifting.** `CellAwareInvocationAcceptedFaultLifting`, in the same file, lifts the
   original fault executions of the same bodies with the same reason and heap (`body_fault`). The
   staged traces express every reason but a type mismatch and a missing declaration
@@ -482,8 +496,7 @@ law.
 
 On the accepted-body route above, the next connected steps are:
 
-- **Close the remaining compiler branches in `Covered`:** writes and matches under contextual
-  metadata views.
+- **Close the remaining compiler branches in `Covered`.**
   - Derive the lambda shape of generalized initializers from the compiler's initializer receipt.
   - Derive the `Generalized` issuer at actual headers from the public diagnostic receipt, as
     `CellAwareNamedDiagnosticIssuer.of_prepared` does.

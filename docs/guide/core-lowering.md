@@ -42,6 +42,7 @@ API, and families with a finite profile.
 | [AcceptedNestedCalls](../../Solcore/SourceSemantics/CoreLowering/AcceptedNestedCalls.lean) | Direct calls, the builtin conversions, mapping indices, builtin closures with their calls, tuples beyond pairs, constructor applications, the memory array forms (`ArraySite`, `MemrefSite`), named functions as values and indirect calls inside expressions and as arguments (`CellAwareInvocationAcceptedNestedTrees.Nested`), their closure and check, and the closure of a family of rows by strong induction on the grade |
 | [AcceptedNamedValues](../../Solcore/SourceSemantics/CoreLowering/AcceptedNamedValues.lean) | A named function used as a value: its site, receipt, authority (`Port`, `ValuePorts`), value heads and the lifting of the Source's `declaration` rule |
 | [AcceptedIndirectCalls](../../Solcore/SourceSemantics/CoreLowering/AcceptedIndirectCalls.lean) | Uncoerced indirect calls: the site, the whole-program premises, the heads through the call site's two gates with the callee's application as an input, and that input at the root function model |
+| [AcceptedLambdaSites](../../Solcore/SourceSemantics/CoreLowering/AcceptedLambdaSites.lean) | A lambda of a named row with runtime parameters and result: its site (`LambdaSite`), the compiler's receipt from the lambda certificate and the issued recipes (`CellAwareLambdaCertificates.Receipt`), and the lifting of the Source's lambda rule (`lambda_lift`); no consumer yet |
 | [AcceptedCallLifting](../../Solcore/SourceSemantics/CoreLowering/AcceptedCallLifting.lean) | Staged traces lifted from Source for bodies with direct calls, the builtin conversions, mapping indices, builtin closures and the memory array forms at any expression position and assignments through mapping indices, by strong induction on the size of the original derivation (`CellAwareInvocationAcceptedCallLifting.body`), and their fault executions (`CellAwareInvocationAcceptedFaultLifting.body_fault`) |
 | [AcceptedPublicRoots](../../Solcore/SourceSemantics/CoreLowering/AcceptedPublicRoots.lean) | Accepted bodies at the actual public start |
 | [PublicSupport](../../Solcore/SourceSemantics/CoreLowering/PublicSupport.lean) | `CompilerProgramStaticProfile.StaticProfile`, program support, `SelectedCompilationPublicSessionState.State` |
@@ -61,7 +62,7 @@ Each directory is one family, merged by topic; each file opens with a module doc
 | `Statements/` | Statement, loop and match meaning on the typed and generic carriers; named and builtin calls |
 | `Protected/` | Contracts that carry a state witness (`ProtectedStateTransition`) through expressions, statements and loops |
 | `Diagnostics/` | Emitted diagnostic plans and reached fault paths |
-| `Callable/` | Callable ancestry, coercions, lambda views, prepared methods, and indexed callables (lambda values, entries, parameters) |
+| `Callable/` | Callable ancestry, coercions, lambda views, prepared methods, an operator's and a trait method's called by its name (`CallablePreparedMethodSelection.MethodCall`, `methodCall_preserves`, `methodCall_reflects_sized`, `methodCall_source_inv`), and indexed callables (lambda values, entries, parameters) |
 | `Owned/` | Function values with immutable keys and reached pools; stored, chosen and contextual calls; lambda receipts |
 | `OwnedAdmitted/`, `OwnedPrepared/`, `OwnedStaged/` | Graded interfaces of the recursive staged profile; receipts read from actual cached preparation; staged bounds by body shape and call form |
 | `RecursiveNamed/` | The finite named-call catalog, the staged profile's primitives and calls, and their public results |
@@ -243,8 +244,9 @@ work, under "Remaining work for the second goal". In short:
 - `StaticProfile` recognizes a strict subset on purpose. The general proof comes from the actual
   named and contextual compiler receipts, not from widening a recognizer or from a body-execution
   law.
-- `Covered` still excludes writes and matches under contextual metadata views, and statements after
-  an always-returning prefix in a non-Unit function.
+- `Covered` still excludes statements after an always-returning prefix in a non-Unit function.
+  Under a contextual metadata view, a projected write asks the original Source's route of its root
+  binder and a match its scrutinee's node type, which a view does not keep.
 - The expression closure covers a first subset, direct calls at any expression position and the
   builtin conversions. Indirect calls, the other builtin calls, methods, indices, tuples,
   constructors, generalized reads, closures and coercions remain.
