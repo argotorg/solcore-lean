@@ -405,7 +405,7 @@ program.
   uses are general over the subset and the shape.
 - **One call.** The test
   [Accepted/OneCall](../../Solcore/Test/SourceSemantics/CoreLowering/Accepted/OneCall.lean) compiles
-  a seventeen-function program at runtime: `identity` returns its `Word` parameter, `relay` returns
+  a seventeen-function program at runtime: `identity` returns its `word` parameter, `relay` returns
   `identity(value)`, `twice` returns `identity(identity(value))`, `narrow` returns `uint8(value)`,
   `roundTrip` returns `Typedef.rep(uint8(value))`, `doubled`, `shifted` and `flipped` update a
   `uint8` local in place with `+=`, `<<=` and `~`, `tailed` ends in `identity(value)` as its final

@@ -133,7 +133,7 @@ Build the umbrella and work up from the lowest failing file: its importers fail 
     `integerMod` are Euclidean.
   - A compound form carries the assignment profile, `WideAssignmentProfile`
     (`Foundations/FixedModifiers`): `AssignmentProfile` (`Foundations/AssignmentProfiles`) on the
-    target's view, that is plain assignment or a compound one at a `Word` target or at an
+    target's view, that is plain assignment or a compound one at a `word` target or at an
     `integer` one whose operator is not Word-only, or `FixedCompoundAssignment` at a fixed-width
     target. A new Word-only compound operator goes into `Syntax.ValueAssignOp.wordOnly`;
     `DataPlaceModifier.word_success` gains its case and `integer_success` refutes it.
@@ -143,7 +143,7 @@ Build the umbrella and work up from the lowest failing file: its importers fail 
     [why the wrap belongs to the leaf](../design/integer-types-unchecked-shifts.md#row-1s-unchecked-compound-assignments-the-wrap-belongs-to-the-leaf)).
     The meaning proofs take them through `FixedCompoundAssignment`, whose operators include
     `<<=` and `>>=` (`ShiftCompoundAssignmentOperator`). A shift's amount keeps its own type at a
-    `Word` target and at a fixed-width one (`AssignedRhsView`), and the place pipelines read it
+    `word` target and at a fixed-width one (`AssignedRhsView`), and the place pipelines read it
     there (`CompatiblePlaceModifier.assigned_outcome`).
   - In-place `~` carries `WideBitNotProfile` (`Foundations/FixedModifiers`): a `word` or `integer`
     view, or a fixed-width target at its own type. At `uint8` … `uint128` the compiler keeps the

@@ -49,7 +49,7 @@ This is what it changed, in pipeline order; each layer's recipe is on its area's
 
 | Layer | What shifts changed | Recipe |
 | --- | --- | --- |
-| Syntax | `shiftLeft` and `shiftRight` in `BinaryOp` and `ValueAssignOp`; a shift layer at precedence 7 (`* / %` 9, `+ -` 8) in the parser and the grammar, which decode through the same `BinaryOp.at?` and `ValueAssignOp.at?`. Tokens and the lexer did not change: `<<` is two adjacent `<` tokens, so `Box<Box<Word>>` still closes with two `>` tokens | [Syntax](syntax.md#an-operator-or-a-spelling-made-of-existing-tokens) |
+| Syntax | `shiftLeft` and `shiftRight` in `BinaryOp` and `ValueAssignOp`; a shift layer at precedence 7 (`* / %` 9, `+ -` 8) in the parser and the grammar, which decode through the same `BinaryOp.at?` and `ValueAssignOp.at?`. Tokens and the lexer did not change: `<<` is two adjacent `<` tokens, so `Box<Box<word>>` still closes with two `>` tokens | [Syntax](syntax.md#an-operator-or-a-spelling-made-of-existing-tokens) |
 | Typing | Nothing in TypeSystem. `inferBinaryOperator` types a shift (`isShiftOperator`) before any dispatch, and `inferBinaryOperator_shift_result` and `inferBinaryOperator_shift_projection` state that branch once, for every proof to use | [Frontend](frontend.md#a-new-construct-in-the-native-compiler) |
 | Source semantics | `ShiftBinaryOperator` and `BinaryOperatorHasType.wordShift`; `BinaryPrimitiveApplies.wordShiftLeft` and `wordShiftRight`, defined by Core's `Word.shiftLeft` and `Word.shiftRight`; `IntegerStrictBinaryOperator`, the strict operators other than shifts; operand faults (`WordBinaryOperator`). No preservation statement changed | [Source semantics](source-semantics.md#add-a-primitive-operator) |
 | Compilation | `SourceCorePrimitive.strictBinaryBody` lowers shifts to `wordShl` and `wordShr`, and `SourceCoreInteger.strictBinaryBody` has a placeholder, since typing never puts a shift at `integer`; `wordOnly?` and `wordOnlyCompound` lower a compound shift of a local; the data places map the compound shifts and refuse them at `integer` leaves; `directBinary` maps them too | [Frontend](frontend.md#a-new-construct-in-the-native-compiler) |
@@ -72,7 +72,7 @@ A new constructor reaches every match on its type, including the paths that must
   canonical for its type.
 - **Tests.** `Tests.SourceCoreShiftExecution`, in `Foundations/Execution` and registered in
   [`Tests/Main.lean`](../../Tests/Main.lean), runs the probe's results and the rejected programs
-  (`a < < b`, `a > >= b`, a shift of or by a `Bool`). The `example` in
+  (`a < < b`, `a > >= b`, a shift of or by a `bool`). The `example` in
   `Tests.SourceCorePrimitiveExpressions` runs every `StrictBinaryOperator` through the lowering
   theorem, so it covers shifts. No parser test was added: the public test checks precedence by its
   results and adjacency by `checkProgram`'s rejections.

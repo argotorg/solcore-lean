@@ -284,23 +284,27 @@ below come from running upstream's own test programs through Lean's native front
   - two functions of one name in a module the entry reaches are refused, whatever their
     parameters, and a function and a type may share a name (`SC0108`);
   - an operator in generic code reaches the trait declared with its name under any name an
-    import gives it, so `where t: Plus` with `{ Add as Plus }` runs `Add`'s method.
+    import gives it, so `where t: Plus` with `{ Add as Plus }` runs `Add`'s method;
+  - the spellings `Word`, `Bool`, `Unit` and `unit` are refused (`SC0103`), and a type name is
+    looked up in the module's own types, then its imports', then the builtins, so a program's
+    own `Word` or `Bool` is its own;
+  - a binder of one of several written scrutinees, `match (x, flag)`, takes that scrutinee's
+    stage, so a comptime part's binder reaches a comptime parameter, and one tuple-valued
+    scrutinee, `match ((x, flag))`, keeps one stage (`SC0240`).
 
   To come, as checker rules:
   - `.true` or `.false` as a call's argument, a tuple's element or an operand of `&&` or
     `||`, where Lean's inference passes no expected type yet;
   - an unannotated lambda's result, with a call's arguments inferred against its one
-    function's parameter types;
-  - the spellings `Word`, `Bool` and `Unit` are refused, and a program's own type names come
-    before the builtins.
+    function's parameter types.
 
   To come, with a Source rule each:
-  - a match binder takes the stage of the scrutinee part it binds, where the scrutinees are
-    written as two or more;
   - a compound assignment at a program's own type or at a type variable runs the operator's
     trait method, with its place evaluated once;
   - a trait method is called by its name, with upstream's lookup order: a local, a function
-    or builtin, the method, then a same-name constructor.
+    or builtin, the method, then a same-name constructor;
+  - a trait method's own type parameters, with their `where` predicates, are instantiated at
+    each call.
 
   `case .true` and `case .false` wait for a case of the Source's pattern relation.
 - **Lean keeps its own rule:**
@@ -332,15 +336,17 @@ below come from running upstream's own test programs through Lean's native front
   later statements to fix and refuses it where nothing does (`SC0299`), and Lean generalizes
   it, so a type that nothing fixes is refused only where specialization reaches it. An
   initializer that Lean's staging defers, an ordinary function's call or a lambda, is refused
-  at a comptime local, where upstream evaluates it while staged. An operator whose trait
-  method does not have the operator's own shape is refused, a method written `returns (a, b)`
-  at a pair among them, where upstream calls the method whatever it returns. And a trait
-  method's own type parameters are refused, where upstream instantiates them at each call.
+  at a comptime local, where upstream evaluates it while staged. Lean's staging also defers
+  a constructor of compile-time values at a comptime parameter, where upstream evaluates it
+  while staged, and a local assigned later wherever it is assigned, where upstream follows
+  the value assigned to it. An operator whose trait method does not have the operator's own
+  shape is refused, a method written `returns (a, b)` at a pair among them, where upstream
+  calls the method whatever it returns.
 - **Forms Lean's native frontend lacks,** in the order planned after the rules above:
-  `struct` declarations with field reads and writes; a trait method's own type parameters;
-  the `Int` trait at a program's own types and in `where`; two-parameter operator traits, for
-  shifts on declared types; std's errors and reverts; std's own types and traits; strings
-  and bytes; `#[derive]`; inline assembly; and contracts, with storage, dispatch and the ABI.
+  `struct` declarations with field reads and writes; the `Int` trait at a program's own types
+  and in `where`; two-parameter operator traits, for shifts on declared types; std's errors
+  and reverts; std's own types and traits; strings and bytes; `#[derive]`; inline assembly;
+  and contracts, with storage, dispatch and the ABI.
 - **The integer types stay builtin for now.** Upstream defines them in std, over `word` and
   the opcode functions. Whether Lean takes them from std's code is decided by differential
   testing, once the forms that std's integers need are in: a native mode with std's integers

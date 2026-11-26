@@ -194,7 +194,7 @@ The shifts `<<`, `>>`, `<<=` and `>>=` were added this way.
    `precedence` and `symbol`. A two-token spelling also needs `secondSymbol?` and a case in
    `BinaryOp.spelled?` or `ValueAssignOp.spelled?`. The parser and the grammar both decode through
    `BinaryOp.at?` and `ValueAssignOp.at?`, so they cannot disagree on spellings.
-2. **Tokens**: unchanged. `<<` is two adjacent `<` tokens, so that `Box<Box<Word>>` still closes
+2. **Tokens**: unchanged. `<<` is two adjacent `<` tokens, so that `Box<Box<word>>` still closes
    with two `>` tokens.
 3. **Parser**, in `Parser/Terms`: `ExpressionInternals.binaryAtPrecedence?` and
    `StatementSimpleInternals.valueAssignAt?` decode with `at?`, `consumeBinary` advances by the
@@ -284,7 +284,7 @@ declaration form has been added, so for those the order below follows the struct
   and `DeclarativeGrammar.ExpressionLayerParses`. Change them together.
 - **The grammar must not call the parser.** Token decoding that both need belongs in the AST layer,
   as `BinaryOp.at?` does in `Syntax/Operator`.
-- **A new token can break old inputs.** A `>>` token would stop `Box<Box<Word>>` from closing,
+- **A new token can break old inputs.** A `>>` token would stop `Box<Box<word>>` from closing,
   which is why shifts are two tokens. Their decoder requires the two tokens to touch, so `a < < b`
   is rejected.
 - **`Unchecked` skips forms it does not know.** `Unchecked.expression` and `Unchecked.statement` end

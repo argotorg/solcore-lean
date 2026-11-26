@@ -399,7 +399,7 @@ inside the meaning proofs (`BinaryProfile.fixedDivision`).
   `typeProjection`, and `SourceProgramExecution`'s direct linking (`SourceCoreDirectLinking`) with
   `unsupportedType`. The public compiler (`SourceCoreExecution`) uses neither. Extending the
   scalar profile would reach its Word and Integer meaning proofs, so the tests that use these
-  paths type their values `Word`.
+  paths type their values `word`.
 - **Effect on programs.** Arithmetic on a defaulted literal is checked at `uint256`, so
   `2^256 - 1 + 1 == 0` panics with `0x11`, where it was `true` at `word`.
 
@@ -457,7 +457,7 @@ inside the meaning proofs (`BinaryProfile.fixedDivision`).
   has `wordShift` and `fixedShift`, so the fixed-width shifts are in the meaning proofs.
 - **Compound shifts** type as upstream's rewrite to `x = x << n` types them
   (`SourceAssignmentHasType.shiftCompound`). At a fixed-width target `<<=` writes back through
-  the leaf wrap, and `>>=` without one. At both a `Word` and a fixed-width target the amount
+  the leaf wrap, and `>>=` without one. At both a `word` and a fixed-width target the amount
   keeps its own type, through `AssignedRhsView`, and at a fixed-width target it need not be
   canonical for the target's type (`fixedShiftAmount`). So `w <<= 3` and a `uint8` `r <<= 1`,
   whose amounts are `uint256`, pass the statement shape check.
@@ -474,7 +474,7 @@ inside the meaning proofs (`BinaryProfile.fixedDivision`).
   which `wrapLeaf` does to the leaf before the setter. Word's `~` alone would not keep a narrow
   target's heap well typed, so the staged rules read the write at `BitNotAssignmentApplies` too.
 - **Inside the meaning proofs** at fixed-width targets. The compiler profiles of `~=`
-  (`BitNotAssignable`, `ProjectedBitNotAssignable`) take a `Word` target or one of the twelve
+  (`BitNotAssignable`, `ProjectedBitNotAssignable`) take a `word` target or one of the twelve
   types, so `w ~=;`, `m[k] ~=;` and an `int8` target's `r ~=;` stay in the compiler body profile
   that the meaning proofs take (`Tests.SourceCoreBitNotSubset`). The heads hold
   `WideBitNotProfile` at the target's type and emit the compiler's wrap (`bitNotWrap`).
@@ -541,7 +541,7 @@ Four differences remain:
 4. **Local lambdas are generalized** at their `let`, where upstream keeps a closure monomorphic. So
    a compound assignment, a shift or an in-place `~` on a parameter that neither the lambda's body
    nor a literal types is rejected in Lean, as in `lam(acc, step) { acc += step; return acc; }`, as
-   `acc + step` already was. A captured `Word` operand, a declared `acc: Word` or a literal operand
+   `acc + step` already was. A captured `word` operand, a declared `acc: word` or a literal operand
    types it. This also predates row 1.
 
 The note also records these contrasts with upstream:
