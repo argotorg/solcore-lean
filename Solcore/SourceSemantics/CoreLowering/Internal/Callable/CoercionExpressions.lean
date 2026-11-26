@@ -28,8 +28,9 @@ abbrev Available := SourceCompilationPlan.EvidenceEnvironment
 def rawNode (node : ExpressionNode) (ordinary : List RequirementId) : ExpressionNode :=
   {node with type := node.rawType, requirements := ordinary, coercions := []}
 
-/-- The delegated cases of the actual match. Named/indirect calls and selected
-operator methods use their separate compiler branches. -/
+/-- The delegated cases of the actual match. Named/indirect calls, selected
+operator methods and trait methods called by their names use their separate
+compiler branches. -/
 def Delegates (node : ExpressionNode) (ordinary : List RequirementId) : Prop :=
   match node.form with
   | .call _ _ (.declaration _) | .reference _ (.declaration _) | .call _ _ (.indirect _) => False

@@ -681,6 +681,221 @@ theorem SourceReceipt.prepared_frame {compiled : SourceCoreUnifiedCompilation.Co
   obtain ⟨cached⟩ := receipt.cached prepared callerMember nodeMember compiled samePlan
   exact ⟨cached, cached.frame (selected.selects loadedAccepted formed range signatures ledger assumptions covered)⟩
 
+
+/-- A trait method called by its name is selected at its own occurrence, as an
+operator's method is, at the arity of the call's trait. Its arguments and
+suffix keep the compiler's exact order, code and fuel. -/
+structure MethodCall (program : CheckedProgram) (project : Projector) (caller : Specialized)
+    (compilation : SourceCoreFunctions.Context) (child : SourceCoreEvidence.Child) (fuel : Nat)
+    (source : TypedSource) (scope : SourceCoreLocalCell.Scope) (id : ExpressionId)
+    (reasonAt : ExpressionId → Word) (policy : SourceCoreFunctions.CallablePolicy)
+    (node : ExpressionNode) (output : Lowered)
+    extends Output program project caller compilation child fuel source scope id reasonAt policy node output where
+  trait : Resolved.DeclarationId
+  methodName : String
+  arguments : List ExpressionId
+  form : node.form = .methodCall trait methodName arguments
+  requirements : List RequirementId
+  ordinary : SourceCompilationPlan.ordinaryOwnedRequirements? node = some requirements
+  nonempty : requirements ≠ []
+  selection : SourceCompilationPlan.CheckedRuntimeOperatorMethod
+  selectedMethod : SourceCompilationPlan.checkedMethodCallMethod program caller (rawNode node requirements) available =
+    .ok selection
+  dictionary : SourceTypedRuntime.RuntimeEvidenceEnvironment
+  materialized : SourceCompilationPlan.operatorMethodRuntimeEvidence program caller (rawNode node requirements) selection =
+    .ok dictionary
+  key : SourceCompilationPlan.Key
+  edge : SourceCompilationPlan.exactCallKey compilation.plan compilation.owner id selection.method.specialized.key = .ok key
+  loweredArguments : List Lowered
+  argumentsAccepted : arguments.mapM (fun argument => child fuel source scope argument reasonAt) = .ok loweredArguments
+  native : NativeCall compilation scope key (SourceCoreCalls.packArguments loweredArguments) operand
+  target : Target project compilation (rawNode node requirements) key policy native.signature native.index
+
+/-- The compiler's own lowering of a trait method called by its name, with its
+requirements, supplies the receipt, as `of_accepted` does for an operator. -/
+theorem MethodCall.of_accepted {program : CheckedProgram} {project : Projector} {caller : Specialized}
+    {compilation : SourceCoreFunctions.Context} {child : SourceCoreEvidence.Child} {fuel : Nat}
+    {source : TypedSource} {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
+    {reasonAt : ExpressionId → Word} {policy : SourceCoreFunctions.CallablePolicy}
+    {node : ExpressionNode} {output : Lowered} {requirements : List RequirementId}
+    {trait : Resolved.DeclarationId} {methodName : String} {arguments : List ExpressionId}
+    (found : source.lookupExpression? id = some node)
+    (form : node.form = .methodCall trait methodName arguments)
+    (ordinary : SourceCompilationPlan.ordinaryOwnedRequirements? node = some requirements)
+    (nonempty : requirements ≠ [])
+    (original : SourceCoreEvidence.lowerWithProjector program project caller compilation child fuel source scope id
+      reasonAt policy = .ok (some output)) :
+    Nonempty (MethodCall program project caller compilation child fuel source scope id reasonAt policy node output) := by
+  have notEmpty : requirements.isEmpty = false := by cases requirements <;> simp_all
+  have accepted := original
+  simp only [SourceCoreEvidence.lowerWithProjector, found, form, ordinary,
+    Bool.not_false, Bool.and_true, Bool.or_false, Bool.and_false,
+    bind, Except.bind, pure, Except.pure, throw, throwThe, MonadExceptOf.throw] at accepted
+  split at accepted <;> try { cases accepted }
+  split at accepted <;> try { cases accepted }
+  rename_i pathValid
+  split at accepted <;> try { cases accepted }
+  rename_i ownerNe
+  have owner : caller.key = compilation.owner := Classical.not_not.mp ownerNe
+  obtain ⟨available, resolved, accepted⟩ := bind_ok accepted
+  simp only [notEmpty, Bool.false_eq_true, if_false] at accepted
+  obtain ⟨selection, methodAccepted, accepted⟩ := bind_ok accepted
+  obtain ⟨returned, discarded, accepted⟩ := bind_ok accepted
+  have materialization : ∃ dictionary,
+      SourceCompilationPlan.operatorMethodRuntimeEvidence program caller (rawNode node requirements) selection = .ok dictionary := by
+    have normalized : (discard ((SourceCompilationPlan.operatorMethodRuntimeEvidence program caller
+        (rawNode node requirements) selection).mapError SourceCoreBasic.Error.callPreparation) : Except SourceCoreBasic.Error Unit) = .ok returned := by
+      simpa only [rawNode, form] using discarded
+    cases run : SourceCompilationPlan.operatorMethodRuntimeEvidence program caller (rawNode node requirements) selection with
+    | error error => simp only [run, Except.mapError, discard] at normalized; cases normalized
+    | ok dictionary => exact ⟨dictionary, rfl⟩
+  obtain ⟨dictionary, materialized⟩ := materialization
+  obtain ⟨key, edgeAccepted, accepted⟩ := bind_ok accepted
+  have edge : SourceCompilationPlan.exactCallKey compilation.plan compilation.owner id selection.method.specialized.key = .ok key := by
+    have same := (lookupExpression?_sound found).2
+    exact same ▸ mapError_ok edgeAccepted
+  obtain ⟨codes, argumentsAccepted, remaining⟩ := bind_ok accepted
+  clear accepted
+  obtain ⟨operand, invoked, remaining⟩ := bind_ok remaining
+  obtain ⟨inputType, inputProjected, remaining⟩ := bind_ok remaining
+  obtain ⟨_, inputEq, remaining⟩ := bind_ok remaining
+  obtain ⟨result, suffix, remaining⟩ := bind_ok remaining
+  obtain ⟨outputType, outputProjected, remaining⟩ := bind_ok remaining
+  obtain ⟨_, outputEq, remaining⟩ := bind_ok remaining
+  cases remaining
+  obtain ⟨pair, signatureAccepted, invoked⟩ := bind_ok invoked
+  rcases pair with ⟨index, signature⟩
+  obtain ⟨_, argumentType, emitted⟩ := bind_ok invoked
+  have emittedEq : operand = ⟨signature.resultType, SourceCoreCalls.call signature
+      (scope.length + compilation.administrativePrefix + index)
+      (SourceCoreCalls.packArguments codes).expression compilation.internalReason⟩ := by
+    exact (Except.ok.inj emitted).symm
+  have targetExists : Nonempty (Target project compilation (rawNode node requirements) key policy signature index) := by
+    apply target_of_accepted
+    simp only [rawNode, form]
+    exact signatureAccepted
+  obtain ⟨target⟩ := targetExists
+  refine ⟨{
+    available := available, operand := operand, found := found, accepted := original,
+    pathValid := pathValid, owner := owner, resolved := mapError_ok resolved,
+    suffix := ⟨?_, suffix, ?_⟩,
+    trait := trait, methodName := methodName, arguments := arguments, form := form,
+    requirements := requirements, ordinary := ordinary, nonempty := nonempty,
+    selection := selection, selectedMethod := ?_, dictionary := dictionary, materialized := materialized,
+    key := key, edge := edge, loweredArguments := codes, argumentsAccepted := argumentsAccepted,
+    native := ⟨signature, index, target.global, ensure_eq argumentType, emittedEq⟩,
+    target := target }⟩
+  · change project (.occurrence node.id.occurrence) node.rawType = .ok inputType at inputProjected
+    rwa [ensure_eq inputEq] at inputProjected
+  · change project (.occurrence node.id.occurrence) node.type = .ok outputType at outputProjected
+    rwa [ensure_eq outputEq] at outputProjected
+  · simpa only [form, rawNode] using mapError_ok methodAccepted
+
+/-- One source receipt for the actual method-call selector: the call's trait,
+its requirement positions and the returned implementation metadata. -/
+structure MethodCallReceipt
+    (receipt : MethodCall program project caller compilation child fuel source scope id reasonAt policy node output) where
+  signature : ProgramTraitSignature
+  lookup : program.signatures.trait? receipt.trait = some signature
+  methodIds : List RequirementId
+  requirements : receipt.requirements = receipt.selection.primaryRequirement :: methodIds
+  certificate : MethodCertificate program caller (rawNode node receipt.requirements)
+    receipt.available receipt.selection.primaryRequirement methodIds signature.parameters.length signature.name
+    receipt.methodName receipt.selection.method
+
+/-- The static selector is inverted once at the actual site, at the call's own
+trait: its arity and name come from that trait's signature. -/
+theorem MethodCall.source_receipt
+    (receipt : MethodCall program project caller compilation child fuel source scope id reasonAt policy node output) :
+    Nonempty (MethodCallReceipt receipt) := by
+  have rawRequirements : SourceCompilationPlan.ordinaryOwnedRequirements? (rawNode node receipt.requirements) =
+      some receipt.requirements := by
+    change (if receipt.requirements.length < 0 then none else
+      if receipt.requirements = receipt.requirements.take (receipt.requirements.length - 0) ++ [] then
+        some (receipt.requirements.take (receipt.requirements.length - 0)) else none) = some receipt.requirements
+    simp
+  obtain ⟨trait, methodName, arguments, signature, methodIds, form, lookup, owned, ⟨certificate⟩⟩ :=
+    methodCall_of_accepted receipt.selectedMethod
+  have same : node.form = .methodCall trait methodName arguments := by simpa only [rawNode] using form
+  rw [receipt.form] at same
+  cases same
+  exact ⟨⟨signature, lookup, methodIds, Option.some.inj (rawRequirements.symm.trans owned), certificate⟩⟩
+
+/-- The actual authenticated dictionaries supply the independent source method
+judgment, at the name of the call's trait and the call's method. -/
+theorem MethodCallReceipt.selects
+    (loadedAccepted : CallableMethodBodyCoherence.Checked program)
+    {receipt : MethodCall program project caller compilation child fuel source scope id reasonAt policy node output}
+    (selected : MethodCallReceipt receipt)
+    (formed : Formation selected.certificate.selected.implementation selected.certificate.selected.declaration)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (Context.ofSignatures program.signatures) receipt.selection.method.specialized.parameterSubstitution)
+    {context : Context} (signatures : context.signatures = program.signatures)
+    (ledger : context.solvedRequirements = caller.function.solvedRequirements)
+    (assumptions : ∀ goal, goal ∈ caller.assumptions → goal ∈ context.assumptions)
+    (covered : CallableCoercionEvidenceOrigins.CallerCovered caller receipt.selection.method) :
+    Dynamic.OperatorMethodSelected (Program.ofChecked program) context (environment receipt.available)
+      selected.signature.name receipt.methodName receipt.requirements
+      (bodyInstance program receipt.selection.method) (environment receipt.dictionary) := by
+  rw [selected.requirements]
+  exact selected.certificate.selects loadedAccepted formed range signatures ledger assumptions
+    receipt.resolved covered receipt.materialized
+
+/-- The actual preparation scan selects the same complete method at the call:
+the operator visit of its occurrence, with the same ordered arguments and
+dictionary. -/
+theorem MethodCall.prepared
+    (receipt : MethodCall program project caller compilation child fuel source scope id reasonAt policy node output)
+    {before : SourceCompilationPlan.Plan} {preparationFuel budget : Nat}
+    (prepared : SourceCompilationPlan.prepareExecutablePlanEvidenceWithBudget program before preparationFuel budget = .ok compilation.plan)
+    (callerMember : caller ∈ compilation.plan.specializations)
+    (nodeMember : .expression node ∈ caller.function.typedBody.nodes) :
+    ∃ visit : CallableCoercionPreparationSteps.OperatorVisit program caller receipt.available node compilation.plan,
+      visit.requirements = receipt.requirements ∧ visit.selection = receipt.selection ∧
+      visit.arguments = receipt.arguments ∧ visit.dictionary = receipt.dictionary ∧
+      receipt.target.specialized = receipt.selection.method.specialized := by
+  have operatorForm : CallableCoercionPreparationSteps.OperatorForm node := by
+    simp only [CallableCoercionPreparationSteps.OperatorForm, receipt.form]
+  obtain ⟨visit⟩ := CallableCoercionPreparation.operator_visit prepared callerMember nodeMember
+    operatorForm receipt.ordinary receipt.nonempty receipt.resolved
+  have requirements := Option.some.inj (visit.owned.symm.trans receipt.ordinary)
+  have reduced : (CallableCoercionPreparationSteps.operatorOwnedNode node receipt.requirements).form =
+      .methodCall receipt.trait receipt.methodName receipt.arguments := receipt.form
+  have selected := visit.selected
+  rw [requirements, reduced] at selected
+  have selection : visit.selection = receipt.selection :=
+    Except.ok.inj (selected.symm.trans receipt.selectedMethod)
+  have materialized := visit.materialized
+  rw [requirements, selection] at materialized
+  have dictionary : visit.dictionary = receipt.dictionary :=
+    Except.ok.inj (materialized.symm.trans receipt.materialized)
+  have arguments : visit.arguments = receipt.arguments := by
+    have selected := visit.argumentsSelected
+    simpa only [CallableCoercionPreparationSteps.operatorOwnedNode, receipt.form, pure, Except.pure,
+      Except.ok.injEq] using selected.symm
+  have retained := visit.finalSelected
+  rw [selection] at retained
+  have emitted := (congrArg (SourceCompilationPlan.exactSpecialization compilation.plan)
+    (CallableCoercionPreparation.exact_call_key receipt.edge)).symm.trans receipt.target.selected
+  exact ⟨visit, requirements, selection, arguments, dictionary,
+    Except.ok.inj (emitted.symm.trans retained)⟩
+
+/-- The emitted target comes from the actual final plan, so its cached row and
+closure carry the selected method's entire retained record. -/
+theorem MethodCall.cached
+    (receipt : MethodCall program project caller compilation child fuel source scope id reasonAt policy node output)
+    {before : SourceCompilationPlan.Plan} {preparationFuel budget : Nat}
+    (prepared : SourceCompilationPlan.prepareExecutablePlanEvidenceWithBudget program before preparationFuel budget = .ok compilation.plan)
+    (callerMember : caller ∈ compilation.plan.specializations)
+    (nodeMember : .expression node ∈ caller.function.typedBody.nodes)
+    (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (samePlan : compilation.plan = compiled.indexed.base.plan) :
+    Nonempty (Cached compiled receipt.selection.method.specialized) := by
+  obtain ⟨_, _, _, _, _, same⟩ := receipt.prepared prepared callerMember nodeMember
+  have selected := receipt.target.selected
+  rw [same, samePlan] at selected
+  exact cached_row compiled (exact_member selected)
+
 end Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodSelection
 end
 
@@ -1926,6 +2141,83 @@ theorem OperatorSource.expression {environment : Dynamic.Environment} {before af
 
 end OperatorSource
 
+section MethodCallSource
+open CallablePreparedMethodSelection
+open CallableCoercionExpressionCertificates (Projector Specialized Lowered rawNode)
+
+variable {checkedProgram : CheckedProgram} {project : Projector} {caller : Specialized}
+  {compilation : SourceCoreFunctions.Context} {child : SourceCoreEvidence.Child} {fuel : Nat}
+  {source : TypedSource} {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
+  {reasonAt : ExpressionId → Word} {policy : SourceCoreFunctions.CallablePolicy}
+  {node : ExpressionNode} {output : Lowered}
+
+/-- A trait method called by its name builds the source method-call judgment
+from the same ordered argument trace and independently selected method body,
+at the call's trait's name. -/
+theorem methodCall_raw
+    {receipt : MethodCall checkedProgram project caller compilation child fuel source scope id reasonAt policy node output}
+    (selected : MethodCallReceipt receipt)
+    {program : Program} {context : SourceSemantics.Context} {evidence dictionary : Dynamic.EvidenceEnvironment}
+    {sourceBody : Dynamic.BodyInstance}
+    (selection : Dynamic.OperatorMethodSelected program context evidence selected.signature.name receipt.methodName
+      receipt.requirements sourceBody dictionary)
+    {environment : Dynamic.Environment} {before after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
+    (trace : NamedCalls.Arguments.Trace program context evidence dictionary source environment before
+      receipt.arguments sourceBody outcome after) :
+    CallableCoercionExpressionMeaning.RawOutcome program context evidence source environment before node outcome after := by
+  have layout : Dynamic.OrdinaryRequirementLayout node.requirements node.coercions receipt.requirements := by
+    have owned := receipt.ordinary
+    change (let suffix := coercionRequirementIds node.coercions
+      if node.requirements.length < suffix.length then none else
+        let owned := node.requirements.take (node.requirements.length - suffix.length)
+        if node.requirements = owned ++ suffix then some owned else none) = some receipt.requirements at owned
+    dsimp only at owned
+    split at owned
+    · contradiction
+    · split at owned
+      · have same := Option.some.inj owned
+        change node.requirements = receipt.requirements ++ coercionRequirementIds node.coercions
+        rw [← same]
+        exact ‹node.requirements = _›
+      · contradiction
+  cases trace with
+  | argumentFault fault =>
+    dsimp only [CallableCoercionExpressionMeaning.RawOutcome]
+    rw [receipt.form]
+    exact .methodCallArguments layout fault
+  | apply evaluated body =>
+    cases body with
+    | value invoked =>
+      dsimp only [CallableCoercionExpressionMeaning.RawOutcome]
+      rw [receipt.form]
+      exact .methodCall layout evaluated selection invoked
+    | fault failed =>
+      dsimp only [CallableCoercionExpressionMeaning.RawOutcome]
+      rw [receipt.form]
+      exact .methodCallBody layout evaluated selection failed
+
+/-- The whole-expression entry adds the empty coercion path to the same raw
+method-call proof. -/
+theorem methodCall_expression
+    {receipt : MethodCall checkedProgram project caller compilation child fuel source scope id reasonAt policy node output}
+    (selected : MethodCallReceipt receipt)
+    {program : Program} {context : SourceSemantics.Context} {evidence dictionary : Dynamic.EvidenceEnvironment}
+    {sourceBody : Dynamic.BodyInstance}
+    (selection : Dynamic.OperatorMethodSelected program context evidence selected.signature.name receipt.methodName
+      receipt.requirements sourceBody dictionary)
+    {environment : Dynamic.Environment} {before after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
+    (coercions : node.coercions = [])
+    (trace : NamedCalls.Arguments.Trace program context evidence dictionary source environment before
+      receipt.arguments sourceBody outcome after) :
+    Dynamic.ExpressionEvaluatesOutcome program context evidence source environment before id outcome after := by
+  have raw := methodCall_raw selected selection trace
+  cases outcome with
+  | value value =>
+    exact .value (.intro (lookupExpression?_sound receipt.found) raw (coercions ▸ .nil))
+  | fault reason => exact .fault (.form (lookupExpression?_sound receipt.found) raw)
+
+end MethodCallSource
+
 section EmittedOperator
 open CallableCoercionExpressionCertificates
 
@@ -2084,6 +2376,164 @@ theorem operator_reflects_sized [FunctionCalls.FaultTokens faults] {mapping : Lo
   exact ⟨outcome, after, finalMap, finalWorld, selected.expression selection coercions trace, rest⟩
 
 end EmittedOperator
+
+section EmittedMethodCall
+open CallableCoercionExpressionCertificates
+
+variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : SourceCoreCallableIndexedPrograms.Prepared checked}
+  {named : SourceCoreGeneralFunctions.Function} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {code : Expr}
+  {compiled : CallableIndexedNamedGeneration.Compilation prepared named diagnostics code}
+  {values : SourceCoreCompatibleValues.Context} {ambient : AmbientDefinitions values.checked.catalog.definitions}
+  {sourceBody : Dynamic.BodyInstance} {dictionary : Dynamic.EvidenceEnvironment}
+  {administrative : Core.Context} {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+
+variable (compiled : CallableIndexedNamedGeneration.Compilation prepared named diagnostics code)
+  (profile : Profile compiled values ambient sourceBody dictionary administrative registry faults)
+  (functions : FunctionModel values.checked.catalog ambient)
+  (extension : SourceCoreRawMetadata.Extends values.registry registry)
+  (program : Program) {identities : Dynamic.Value → Word → Prop}
+  (faithful : DataEquality.IdentityFaithful identities)
+  (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
+  (functionTypes : FunctionRuntimeViews functions)
+  (uninitialized : ∀ id location, faults (.uninitializedLocation location) (diagnostics.reasonAt named.signature.key id))
+  (missing : ∀ id key value tag, MetadataRep registry (.mapping key value) tag →
+    faults (.missingMappingDefault value) ((diagnostics.reasonAt named.signature.key id).add tag))
+  (escaped : faults .controlEscapedFunction compiled.own.table.escapedReason)
+  {callerSource : TypedSource} {callerContext : SourceSemantics.Context}
+  {callerEvidence : Dynamic.EvidenceEnvironment} {callerSolved : List SolvedRequirement}
+  {callerReasonAt : ExpressionId → Word} {readFuel : Nat}
+  (callerValid : CompatibleRuntimeContextValidity.Valid callerSolved callerContext callerEvidence)
+  (callerUninitialized : ∀ id location, faults (.uninitializedLocation location) (callerReasonAt id))
+  (callerMissing : ∀ id key value tag, MetadataRep registry (.mapping key value) tag →
+    faults (.missingMappingDefault value) ((callerReasonAt id).add tag))
+  {checkedProgram : CheckedProgram} {project : CallableCoercionExpressionCertificates.Projector}
+  {caller : SourceSpecialization.SpecializedFunction} {compilation : SourceCoreFunctions.Context}
+  {child : SourceCoreEvidence.Child} {fuel : Nat} {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
+  {policy : SourceCoreFunctions.CallablePolicy} {node : ExpressionNode} {output : SourceCoreBasic.LoweredExpr}
+  (receipt : CallablePreparedMethodSelection.MethodCall checkedProgram project caller compilation child fuel
+    callerSource scope id callerReasonAt policy node output)
+
+/-- Full retained method and dictionary equality accompany the real compiled
+closure, as for an operator. -/
+structure MethodCallAlignment : Prop where
+  retained : named.specialized = receipt.selection.method.specialized
+  sourceBody : sourceBody = CallableCoercionMethodInstantiation.bodyInstance checkedProgram receipt.selection.method
+  dictionary : dictionary = CallableNamedMetadata.environment receipt.dictionary
+  signature : receipt.native.signature = named.signature
+
+variable (alignment : MethodCallAlignment (named := named) (sourceBody := sourceBody) (dictionary := dictionary) receipt)
+  (selected : CallablePreparedMethodSelection.MethodCallReceipt receipt)
+  (selection : Dynamic.OperatorMethodSelected program callerContext callerEvidence selected.signature.name
+    receipt.methodName receipt.requirements sourceBody dictionary)
+  (children : DataExpressionSequence.Tree callerSource
+    (CompatibleExpressionBuiltinRuntime.Certificate readFuel values callerSource callerContext callerSolved callerReasonAt)
+    scope receipt.arguments (named.inputs.map (fun binding => binding.1.scheme.body)) receipt.loweredArguments)
+  (nativeTypes : receipt.loweredArguments.map (·.type) = named.inputs.map Prod.snd)
+
+include alignment in
+/-- The final expression of a call without coercions is the issued method call. -/
+theorem MethodCallAlignment.emitted (coercions : node.coercions = []) (ξ : Renaming) :
+    output.expression.rename ξ = SourceCoreCalls.call named.signature
+      (ξ (scope.length + compilation.administrativePrefix + receipt.native.index))
+      ((SourceCoreCalls.packArguments receipt.loweredArguments).expression.rename ξ) compilation.internalReason := by
+  have suffix := receipt.suffix.accepted
+  rw [coercions] at suffix
+  have same : receipt.operand = output := Except.ok.inj suffix
+  have operand : receipt.operand.expression.rename ξ = SourceCoreCalls.call named.signature
+      (ξ (scope.length + compilation.administrativePrefix + receipt.native.index))
+      ((SourceCoreCalls.packArguments receipt.loweredArguments).expression.rename ξ) compilation.internalReason := by
+    simpa only [NamedCalls.Arguments.call_rename, alignment.signature] using
+      congrArg (fun value : SourceCoreBasic.LoweredExpr => value.expression.rename ξ) receipt.native.emitted
+  exact (congrArg (fun value : SourceCoreBasic.LoweredExpr => value.expression.rename ξ) same.symm).trans operand
+
+include extension faithful observations functionTypes uninitialized missing escaped callerValid callerUninitialized callerMissing
+  children nativeTypes profile alignment selected selection in
+/-- A trait method called by its name: its source execution and the compiled
+call imply each other, as an operator's do (`operator_preserves`). -/
+theorem methodCall_preserves [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping}
+    {before after : Dynamic.Heap}
+    {store : Store} {callerEnvironment canonical : Environment}
+    {callerAdministrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
+    {ξ : Renaming} {outcome : Dynamic.ExpressionOutcome}
+    (coercions : node.coercions = [])
+    (installed : Installed compiled (sourceBody := sourceBody) (administrative := administrative)
+      functions mapping world before store callerEnvironment)
+    (located : installed.globalIndex = ξ (scope.length + compilation.administrativePrefix + receipt.native.index))
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog) mapping world
+      callerAdministrative scope sourceEnvironment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before callerContext.locals sourceEnvironment)
+    (layout : EnvironmentsAgree ξ canonical callerEnvironment)
+    (actualTyped : RuntimeEnvironmentHasTypes world callerEnvironment actualContext ambient.definitions)
+    (unique : NodeOccurrencesUnique callerSource)
+    (execution : NamedCalls.Arguments.Trace program callerContext callerEvidence dictionary callerSource sourceEnvironment
+      before receipt.arguments sourceBody outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Dynamic.ExpressionEvaluatesOutcome program callerContext callerEvidence callerSource sourceEnvironment before id outcome after ∧
+      Evaluates callerEnvironment store (output.expression.rename ξ) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld sourceBody.resultType named.signature.resultType faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame
+        installed.frameLocation installed.current installed.currentGhost finalStore ∧
+      CallableIndexedSnapshots.All prepared.ancestry.graph.inputs prepared.ancestry.graph.table
+        prepared.ancestry.layout.frame finalMap finalStore installed.records := by
+  have packedType : named.signature.parameterType = (SourceCoreCalls.packArguments receipt.loweredArguments).type := by
+    simpa only [alignment.signature] using receipt.native.inputType
+  have emitted := alignment.emitted receipt coercions ξ
+  rw [← located] at emitted
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, rest⟩ :=
+    call_preserves compiled profile functions extension program faithful observations functionTypes uninitialized missing escaped
+      callerValid callerUninitialized callerMissing children nativeTypes packedType
+      installed environments heaps locals layout actualTyped unique execution
+  exact ⟨value, finalStore, finalMap, finalWorld, methodCall_expression selected selection coercions execution,
+    emitted.symm ▸ evaluated, rest⟩
+
+include extension faithful observations functionTypes uninitialized missing escaped callerValid callerUninitialized callerMissing
+  children nativeTypes profile alignment selected selection in
+/-- A completed compiled call of a trait method called by its name reflects to
+its source execution, as an operator's does (`operator_reflects_sized`). -/
+theorem methodCall_reflects_sized [FunctionCalls.FaultTokens faults] {mapping : LocationMap} {world : StoreTyping}
+    {before : Dynamic.Heap}
+    {store finalStore : Store} {callerEnvironment canonical : Environment}
+    {callerAdministrative actualContext : Core.Context} {sourceEnvironment : Dynamic.Environment}
+    {ξ : Renaming} {value : Value} {size : Nat}
+    (coercions : node.coercions = [])
+    (installed : Installed compiled (sourceBody := sourceBody) (administrative := administrative)
+      functions mapping world before store callerEnvironment)
+    (located : installed.globalIndex = ξ (scope.length + compilation.administrativePrefix + receipt.native.index))
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog) mapping world
+      callerAdministrative scope sourceEnvironment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before callerContext.locals sourceEnvironment)
+    (layout : EnvironmentsAgree ξ canonical callerEnvironment)
+    (actualTyped : RuntimeEnvironmentHasTypes world callerEnvironment actualContext ambient.definitions)
+    (completed : EvaluationSize size callerEnvironment store (output.expression.rename ξ) value finalStore) :
+    ∃ outcome after finalMap finalWorld,
+      Dynamic.ExpressionEvaluatesOutcome program callerContext callerEvidence callerSource sourceEnvironment before id outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld sourceBody.resultType named.signature.resultType faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame
+        installed.frameLocation installed.current installed.currentGhost finalStore ∧
+      CallableIndexedSnapshots.All prepared.ancestry.graph.inputs prepared.ancestry.graph.table
+        prepared.ancestry.layout.frame finalMap finalStore installed.records := by
+  have packedType : named.signature.parameterType = (SourceCoreCalls.packArguments receipt.loweredArguments).type := by
+    simpa only [alignment.signature] using receipt.native.inputType
+  have emitted := alignment.emitted receipt coercions ξ
+  rw [← located] at emitted
+  rw [emitted] at completed
+  obtain ⟨outcome, after, finalMap, finalWorld, trace, rest⟩ :=
+    call_reflects_sized compiled profile functions extension program faithful observations functionTypes uninitialized missing escaped
+      callerValid callerUninitialized callerMissing children nativeTypes packedType
+      installed environments heaps locals layout actualTyped completed
+  exact ⟨outcome, after, finalMap, finalWorld, methodCall_expression selected selection coercions trace, rest⟩
+
+end EmittedMethodCall
 
 end Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodRuntimeMeaning
 end

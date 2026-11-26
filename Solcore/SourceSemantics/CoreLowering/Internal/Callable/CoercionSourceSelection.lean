@@ -1986,5 +1986,35 @@ theorem body_eq {program : Program} (catalog : Catalog program)
           cases leftBody; cases rightBody
           simp_all
 
+/-- The primary requirement fixes the selected trait, and so the trait name a
+selection is at: two selections at the same requirements share it. -/
+theorem traitName_eq {program : Program} (catalog : Catalog program)
+    {context : SourceSemantics.Context} {caller : Dynamic.EvidenceEnvironment}
+    {leftName rightName methodName : String} {primary : RequirementId} {rest : List RequirementId}
+    {leftBody rightBody : Dynamic.BodyInstance} {leftDictionary rightDictionary : Dynamic.EvidenceEnvironment}
+    (unique : ∀ first second, ContainsRequirement context primary first → ContainsRequirement context primary second → first = second)
+    (left : Dynamic.OperatorMethodSelected program context caller leftName methodName (primary :: rest) leftBody leftDictionary)
+    (right : Dynamic.OperatorMethodSelected program context caller rightName methodName (primary :: rest) rightBody rightDictionary) :
+    leftName = rightName := by
+  cases left with
+  | @intro _ _ goal closed implementation method trait definition substitution _ methodEvidence _
+      selects shape implementationMember traitMember traitName goalTrait determined methodMember methodName methodOwner
+      requirements instantiated assembled covers =>
+    cases right with
+    | @intro _ _ otherGoal otherClosed otherImplementation otherMethod otherTrait otherDefinition otherSubstitution _ otherMethodEvidence _
+        otherSelects otherShape otherImplementationMember otherTraitMember otherTraitName otherGoalTrait otherDetermined
+        otherMethodMember otherMethodName otherMethodOwner otherRequirements otherInstantiated otherAssembled otherCovers =>
+      have sameRequirement : goal = otherGoal ∧ closed = otherClosed := by
+        cases selects with
+        | intro produced _ =>
+          cases otherSelects with
+          | intro otherProduced _ => exact requirement_functional unique produced otherProduced
+      have traitId : trait.id = otherTrait.id := by
+        have same := goalTrait.symm.trans ((congrArg (fun goal : ProgramPredicate => goal.trait) sameRequirement.1).trans otherGoalTrait)
+        injection same
+      have sameTrait := same_member catalog.traits traitMember otherTraitMember traitId
+      subst otherTrait
+      exact traitName.symm.trans otherTraitName
+
 end Solcore.SourceSemantics.CoreLowering.CallableCoercionSelectionIdentity
 end

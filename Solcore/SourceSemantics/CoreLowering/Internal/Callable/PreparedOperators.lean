@@ -112,6 +112,35 @@ theorem RawTraceAt.sound {program budget context caller invocation source enviro
     | value invoked => exact .apply arguments.sound (.value invoked.sound)
     | fault failed => exact .apply arguments.sound (.fault failed.sound)
 
+/-- A sized argument vector below the budget gives each argument below it. -/
+theorem ArgumentsAt.of_sized {program budget context evidence source environment before ids values after size}
+    (trace : SourceExecutionSize.ExpressionsEvaluate program size context evidence source environment before ids values after)
+    (within : size < budget) :
+    ArgumentsAt program budget context evidence source environment before ids values after := by
+  induction ids generalizing size before values with
+  | nil => cases trace; exact .nil
+  | cons id ids ih =>
+    cases trace with
+    | cons head tail =>
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within
+      exact .cons head (by omega) (ih tail (by omega))
+
+/-- A sized argument fault below the budget, argument by argument. -/
+theorem ArgumentsFaultAt.of_sized {program budget context evidence source environment before ids reason after size}
+    (trace : SourceExecutionSize.ExpressionsFault program size context evidence source environment before ids reason after)
+    (within : size < budget) :
+    ArgumentsFaultAt program budget context evidence source environment before ids reason after := by
+  induction ids generalizing size before with
+  | nil => cases trace
+  | cons id ids ih =>
+    cases trace with
+    | head failed =>
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within
+      exact .head failed (by omega)
+    | tail head tail =>
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within
+      exact .tail head (by omega) (ih tail (by omega))
+
 /-- Raw and suffix children are bounded by the same original whole judgment.
 The intermediate value and heap remain distinct from the final result. -/
 inductive TraceForAt (raw : Nat → Dynamic.ExpressionOutcome → Dynamic.Heap → Prop)
@@ -343,6 +372,123 @@ theorem OperatorSource.raw_inv_sized {size : Nat} {environment : Dynamic.Environ
 
 
 end SourceInversion
+
+section MethodCallInversion
+open CallablePreparedMethodSelection
+open CallableCoercionExpressionCertificates (Projector Specialized Lowered)
+
+variable {checkedProgram : CheckedProgram} {project : Projector} {caller : Specialized}
+  {compilation : SourceCoreFunctions.Context} {child : SourceCoreEvidence.Child} {fuel : Nat}
+  {source : TypedSource} {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
+  {reasonAt : ExpressionId → Word} {policy : SourceCoreFunctions.CallablePolicy}
+  {node : ExpressionNode} {output : Lowered}
+  {receipt : MethodCall checkedProgram project caller compilation child fuel source scope id reasonAt policy node output}
+  (selected : MethodCallReceipt receipt)
+  {program : Program} {context : SourceSemantics.Context} {evidence dictionary : Dynamic.EvidenceEnvironment}
+  {sourceBody : Dynamic.BodyInstance}
+  (catalog : CallableCoercionSelectionIdentity.Catalog program)
+  (ledger : context.solvedRequirements = caller.function.solvedRequirements)
+  (selection : Dynamic.OperatorMethodSelected program context evidence selected.signature.name receipt.methodName
+    receipt.requirements sourceBody dictionary)
+
+theorem methodCall_owned_eq {owned : List RequirementId}
+    (layout : Dynamic.OrdinaryRequirementLayout node.requirements node.coercions owned) :
+    owned = receipt.requirements := by
+  have original := CallableCallRequirementLayouts.ordinary_owned receipt.ordinary
+  exact List.append_cancel_right (layout.symm.trans original)
+
+include selected catalog ledger selection in
+/-- Any source selection at the call's requirements is at its trait's name and
+selects the same body. -/
+theorem methodCall_same {traitName : String} {otherBody : Dynamic.BodyInstance}
+    {otherDictionary : Dynamic.EvidenceEnvironment}
+    (actual : Dynamic.OperatorMethodSelected program context evidence traitName receipt.methodName
+      receipt.requirements otherBody otherDictionary) :
+    traitName = selected.signature.name ∧ otherBody = sourceBody := by
+  have unique := CallableCoercionSelectionIdentity.primary_unique ledger selected.certificate.roots.primarySelected
+  have name : traitName = selected.signature.name :=
+    CallableCoercionSelectionIdentity.traitName_eq catalog unique
+      (by simpa only [selected.requirements] using actual)
+      (by simpa only [selected.requirements] using selection)
+  subst name
+  refine ⟨rfl, ?_⟩
+  apply CallableCoercionSelectionIdentity.body_eq catalog unique
+  · simpa only [selected.requirements] using actual
+  · simpa only [selected.requirements] using selection
+
+include selected ledger selection in
+theorem methodCall_requirement_safe {failed : RequirementId}
+    (fault : Dynamic.RequirementListFaults context evidence receipt.requirements failed) : False := by
+  apply CallableCoercionRequirementSafety.selected_safe_for ledger selected.certificate.roots
+  · simpa only [selected.requirements] using selection
+  · simpa only [selected.requirements] using fault
+
+include selected catalog ledger selection in
+/-- Reverse the original raw source outcome of a trait method called by its
+name, preserving each actual source dictionary. -/
+theorem methodCall_raw_inv_sized {size : Nat} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+    {outcome : Dynamic.ExpressionOutcome}
+    (raw : RawOutcomeAt program size context evidence source environment before node outcome after) :
+    ∃ actualDictionary,
+      Dynamic.OperatorMethodSelected program context evidence selected.signature.name receipt.methodName
+        receipt.requirements sourceBody actualDictionary ∧
+      RawTraceAt program size context evidence actualDictionary source environment before
+        receipt.arguments sourceBody outcome after := by
+  cases outcome with
+  | value value =>
+    change SourceExecutionSize.ExpressionFormEvaluates _ _ _ _ _ _ _ _ _ _ _ _ at raw
+    rw [receipt.form] at raw
+    cases raw with
+    | methodCall layout argumentsEvaluated actual invoked =>
+      rw [methodCall_owned_eq (receipt := receipt) layout] at actual
+      obtain ⟨name, body⟩ := methodCall_same selected catalog ledger selection actual
+      cases name
+      cases body
+      refine ⟨_, actual, .apply (ArgumentsAt.of_sized argumentsEvaluated ?_) (.value invoked) ?_⟩
+      all_goals (simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil]; omega)
+  | fault reason =>
+    change SourceExecutionSize.ExpressionFormFaults _ _ _ _ _ _ _ _ _ _ _ _ at raw
+    rw [receipt.form] at raw
+    cases raw with
+    | methodCallArguments _ failed =>
+      refine ⟨_, selection, .argumentFault (ArgumentsFaultAt.of_sized failed ?_)⟩
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil]; omega
+    | methodCallRequirement layout _ failed =>
+      rw [methodCall_owned_eq (receipt := receipt) layout] at failed
+      exact False.elim (methodCall_requirement_safe selected ledger selection failed)
+    | methodCallBody layout argumentsEvaluated actual failed =>
+      rw [methodCall_owned_eq (receipt := receipt) layout] at actual
+      obtain ⟨name, body⟩ := methodCall_same selected catalog ledger selection actual
+      cases name
+      cases body
+      refine ⟨_, actual, .apply (ArgumentsAt.of_sized argumentsEvaluated ?_) (.fault failed) ?_⟩
+      all_goals (simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil]; omega)
+
+include selected catalog ledger selection in
+/-- The whole source outcome of a trait method called by its name: its raw
+outcome and its original output-coercion path, each with its own size. -/
+theorem methodCall_source_inv_sized {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+    {outcome : Dynamic.ExpressionOutcome} {size : Nat}
+    (unique : NodeOccurrencesUnique source)
+    (trace : RecursiveNamedCallBounds.ExpressionOutcome program size context evidence source environment before id outcome after) :
+    TraceForAt
+      (fun rawSize rawOutcome rawHeap => ∃ actualDictionary,
+        Dynamic.OperatorMethodSelected program context evidence selected.signature.name receipt.methodName
+          receipt.requirements sourceBody actualDictionary ∧
+        RawTraceAt program rawSize context evidence actualDictionary source environment before
+          receipt.arguments sourceBody rawOutcome rawHeap)
+      (fun pathSize heap value => PathAt program pathSize context evidence heap node.coercions value)
+      size outcome after := by
+  have notLocal : ∀ name binder, node.form ≠ .reference name (.local binder) := by
+    intro name binder impossible
+    rw [receipt.form] at impossible
+    cases impossible
+  cases raw_source_inv_sized receipt.found unique notLocal trace with
+  | rawFault raw strict => exact .rawFault (methodCall_raw_inv_sized selected catalog ledger selection raw) strict
+  | path raw path rawStrict pathStrict =>
+    exact .path (methodCall_raw_inv_sized selected catalog ledger selection raw) path rawStrict pathStrict
+
+end MethodCallInversion
 
 section SelectedWhole
 open CallablePreparedMethodSelection CallablePreparedMethodRuntimeMeaning
@@ -1177,6 +1323,67 @@ theorem OperatorSource.source_inv {environment : Dynamic.Environment} {before af
     CallablePreparedOperatorSourceBounds.PathAt.sound
 
 end SourceInversion
+
+section MethodCallInversion
+open CallablePreparedMethodSelection
+open CallableCoercionExpressionCertificates (Projector Specialized Lowered)
+
+variable {checkedProgram : CheckedProgram} {project : Projector} {caller : Specialized}
+  {compilation : SourceCoreFunctions.Context} {child : SourceCoreEvidence.Child} {fuel : Nat}
+  {source : TypedSource} {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
+  {reasonAt : ExpressionId → Word} {policy : SourceCoreFunctions.CallablePolicy}
+  {node : ExpressionNode} {output : Lowered}
+  {receipt : MethodCall checkedProgram project caller compilation child fuel source scope id reasonAt policy node output}
+  (selected : MethodCallReceipt receipt)
+  {program : Program} {context : SourceSemantics.Context} {evidence dictionary : Dynamic.EvidenceEnvironment}
+  {sourceBody : Dynamic.BodyInstance}
+  (catalog : CallableCoercionSelectionIdentity.Catalog program)
+  (ledger : context.solvedRequirements = caller.function.solvedRequirements)
+  (selection : Dynamic.OperatorMethodSelected program context evidence selected.signature.name receipt.methodName
+    receipt.requirements sourceBody dictionary)
+
+include selected catalog ledger selection in
+/-- Reverse the raw source outcome of a trait method called by its name,
+preserving each actual source dictionary. -/
+theorem methodCall_raw_inv {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+    {outcome : Dynamic.ExpressionOutcome}
+    (raw : CallableCoercionExpressionMeaning.RawOutcome program context evidence source environment before node outcome after) :
+    ∃ actualDictionary,
+      Dynamic.OperatorMethodSelected program context evidence selected.signature.name receipt.methodName
+        receipt.requirements sourceBody actualDictionary ∧
+      NamedCalls.Arguments.Trace program context evidence actualDictionary source environment before
+        receipt.arguments sourceBody outcome after := by
+  obtain ⟨size, measured⟩ : ∃ size,
+      CallablePreparedOperatorSourceBounds.RawOutcomeAt program size context evidence source environment before node outcome after := by
+    cases outcome with
+    | value value => exact SourceExecutionSize.ExpressionFormEvaluates.has_size raw
+    | fault reason => exact SourceExecutionSize.ExpressionFormFaults.has_size raw
+  obtain ⟨actualDictionary, actual, traced⟩ :=
+    CallablePreparedOperatorSourceBounds.methodCall_raw_inv_sized selected catalog ledger selection measured
+  exact ⟨actualDictionary, actual, traced.sound⟩
+
+include selected catalog ledger selection in
+/-- The whole source outcome of a trait method called by its name keeps its raw
+intermediate value and heap before its original output-coercion suffix. -/
+theorem methodCall_source_inv {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+    {outcome : Dynamic.ExpressionOutcome}
+    (unique : NodeOccurrencesUnique source)
+    (trace : Dynamic.ExpressionEvaluatesOutcome program context evidence source environment before id outcome after) :
+    CallableCoercionExpressionMeaning.TraceFor
+      (fun rawOutcome rawHeap => ∃ actualDictionary,
+        Dynamic.OperatorMethodSelected program context evidence selected.signature.name receipt.methodName
+          receipt.requirements sourceBody actualDictionary ∧
+        NamedCalls.Arguments.Trace program context evidence actualDictionary source environment before
+          receipt.arguments sourceBody rawOutcome rawHeap)
+      (fun heap value => CallableCoercionExpressionMeaning.Path program context evidence heap node.coercions value)
+      outcome after := by
+  obtain ⟨size, measured⟩ := RecursiveNamedCallBounds.ExpressionOutcome.has_size trace
+  exact (CallablePreparedOperatorSourceBounds.methodCall_source_inv_sized
+    selected catalog ledger selection unique measured).forget
+    (fun ⟨actualDictionary, actual, traced⟩ => ⟨actualDictionary, actual, traced.sound⟩)
+    CallablePreparedOperatorSourceBounds.PathAt.sound
+
+end MethodCallInversion
 
 section Operator
 open CallablePreparedMethodRuntimeMeaning
