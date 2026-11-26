@@ -526,6 +526,7 @@ private theorem items_covered {policy : SourceCoreLoops.Policy} {source semantic
       (tree : AcceptedNamedBodyFlow.Items policy source site result reasonAt next finalScope finish fuel scope items
         code),
       tree.Ready → ItemsShape source child items → CellAwareInvocationAcceptedForItems.ItemsCovered semantic tree := by
+  have view : LambdaMetadataViews.MetadataView semantic source := by subst sameSource; exact .refl _
   intro fuel scope items code tree
   induction tree with
   | nil => intro _ _; trivial
@@ -546,21 +547,31 @@ private theorem items_covered {policy : SourceCoreLoops.Policy} {source semantic
     cases shape with
     | assigned assignable _ _ => exact absurd (.inl assignable) ready.1
     | projectedAssigned assignable _ _ _ => exact absurd (.inr assignable) ready.1
-  | assigned _ _ _ ih | projectedAssigned _ _ _ ih =>
+  | assigned _ _ _ ih =>
     intro ready shape
     cases shape with
-    | assigned _ _ tail => exact ⟨sameSource, ih ready tail⟩
-    | projectedAssigned _ _ _ tail => exact ⟨sameSource, ih ready tail⟩
+    | assigned _ _ tail => exact ⟨view, ih ready tail⟩
+    | projectedAssigned _ _ _ tail => exact ⟨view, ih ready tail⟩
+  | projectedAssigned _ _ route ih =>
+    intro ready shape
+    cases shape with
+    | assigned _ _ tail => exact ⟨view, by subst sameSource; exact route, ih ready tail⟩
+    | projectedAssigned _ _ _ tail => exact ⟨view, by subst sameSource; exact route, ih ready tail⟩
   | bitNotting =>
     intro ready shape
     cases shape with
     | bitNotted assignable _ => exact absurd (.inl assignable) ready.1
     | projectedBitNotted assignable _ _ => exact absurd (.inr assignable) ready.1
-  | bitNotted _ _ _ ih | projectedBitNotted _ _ _ ih =>
+  | bitNotted _ _ _ ih =>
     intro ready shape
     cases shape with
-    | bitNotted _ tail => exact ⟨sameSource, ih ready tail⟩
-    | projectedBitNotted _ _ tail => exact ⟨sameSource, ih ready tail⟩
+    | bitNotted _ tail => exact ⟨view, ih ready tail⟩
+    | projectedBitNotted _ _ tail => exact ⟨view, ih ready tail⟩
+  | projectedBitNotted _ _ route ih =>
+    intro ready shape
+    cases shape with
+    | bitNotted _ tail => exact ⟨view, by subst sameSource; exact route, ih ready tail⟩
+    | projectedBitNotted _ _ tail => exact ⟨view, by subst sameSource; exact route, ih ready tail⟩
 
 /-- Every refined accepted tree of a supported statement list whose match
 receipts are at contexts that `admitted` admits is covered, for every
@@ -860,7 +871,7 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
       rw [form] at form'
       cases form'
-      refine ⟨contexts.1, sameSource, fun request member => ?_, tailIH ready.2 contexts.2.2 tail⟩
+      refine ⟨contexts.1, view, by subst sameSource; rfl, fun request member => ?_, tailIH ready.2 contexts.2.2 tail⟩
       refine branchIH request member (ready.1 request member) (contexts.2.1 request member) ?_
       rcases receipt.original request member with ⟨arm, armMember, same⟩ | same
       · rw [same]

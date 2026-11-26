@@ -471,9 +471,9 @@ section
 the flow heads used by the mixed-cell write theorems. A right-hand side
 certificate is the compiler's own child lowering; checker typing supplies
 writability, and diagnostic words come from the body's own fault tables. The
-`_view` heads are at a Source of which the compiler's is a metadata view: the
-view keeps the root binder, and with the Source's route of a projected write,
-the place's description, so the place lowering (`lower_view`). -/
+heads are at a Source of which the compiler's is a metadata view: the view
+keeps the root binder, and with the Source's route of a projected write, the
+place's description, so the place lowering (`lower_view`). -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedAssignments
@@ -481,30 +481,6 @@ open Core Frontend SourceInference
 open CellAwareInvocationAcceptedTerminals (children)
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled} {bodyRelation : ActualBodyInvocation.BodyRelation}
-
-/-- The head is stated over any Source equal to the compiler's view, so it
-can be used directly at the invocation's own Source. -/
-theorem bare_head (index : ActualBodyInvocation.Index compiled bodyRelation) {target : TypedSource}
-    (sameSource : index.compilerSource = target) (unique : NodeOccurrencesUnique target)
-    {fuel : Nat} {scope : SourceCoreLocalCell.Scope} {site : SourceCoreElaboration.ErrorSite}
-    {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
-    {output : Ty} {next code : Expr}
-    (receipt : AcceptedBareAssignmentReceipt.Receipt index.policy fuel index.compilerSource scope site assignment
-      operator rhs output next index.reasonAt code)
-    (targetType : receipt.binder.scheme.body = assignment.target.type)
-    {context : SourceSemantics.Context} (typed : SourceAssignmentHasType target context assignment operator rhs)
-    (administrative : Core.Context) :
-    ∃ head : GenericAssignmentStatements.Head (.initial compiled.compatible.checked) target context
-        (children index fuel) scope administrative compiled.indexed.layouts.definitions assignment operator rhs,
-      code = head.emit next output ∧ head.invalid = index.invalidOperand site assignment.target.root operator := by
-  subst target
-  have lowered := index.assignment_lowered receipt.accepted
-  obtain ⟨_, writable, rightTyped, profile⟩ :=
-    ScopedSourceForItemsAdmission.assignment_facts receipt.declaration targetType receipt.bare receipt.sourceProfile typed
-  obtain ⟨_, rhsTyped, _⟩ := id rightTyped
-  obtain ⟨node, found, _, _⟩ := CellAwareInvocationAcceptedSourceFacts.expression_node unique rhsTyped
-  exact GenericAssignmentStatements.Head.of_lower_bare_with_token receipt.bare unique writable rightTyped profile
-    (fun _ generated => ⟨node, found, generated⟩) lowered
 
 /-- Checker validity of a bare bit-not target gives its writable declaration,
 and the compiler profile's `Word` or fixed-width target (`sourceProfile`)
@@ -529,91 +505,6 @@ theorem bitNot_facts {source : TypedSource} {context : SourceSemantics.Context}
     rw [bare] at projections
     cases projections
     exact targetType.symm ▸ target.symm ▸ writable
-
-/-- The accepted bare bit-not receipt supplies the unary flow head and its
-diagnostic word from this body's own fault table. -/
-theorem bitNot_head (index : ActualBodyInvocation.Index compiled bodyRelation) {target : TypedSource}
-    (sameSource : index.compilerSource = target)
-    {fuel : Nat} {scope : SourceCoreLocalCell.Scope} {site : SourceCoreElaboration.ErrorSite}
-    {assignment : AssignmentResolution} {output : Ty} {next code : Expr}
-    (receipt : AcceptedBareBitNotReceipt.Receipt index.policy fuel index.compilerSource scope site assignment
-      output next index.reasonAt code)
-    (targetType : receipt.binder.scheme.body = assignment.target.type)
-    {context : SourceSemantics.Context} (typed : SourceBitNotAssignmentValid target context assignment) :
-    ∃ head : CompatibleBitNotStatements.Head context scope assignment,
-      code = head.emit next output ∧ head.invalid = index.invalidUnary site assignment.target.root := by
-  subst target
-  have lowered := index.bitNot_lowered receipt.selected receipt.accepted
-  obtain ⟨writable, profile⟩ := bitNot_facts receipt.declaration targetType receipt.bare
-    receipt.sourceProfile typed
-  exact CompatibleBitNotStatements.Head.of_lower_with_token writable receipt.bare profile lowered
-
-/-- A projected write's head retains the compiler's ordered key and right-hand
-actions, its native typing and the prepared place used by reached diagnostics. -/
-theorem projected_head (index : ActualBodyInvocation.Index compiled bodyRelation) {target : TypedSource}
-    (sameSource : index.compilerSource = target) (unique : NodeOccurrencesUnique target)
-    {fuel : Nat} {scope : SourceCoreLocalCell.Scope} {site : SourceCoreElaboration.ErrorSite}
-    {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
-    {output : Ty} {next code : Expr}
-    (receipt : AcceptedProjectedAssignmentReceipt.Receipt index.policy fuel index.compilerSource scope site
-      assignment operator rhs output next index.reasonAt code)
-    (route : AcceptedProjectedAssignmentRoute.Route index.compilerSource receipt.binder.scheme.body
-      assignment.target.projections assignment.target.type)
-    {context : SourceSemantics.Context} (signatures : context.signatures = compiled.compatible.checked.signatures)
-    (typed : SourceAssignmentHasType target context assignment operator rhs)
-    (administrative : Core.Context) {result : Ty}
-    (native : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code result
-      compiled.indexed.layouts.definitions) :
-    ∃ head : GenericAssignmentStatements.Head (.initial compiled.compatible.checked) target context
-        (children index fuel) scope administrative compiled.indexed.layouts.definitions assignment operator rhs,
-      code = head.emit next output ∧ head.invalid = index.invalidOperand site assignment.target.root operator ∧
-      head.PreparedAt site fuel (index.invalidProjection site assignment.target.root)
-        (index.missingDefault site assignment.target.root) := by
-  subst target
-  have lowered := index.assignment_lowered receipt.accepted
-  obtain ⟨sourceTyped, writable, rightTyped, profile⟩ :=
-    ScopedSourceForItemsAdmission.projected_assignment_facts unique receipt.description.binding route receipt.sourceProfile typed
-  exact CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences
-    unique signatures sourceTyped writable route.elementFree rightTyped profile
-    (fun id _ member generated _ => by
-      rcases List.mem_cons.mp member with same | member
-      · subst id
-        obtain ⟨_, rhsTyped, _⟩ := id rightTyped
-        obtain ⟨node, found, _, _⟩ := CellAwareInvocationAcceptedSourceFacts.expression_node unique rhsTyped
-        exact ⟨node, found, generated⟩
-      · obtain ⟨node, found, _⟩ := route.key_typed unique (sourceTyped _ receipt.description.binding) member
-        exact ⟨node, found, generated⟩) lowered native
-
-/-- The projected unary head keeps the absent operand literal; only ordered
-keys are compiler children, each certified by its own accepted lowering. -/
-theorem projected_bitNot_head (index : ActualBodyInvocation.Index compiled bodyRelation) {target : TypedSource}
-    (sameSource : index.compilerSource = target) (unique : NodeOccurrencesUnique target)
-    {fuel : Nat} {scope : SourceCoreLocalCell.Scope} {site : SourceCoreElaboration.ErrorSite}
-    {assignment : AssignmentResolution} {output : Ty} {next code : Expr}
-    (receipt : AcceptedProjectedBitNotReceipt.Receipt index.policy fuel index.compilerSource scope site
-      assignment output next index.reasonAt code)
-    (route : AcceptedProjectedAssignmentRoute.Route index.compilerSource receipt.binder.scheme.body
-      assignment.target.projections assignment.target.type)
-    {context : SourceSemantics.Context} (signatures : context.signatures = compiled.compatible.checked.signatures)
-    (typed : SourceBitNotAssignmentValid target context assignment)
-    (administrative : Core.Context) {result : Ty}
-    (native : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code result
-      compiled.indexed.layouts.definitions) :
-    ∃ head : CompatibleProjectedBitNotStatements.Head (.initial compiled.compatible.checked) target context
-        (children index fuel) scope administrative compiled.indexed.layouts.definitions assignment,
-      code = head.emit next output ∧ head.invalid = index.invalidUnary site assignment.target.root ∧
-      head.PreparedAt site fuel (index.invalidProjection site assignment.target.root)
-        (index.missingDefault site assignment.target.root) := by
-  subst target
-  have lowered := index.bitNot_lowered receipt.callbackSelected receipt.accepted
-  obtain ⟨sourceTyped, writable⟩ :=
-    ScopedSourceForItemsAdmission.projected_bitNot_facts unique receipt.description.binding route typed
-  exact CallableIndexedOwnedPreparedNativeProjectedBitNotHeadCollectors.Head.of_lower_with_raw_occurrences
-    unique signatures sourceTyped writable receipt.projected route.elementFree
-    (WideBitNotProfile.of_word_or_fixed receipt.sourceProfile)
-    (fun id _ member generated _ => by
-      obtain ⟨node, found, _⟩ := route.key_typed unique (sourceTyped _ receipt.description.binding) member
-      exact ⟨node, found, generated⟩) lowered native
 
 /-- A route traversal reads a Source only through its owner and the node types of its keys. -/
 theorem routeSteps_congr {checked : SourceCoreCompatibleDataPlaces.Checked} {signatures : ProgramSignatures}
@@ -689,8 +580,9 @@ theorem lower_view {context : SourceCoreCompatibleDataPlaces.Context} {signature
         output next reasonAt invalidProjection invalidOperand missing := by
   simp only [SourceCoreCompatibleDataPlaces.lower_of_plain plain, SourceCoreCompatibleDataPlaces.lowerRoute, described]
 
-/-- `bare_head` at a Source of which the compiler's is a metadata view: the view keeps the root binder, and
-the right side's node and type are the Source's. -/
+/-- The head is stated over any Source of which the compiler's is a metadata view, so it can be used directly
+at the invocation's own Source: the view keeps the root binder, and the right side's node and type are the
+Source's. -/
 theorem bare_head_view (index : ActualBodyInvocation.Index compiled bodyRelation) {target : TypedSource}
     (view : LambdaMetadataViews.MetadataView target index.compilerSource) (unique : NodeOccurrencesUnique target)
     {fuel : Nat} {scope : SourceCoreLocalCell.Scope} {site : SourceCoreElaboration.ErrorSite}
@@ -716,7 +608,8 @@ theorem bare_head_view (index : ActualBodyInvocation.Index compiled bodyRelation
     (expression := fun fuel _ => index.policy.lowerExpression fuel index.compilerSource) receipt.bare unique writable
     rightTyped profile (fun _ generated => ⟨node, found, generated⟩) lowered
 
-/-- `bitNot_head` at a Source of which the compiler's is a metadata view, which keeps the root binder. -/
+/-- The accepted bare bit-not receipt supplies the unary flow head and its diagnostic word from this body's own
+fault table, at a Source of which the compiler's is a metadata view, which keeps the root binder. -/
 theorem bitNot_head_view (index : ActualBodyInvocation.Index compiled bodyRelation) {target : TypedSource}
     (view : LambdaMetadataViews.MetadataView target index.compilerSource)
     {fuel : Nat} {scope : SourceCoreLocalCell.Scope} {site : SourceCoreElaboration.ErrorSite}
@@ -733,9 +626,10 @@ theorem bitNot_head_view (index : ActualBodyInvocation.Index compiled bodyRelati
   rw [view.rootBinder] at writable
   exact CompatibleBitNotStatements.Head.of_lower_with_token writable receipt.bare profile lowered
 
-/-- `projected_head` at a Source of which the compiler's is a metadata view. The view keeps the root binder;
-the keys' types, which it does not keep, come from the Source's own route of the root binder (`routed`),
-which with the compiler's (`route`) keeps the place's description. -/
+/-- A projected write's head retains the compiler's ordered key and right-hand actions, its native typing and
+the prepared place used by reached diagnostics, at a Source of which the compiler's is a metadata view. The
+view keeps the root binder; the keys' types, which it does not keep, come from the Source's own route of the
+root binder (`routed`), which with the compiler's (`route`) keeps the place's description. -/
 theorem projected_head_view (index : ActualBodyInvocation.Index compiled bodyRelation) {target : TypedSource}
     (view : LambdaMetadataViews.MetadataView target index.compilerSource) (unique : NodeOccurrencesUnique target)
     {fuel : Nat} {scope : SourceCoreLocalCell.Scope} {site : SourceCoreElaboration.ErrorSite}
@@ -774,8 +668,9 @@ theorem projected_head_view (index : ActualBodyInvocation.Index compiled bodyRel
       · obtain ⟨node, found, _⟩ := routed.key_typed unique (sourceTyped _ declaration) member
         exact ⟨node, found, generated⟩) lowered native
 
-/-- `projected_bitNot_head` at a Source of which the compiler's is a metadata view, with the Source's own
-route of the root binder, as `projected_head_view` has it. -/
+/-- The projected unary head keeps the absent operand literal; only ordered keys are compiler children, each
+certified by its own accepted lowering. It is at a Source of which the compiler's is a metadata view, with the
+Source's own route of the root binder, as `projected_head_view` has it. -/
 theorem projected_bitNot_head_view (index : ActualBodyInvocation.Index compiled bodyRelation) {target : TypedSource}
     (view : LambdaMetadataViews.MetadataView target index.compilerSource) (unique : NodeOccurrencesUnique target)
     {fuel : Nat} {scope : SourceCoreLocalCell.Scope} {site : SourceCoreElaboration.ErrorSite}
@@ -835,8 +730,9 @@ variable {policy : SourceCoreLoops.Policy} {source : TypedSource} {site : Source
   {finalScope : SourceCoreLocalCell.Scope} {finish : Expr}
 
 /-- Header items closed below. Raw write receipts that were not refined are
-outside the closure, and writes require the compiler view to be the original
-Source, as for named rows. -/
+outside the closure, and writes require the compiler's source to be a metadata
+view of the original Source, a projected one also at the original Source's
+route of its root binder, as `Covered` has them. -/
 def ItemsCovered (semantic : TypedSource) {fuel scope items code}
     (tree : Items policy source site result reasonAt next finalScope finish fuel scope items code) : Prop :=
   match tree with
@@ -845,8 +741,16 @@ def ItemsCovered (semantic : TypedSource) {fuel scope items code}
   | @Items.initialized _ _ _ _ _ _ _ _ _ _ binder _ _ _ _ _ _ _ _ _ remaining _ =>
       binder.scheme.quantified = [] ∧ ItemsCovered semantic remaining
   | .discard _ _ remaining => ItemsCovered semantic remaining
-  | .assigned remaining _ _ | .projectedAssigned remaining _ _ | .bitNotted remaining _ _
-    | .projectedBitNotted remaining _ _ => source = semantic ∧ ItemsCovered semantic remaining
+  | .assigned remaining _ _ | .bitNotted remaining _ _ =>
+      LambdaMetadataViews.MetadataView semantic source ∧ ItemsCovered semantic remaining
+  | @Items.projectedAssigned _ _ _ _ _ _ _ _ _ _ assignment _ _ _ _ _ remaining receipt _ =>
+      LambdaMetadataViews.MetadataView semantic source ∧
+        AcceptedProjectedAssignmentRoute.Route semantic receipt.binder.scheme.body assignment.target.projections
+          assignment.target.type ∧ ItemsCovered semantic remaining
+  | @Items.projectedBitNotted _ _ _ _ _ _ _ _ _ _ assignment _ _ _ remaining receipt _ =>
+      LambdaMetadataViews.MetadataView semantic source ∧
+        AcceptedProjectedAssignmentRoute.Route semantic receipt.binder.scheme.body assignment.target.projections
+          assignment.target.type ∧ ItemsCovered semantic remaining
   | .assigning .. | .bitNotting .. => False
 
 end Coverage
@@ -1092,22 +996,21 @@ theorem post_correct [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
   | assigning => intro covered; cases covered
   | @assigned fuel scope assignment operator expression rest tail code remaining receipt targetType tailIH =>
     intro covered members control context final signatures typed native
-    obtain ⟨sameSource, covered⟩ := covered
+    obtain ⟨view, covered⟩ := covered
+    rw [← sourceEq] at view
     cases typed with
     | cons headTyped restTyped =>
     cases headTyped with
     | assignValue assignmentTyped =>
-    obtain ⟨head, emitted, invalid⟩ := CellAwareInvocationAcceptedAssignments.bare_head index
-      (sameSource.trans sourceEq.symm) unique receipt targetType (sourceEq ▸ assignmentTyped) administrative
+    obtain ⟨head, emitted, invalid⟩ := CellAwareInvocationAcceptedAssignments.bare_head_view index
+      view unique receipt targetType (sourceEq ▸ assignmentTyped) administrative
     obtain ⟨_, native⟩ := native
     have tailNative := TypedImperative.Native.execute_continuation (emitted ▸ native)
     have tailBounds := tailIH covered (fun item member => members item (List.mem_cons_of_mem _ member))
       signatures restTyped ⟨_, tailNative⟩
     have token : AssignmentOperandDiagnostics.OperandsLaw (fun reason token => faults (.semantic reason) token)
         operator head.invalid := by
-      have found : invocation.source.lookupStatement? parentId = some statement := by
-        rw [sourceEq, ← sameSource]
-        exact parentFound
+      have found : invocation.source.lookupStatement? parentId = some statement := view.statement parentFound
       rw [invalid]
       exact writes.operands (.header found parentForm (members _ (List.mem_cons_self ..)))
         (sourceEq ▸ assignmentTyped)
@@ -1122,20 +1025,19 @@ theorem post_correct [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
           (expressions fuel context runtime covers ledger).2 tailBounds.2⟩
   | @projectedAssigned fuel scope assignment operator expression rest tail code remaining receipt route tailIH =>
     intro covered members control context final signatures typed native
-    obtain ⟨sameSource, covered⟩ := covered
+    obtain ⟨view, routed, covered⟩ := covered
+    rw [← sourceEq] at view routed
     cases typed with
     | cons headTyped restTyped =>
     cases headTyped with
     | assignValue assignmentTyped =>
     obtain ⟨_, native⟩ := native
-    obtain ⟨head, emitted, invalid, preparedAt⟩ := CellAwareInvocationAcceptedAssignments.projected_head index
-      (sameSource.trans sourceEq.symm) unique receipt route signatures (sourceEq ▸ assignmentTyped) administrative native
+    obtain ⟨head, emitted, invalid, preparedAt⟩ := CellAwareInvocationAcceptedAssignments.projected_head_view index
+      view unique receipt route routed signatures (sourceEq ▸ assignmentTyped) administrative native
     have tailNative := TypedImperative.Native.execute_continuation (emitted ▸ native)
     have tailBounds := tailIH covered (fun item member => members item (List.mem_cons_of_mem _ member))
       signatures restTyped ⟨_, tailNative⟩
-    have found : invocation.source.lookupStatement? parentId = some statement := by
-      rw [sourceEq, ← sameSource]
-      exact parentFound
+    have found : invocation.source.lookupStatement? parentId = some statement := view.statement parentFound
     have shapes := fun (sourceTyped : SourceAssignmentHasType invocation.source context assignment operator expression)
         {environment : Dynamic.Environment} {initialIndex : ProtectedStateTransition.Index}
         (initial : protocol.State initialIndex) =>
@@ -1154,22 +1056,21 @@ theorem post_correct [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
   | bitNotting => intro covered; cases covered
   | @bitNotted fuel scope assignment rest tail code remaining receipt targetType tailIH =>
     intro covered members control context final signatures typed native
-    obtain ⟨sameSource, covered⟩ := covered
+    obtain ⟨view, covered⟩ := covered
+    rw [← sourceEq] at view
     cases typed with
     | cons headTyped restTyped =>
     cases headTyped with
     | assignBitNot assignmentTyped =>
-    obtain ⟨head, emitted, invalid⟩ := CellAwareInvocationAcceptedAssignments.bitNot_head index
-      (sameSource.trans sourceEq.symm) receipt targetType (sourceEq ▸ assignmentTyped)
+    obtain ⟨head, emitted, invalid⟩ := CellAwareInvocationAcceptedAssignments.bitNot_head_view index
+      view receipt targetType (sourceEq ▸ assignmentTyped)
     obtain ⟨_, native⟩ := native
     have tailNative := TypedImperative.Native.execute_continuation (emitted ▸ native)
     have tailBounds := tailIH covered (fun item member => members item (List.mem_cons_of_mem _ member))
       signatures restTyped ⟨_, tailNative⟩
     have errors : head.Errors (fun reason token => faults (.semantic reason) token) := by
       show faults (.semantic (.invalidUnaryOperand .bitNot)) head.invalid
-      have found : invocation.source.lookupStatement? parentId = some statement := by
-        rw [sourceEq, ← sameSource]
-        exact parentFound
+      have found : invocation.source.lookupStatement? parentId = some statement := view.statement parentFound
       rw [invalid]
       exact writes.unary (.header found parentForm (members _ (List.mem_cons_self ..)))
         (sourceEq ▸ assignmentTyped)
@@ -1180,20 +1081,19 @@ theorem post_correct [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
         budget tailBounds.2⟩
   | @projectedBitNotted fuel scope assignment rest tail code remaining receipt route tailIH =>
     intro covered members control context final signatures typed native
-    obtain ⟨sameSource, covered⟩ := covered
+    obtain ⟨view, routed, covered⟩ := covered
+    rw [← sourceEq] at view routed
     cases typed with
     | cons headTyped restTyped =>
     cases headTyped with
     | assignBitNot assignmentTyped =>
     obtain ⟨_, native⟩ := native
-    obtain ⟨head, emitted, invalid, preparedAt⟩ := CellAwareInvocationAcceptedAssignments.projected_bitNot_head index
-      (sameSource.trans sourceEq.symm) unique receipt route signatures (sourceEq ▸ assignmentTyped) administrative native
+    obtain ⟨head, emitted, invalid, preparedAt⟩ := CellAwareInvocationAcceptedAssignments.projected_bitNot_head_view
+      index view unique receipt route routed signatures (sourceEq ▸ assignmentTyped) administrative native
     have tailNative := TypedImperative.Native.execute_continuation (emitted ▸ native)
     have tailBounds := tailIH covered (fun item member => members item (List.mem_cons_of_mem _ member))
       signatures restTyped ⟨_, tailNative⟩
-    have found : invocation.source.lookupStatement? parentId = some statement := by
-      rw [sourceEq, ← sameSource]
-      exact parentFound
+    have found : invocation.source.lookupStatement? parentId = some statement := view.statement parentFound
     have reachedErrors : SourceBitNotAssignmentValid invocation.source context assignment →
         ∀ {environment : Dynamic.Environment} {initialIndex : ProtectedStateTransition.Index}
           (initial : protocol.State initialIndex),
@@ -1349,22 +1249,21 @@ theorem initial_correct [RecursiveStageMeaning.FaultTokens faults] (budget : Nat
   | assigning => intro covered; cases covered
   | @assigned fuel scope assignment operator expression rest tail code remaining receipt targetType tailIH =>
     intro covered members context signatures typed native
-    obtain ⟨sameSource, covered⟩ := covered
+    obtain ⟨view, covered⟩ := covered
+    rw [← sourceEq] at view
     cases typed with
     | cons headTyped restTyped =>
     cases headTyped with
     | assignValue assignmentTyped =>
-    obtain ⟨head, emitted, invalid⟩ := CellAwareInvocationAcceptedAssignments.bare_head index
-      (sameSource.trans sourceEq.symm) unique receipt targetType (sourceEq ▸ assignmentTyped) administrative
+    obtain ⟨head, emitted, invalid⟩ := CellAwareInvocationAcceptedAssignments.bare_head_view index
+      view unique receipt targetType (sourceEq ▸ assignmentTyped) administrative
     obtain ⟨_, native⟩ := native
     have tailNative := TypedImperative.Native.execute_continuation (emitted ▸ native)
     have tailBounds := tailIH covered (fun item member => members item (List.mem_cons_of_mem _ member))
       signatures restTyped ⟨_, tailNative⟩
     have token : AssignmentOperandDiagnostics.OperandsLaw (fun reason token => faults (.semantic reason) token)
         operator head.invalid := by
-      have found : invocation.source.lookupStatement? parentId = some statement := by
-        rw [sourceEq, ← sameSource]
-        exact parentFound
+      have found : invocation.source.lookupStatement? parentId = some statement := view.statement parentFound
       rw [invalid]
       exact writes.operands (.header found parentForm (members _ (List.mem_cons_self ..)))
         (sourceEq ▸ assignmentTyped)
@@ -1379,20 +1278,19 @@ theorem initial_correct [RecursiveStageMeaning.FaultTokens faults] (budget : Nat
           (expressions fuel context runtime covers ledger).2 tailBounds.2⟩
   | @projectedAssigned fuel scope assignment operator expression rest tail code remaining receipt route tailIH =>
     intro covered members context signatures typed native
-    obtain ⟨sameSource, covered⟩ := covered
+    obtain ⟨view, routed, covered⟩ := covered
+    rw [← sourceEq] at view routed
     cases typed with
     | cons headTyped restTyped =>
     cases headTyped with
     | assignValue assignmentTyped =>
     obtain ⟨_, native⟩ := native
-    obtain ⟨head, emitted, invalid, preparedAt⟩ := CellAwareInvocationAcceptedAssignments.projected_head index
-      (sameSource.trans sourceEq.symm) unique receipt route signatures (sourceEq ▸ assignmentTyped) administrative native
+    obtain ⟨head, emitted, invalid, preparedAt⟩ := CellAwareInvocationAcceptedAssignments.projected_head_view index
+      view unique receipt route routed signatures (sourceEq ▸ assignmentTyped) administrative native
     have tailNative := TypedImperative.Native.execute_continuation (emitted ▸ native)
     have tailBounds := tailIH covered (fun item member => members item (List.mem_cons_of_mem _ member))
       signatures restTyped ⟨_, tailNative⟩
-    have found : invocation.source.lookupStatement? parentId = some statement := by
-      rw [sourceEq, ← sameSource]
-      exact parentFound
+    have found : invocation.source.lookupStatement? parentId = some statement := view.statement parentFound
     have shapes := fun (sourceTyped : SourceAssignmentHasType invocation.source context assignment operator expression)
         {environment : Dynamic.Environment} {initialIndex : ProtectedStateTransition.Index}
         (initial : protocol.State initialIndex) =>
@@ -1411,22 +1309,21 @@ theorem initial_correct [RecursiveStageMeaning.FaultTokens faults] (budget : Nat
   | bitNotting => intro covered; cases covered
   | @bitNotted fuel scope assignment rest tail code remaining receipt targetType tailIH =>
     intro covered members context signatures typed native
-    obtain ⟨sameSource, covered⟩ := covered
+    obtain ⟨view, covered⟩ := covered
+    rw [← sourceEq] at view
     cases typed with
     | cons headTyped restTyped =>
     cases headTyped with
     | assignBitNot assignmentTyped =>
-    obtain ⟨head, emitted, invalid⟩ := CellAwareInvocationAcceptedAssignments.bitNot_head index
-      (sameSource.trans sourceEq.symm) receipt targetType (sourceEq ▸ assignmentTyped)
+    obtain ⟨head, emitted, invalid⟩ := CellAwareInvocationAcceptedAssignments.bitNot_head_view index
+      view receipt targetType (sourceEq ▸ assignmentTyped)
     obtain ⟨_, native⟩ := native
     have tailNative := TypedImperative.Native.execute_continuation (emitted ▸ native)
     have tailBounds := tailIH covered (fun item member => members item (List.mem_cons_of_mem _ member))
       signatures restTyped ⟨_, tailNative⟩
     have errors : head.Errors (fun reason token => faults (.semantic reason) token) := by
       show faults (.semantic (.invalidUnaryOperand .bitNot)) head.invalid
-      have found : invocation.source.lookupStatement? parentId = some statement := by
-        rw [sourceEq, ← sameSource]
-        exact parentFound
+      have found : invocation.source.lookupStatement? parentId = some statement := view.statement parentFound
       rw [invalid]
       exact writes.unary (.header found parentForm (members _ (List.mem_cons_self ..)))
         (sourceEq ▸ assignmentTyped)
@@ -1437,20 +1334,19 @@ theorem initial_correct [RecursiveStageMeaning.FaultTokens faults] (budget : Nat
         budget tailBounds.2⟩
   | @projectedBitNotted fuel scope assignment rest tail code remaining receipt route tailIH =>
     intro covered members context signatures typed native
-    obtain ⟨sameSource, covered⟩ := covered
+    obtain ⟨view, routed, covered⟩ := covered
+    rw [← sourceEq] at view routed
     cases typed with
     | cons headTyped restTyped =>
     cases headTyped with
     | assignBitNot assignmentTyped =>
     obtain ⟨_, native⟩ := native
-    obtain ⟨head, emitted, invalid, preparedAt⟩ := CellAwareInvocationAcceptedAssignments.projected_bitNot_head index
-      (sameSource.trans sourceEq.symm) unique receipt route signatures (sourceEq ▸ assignmentTyped) administrative native
+    obtain ⟨head, emitted, invalid, preparedAt⟩ := CellAwareInvocationAcceptedAssignments.projected_bitNot_head_view
+      index view unique receipt route routed signatures (sourceEq ▸ assignmentTyped) administrative native
     have tailNative := TypedImperative.Native.execute_continuation (emitted ▸ native)
     have tailBounds := tailIH covered (fun item member => members item (List.mem_cons_of_mem _ member))
       signatures restTyped ⟨_, tailNative⟩
-    have found : invocation.source.lookupStatement? parentId = some statement := by
-      rw [sourceEq, ← sameSource]
-      exact parentFound
+    have found : invocation.source.lookupStatement? parentId = some statement := view.statement parentFound
     have reachedErrors : SourceBitNotAssignmentValid invocation.source context assignment →
         ∀ {environment : Dynamic.Environment} {initialIndex : ProtectedStateTransition.Index}
           (initial : protocol.State initialIndex),
@@ -1540,7 +1436,9 @@ include bindings registered in
 /-- Both directions for an accepted match head followed by its actual suffix.
 Branch bounds are required only at the exact compiler requests and their
 original Source contexts; the hidden scrutinee and every pattern binder are
-non-inputs by the runtime ownership of the body's local identities. -/
+non-inputs by the runtime ownership of the body's local identities. The
+compiler's source is a metadata view of the original Source whose scrutinee
+keeps its node type (`scrutineeType`), which a view does not keep. -/
 theorem correct (budget : Nat)
     (expressions : CellAwareInvocationAcceptedInputs.Expressions (attachment := attachment) (receiving := receiving)
       (functions := functions) bridge index registry invocation faults budget)
@@ -1557,7 +1455,9 @@ theorem correct (budget : Nat)
     (form : node.form = .matchWith resolution)
     (receipt : AcceptedNamedMatchFlow.Receipt index.policy compilation index.compilerSource scope id resolution
       index.result index.reasonAt escaped fuel matchedCode)
-    (admitted : Admitted index compilation) (sameSource : index.compilerSource = index.source)
+    (admitted : Admitted index compilation) (view : LambdaMetadataViews.MetadataView index.source index.compilerSource)
+    (scrutineeType : (index.source.lookupExpression? resolution.scrutinee).map ExpressionNode.type =
+      (index.compilerSource.lookupExpression? resolution.scrutinee).map ExpressionNode.type)
     (branches : ∀ request ∈ receipt.requests, ∀ {control : ControlContext} {context final : SourceSemantics.Context}
       {facts : BodyFacts}, control.returnType = expected →
       context.signatures = whole.compatible.checked.signatures →
@@ -1621,9 +1521,10 @@ theorem correct (budget : Nat)
       ∃ last bodyFacts, StatementsHaveType invocation.source control context statements last bodyFacts := by
     rw [sourceEq]
     exact defaultTyped
-  have compilerFound : index.compilerSource.lookupExpression? resolution.scrutinee = some scrutineeNode := by
-    rw [sameSource]
-    exact scrutineeFound
+  obtain ⟨compilerNode, compilerFound, _, _⟩ := view.symm.expression scrutineeFound
+  have sameType : compilerNode.type = scrutineeNode.type := by
+    rw [scrutineeFound, compilerFound] at scrutineeType
+    exact (Option.some.inj scrutineeType).symm
   obtain ⟨valuesEq, cellsEq, extension⟩ := admitted
   have allocator : compilation.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator
       whole.indexed.ancestry.layout.frame whole.indexed.base.globals.length
@@ -1668,7 +1569,7 @@ theorem correct (budget : Nat)
     intro innerSize innerWithin
     exact CellAwareInvocationMatchTreeHeads.preserves bridge functions index
       (fun error => .sourceAllocation (reprStr error)) allocator rfl registered writes.extension certificate
-      ordinary signatures catalog found typedAt sourceEq compilerFound rfl statementFound form casesAt defaultAt
+      ordinary signatures catalog found typedAt sourceEq compilerFound sameType statementFound form casesAt defaultAt
       budget producer bindings unique
       (by
         intro childSize smaller childScope expression lowered certified
@@ -1690,7 +1591,7 @@ theorem correct (budget : Nat)
     intro innerSize innerWithin
     exact CellAwareInvocationMatchTreeHeads.reflects bridge functions index
       (fun error => .sourceAllocation (reprStr error)) allocator rfl registered writes.extension certificate
-      ordinary signatures catalog found typedAt sourceEq compilerFound rfl statementFound form casesAt defaultAt
+      ordinary signatures catalog found typedAt sourceEq compilerFound sameType statementFound form casesAt defaultAt
       budget producer bindings
       (by
         intro childSize smaller childScope expression lowered certified
@@ -1739,9 +1640,9 @@ projected and element assignments and bit-not updates are closed when the
 compiler's source is a metadata view of the original Source, as a closure's
 body is compiled; a projected one also asks the original Source's route of
 its root binder, which has the keys' types a view does not keep. A match
-receipt is closed when the compiler view is the original Source, as for named
-rows, at an `admitted` compilation context, and a generalized declaration
-when its inputs are `generalized` and its initializer is a direct lambda. -/
+receipt is closed along the same view when its scrutinee keeps its node type
+and its compilation context is `admitted`, and a generalized declaration when
+its inputs are `generalized` and its initializer is a direct lambda. -/
 def Covered (semantic : TypedSource) (expected : TypeSystem.Ty)
     (admitted : SourceCoreCompatibleDataMatches.Context → Prop) (generalized : Prop)
     {mode : Bool} {escaped : Word} {fuel scope statements code}
@@ -1776,8 +1677,10 @@ def Covered (semantic : TypedSource) (expected : TypeSystem.Ty)
   | .conditional _ _ _ _ _ left right tail =>
       Covered semantic expected admitted generalized left ∧
         Covered semantic expected admitted generalized right ∧ Covered semantic expected admitted generalized tail
-  | @Tree.matched _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ compilation _ _ _ branches tail =>
-      admitted compilation ∧ source = semantic ∧
+  | @Tree.matched _ _ _ _ _ _ _ _ _ _ _ _ resolution _ _ compilation _ _ _ branches tail =>
+      admitted compilation ∧ LambdaMetadataViews.MetadataView semantic source ∧
+        (semantic.lookupExpression? resolution.scrutinee).map ExpressionNode.type =
+          (source.lookupExpression? resolution.scrutinee).map ExpressionNode.type ∧
         (∀ request member, Covered semantic expected admitted generalized (branches request member)) ∧
         Covered semantic expected admitted generalized tail
   | .whileLoop _ _ _ _ _ _ inner tail =>
@@ -2472,7 +2375,7 @@ theorem correct [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
   | @matched mode escaped fuel scope id rest node stored resolution matchedCode tail compilation
       read form receipt branches remaining branchIH tailIH =>
     intro covered reached control context final facts result signatures typed native
-    obtain ⟨admitted, sameSource, branchesCovered, tailCovered⟩ := covered
+    obtain ⟨admitted, view, scrutineeType, branchesCovered, tailCovered⟩ := covered
     have headReached := reached id (List.mem_cons_self ..)
     have statementFound := index.statement_read_reached headReached.reached read
     obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
@@ -2496,7 +2399,7 @@ theorem correct [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
         exact List.mem_append_right _ (List.mem_map.mpr ⟨other, otherMember, rfl⟩)
     have matchBounds := CellAwareInvocationAcceptedMatches.correct bridge bindings index producer registered
       registry invocation faults administrative budget expressions writes catalog sourceEq unique headReached.reached
-      read form receipt admitted sameSource
+      read form receipt admitted view scrutineeType
       (by
         intro request member _ _ _ _ childResult childSignatures childTyped childNative
         have branchBounds := branchIH request member (branchesCovered request member) (branchReached request member)
