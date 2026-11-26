@@ -57,9 +57,9 @@ obligations. None follows from agreement in a test corpus.
     statement shape for named rows, connected to the unchanged public root; one concrete instance
     (`AcceptedTick` in `Generalized/Export`); direct calls, the builtin conversions, mapping
     indices and builtin closures at any expression position, closed by one size induction over a
-    family of rows, and final values, assignments and in-place `~` through mapping indices and
-    loops in the shape; call authority from a complete inventory; and the public root in both
-    directions for call-containing rows
+    family of rows, and final values, assignments and in-place `~` through mapping indices,
+    matches and loops in the shape; call authority from a complete inventory; and the public
+    root in both directions for call-containing rows
     (`CellAwarePublicAcceptedCallRoot`), with their original traces lifted and instances at a
     call, a nested call, a conversion and `Typedef.rep` of a conversion (`Accepted/OneCall`); and
     the fault lifting of call-containing rows with the public failure theorem, instanced at the
@@ -154,12 +154,14 @@ The last two are recorded without investigation, and the generators avoid them.
    ([remaining work](core-runtime-unification.md#remaining-work-for-the-second-goal)). Row 1 has
    no leftover, and the faults, the final values, the mapping indices and the builtin closures of
    call-containing rows are lifted, with assignments and in-place `~` through mapping indices,
-   loops, tuples beyond pairs and constructor applications. Memory arrays are under way
+   loops, matches, tuples beyond pairs and constructor applications. Memory arrays are under way
    ([decision 6](memory-arrays-slices.md#6-meaning-proofs)): the staged traces have the array
    forms and the element writes, the selected preservation keeps every array object's length,
    the heap and payload relations relate array objects and views to their Core cells, and the
    compiler's receipts and the cell-aware heads take the array forms as nested sites, which
-   accepted rows run through the public root. Next come the element writes. This unit takes
+   accepted rows run through the public root. The writes to an element have their heads and
+   the flows from a Core run back to the Source; next come the flows from the Source and their
+   place in the body shape. This unit takes
    a memref only as the
    operand of a load or a store, and `toArray` only of slices made where it is called. The
    public compiler rejects a root whose signature holds an array, a slice or a memref, and a

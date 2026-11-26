@@ -34,7 +34,7 @@ API, and families with a finite profile.
 | [ActualBodyInvocation](../../Solcore/SourceSemantics/CoreLowering/ActualBodyInvocation.lean) | `ActualBodyInvocation.Index`: one invocation, a named cache row or a materialized closure |
 | [AcceptedStatements](../../Solcore/SourceSemantics/CoreLowering/AcceptedStatements.lean) | The statement closure: `CellAwareInvocationAcceptedFlow.Covered`, `correct`, `body_preserves`, `body_reflects`, and their inputs (`CellAwareInvocationAcceptedInputs.Expressions`, `Writes`, `Generalized`). A new statement branch goes here |
 | [AcceptedExpressions](../../Solcore/SourceSemantics/CoreLowering/AcceptedExpressions.lean) | The first expression subset (`CellAwareInvocationAcceptedExpressionTrees.Subset`, `CellAwareInvocationAcceptedExpressions.Closed`) and the named-row entry |
-| [AcceptedShapes](../../Solcore/SourceSemantics/CoreLowering/AcceptedShapes.lean) | A Source shape that implies `Covered` (`CellAwareInvocationAcceptedBodyShape.Shape`, checked by `shapeWith?`, with `for` headers as `ItemsShape`), a function body's final value, assignments and in-place `~` through mapping indices and loops included, and staged traces of call-free bodies lifted from Source (`CellAwareInvocationAcceptedStatementLifting.body`) |
+| [AcceptedShapes](../../Solcore/SourceSemantics/CoreLowering/AcceptedShapes.lean) | A Source shape that implies `Covered` (`CellAwareInvocationAcceptedBodyShape.Shape`, checked by `shapeWith?`, with `for` headers as `ItemsShape`), a function body's final value, assignments and in-place `~` through mapping indices, matches and loops included, and staged traces of call-free bodies lifted from Source (`CellAwareInvocationAcceptedStatementLifting.body`) |
 | [AcceptedCalls](../../Solcore/SourceSemantics/CoreLowering/AcceptedCalls.lean) | Direct calls at expression roots and their check on a compiled row |
 | [AcceptedConversions](../../Solcore/SourceSemantics/CoreLowering/AcceptedConversions.lean) | The builtin conversions as compiler sites: the native check, the compiler's receipt, the dirty-integer revert's token law (`CellAwareInvocationAcceptedConversionFaults.DirtyToken`) and the head |
 | [AcceptedBuiltins](../../Solcore/SourceSemantics/CoreLowering/AcceptedBuiltins.lean) | The builtin closures as compiler sites of named-row bodies, and the cell-aware head of their calls (`CellAwareInvocationAcceptedBuiltins.preserves`, `reflects`) |
@@ -65,7 +65,7 @@ Each directory is one family, merged by topic; each file opens with a module doc
 | `RecursiveNamed/` | The finite named-call catalog, the staged profile's primitives and calls, and their public results |
 | `Generalized/` | Generalized local functions: compilation, formation, reads and body meaning |
 | `Accepted/` | Accepted expressions and programs, invocation allocation, scoped Source bodies |
-| `CellAware/` | Bodies over heaps that mix value cells and function descriptors: invocations, scopes, Source lifting, public handles; the heads of the memory array forms (`InvocationArrays`, `InvocationArrayCells`, `InvocationArrayMemrefs`) |
+| `CellAware/` | Bodies over heaps that mix value cells and function descriptors: invocations, scopes, Source lifting, public handles; the heads of the memory array forms (`InvocationArrays`, `InvocationArrayCells`, `InvocationArrayMemrefs`) and of the writes to an element, with their statement flows from a Core run back to the Source (`InvocationElementHeads` to `InvocationElementFlows`) |
 | `Selected/` | Selected compilations: admission, calls, public steps, and lifting to staged Source |
 
 **Words.** Names are systematic:
@@ -253,7 +253,8 @@ work, under "Remaining work for the second goal". In short:
   ([decision 6](../design/memory-arrays-slices.md#6-meaning-proofs)). Relating array objects to
   their Core cells, and slices and memrefs to their Core products, is under way: the staged
   traces, the heap and payload relations, the compiler receipts, the heads and the accepted
-  rows have the array expressions, and the element writes do not yet.
+  rows have the array expressions. The writes to an element have their heads and are not yet
+  in the body shape.
 
 ## Pitfalls
 

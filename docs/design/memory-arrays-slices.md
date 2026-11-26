@@ -551,7 +551,13 @@ Decision 2 changes a result only for lengths just below 2^251 − 1 (difference 
   is related as the pair of its array's Core cell and its position's word (`ValueRep.memref`);
   like an array's reference it is a view (`ViewCarrier.memref`), so no comparison takes one.
   `CanStore.load(r)` and `CanStore.store(r, v)` are sites only when `r` is a `lidx(a, i)` made
-  on the spot (`MemrefSite`). The element writes are under way.
+  on the spot (`MemrefSite`). The writes to an element, `a[i] = v`, `a[i] op= v` and
+  `a[i] ~=`, have their heads in both directions and their statement flows from a Core run
+  back to the Source (`CellAwareInvocationElementAssignmentFlow.reflects`,
+  `CellAwareInvocationElementBitNotFlow.reflects`). At an element a compound write's operands
+  and a `~`'s operand are never invalid, since the snapshot is the element present or the
+  array's default, so those Source faults are refuted there, not mapped. The flows from the
+  Source to Core, the body shape and their accepted row follow.
   The unit takes a memref only as the operand of a load or a store, and `toArray` only of
   slices made where it is called: the Source has no rule for a load, a store or a copy out of
   bounds, and the bound of a stored memref or slice would be an invariant over the heap. The
@@ -711,7 +717,8 @@ rejection in 22 to 24, as it could the open `Typedef` call. Nothing schedules it
   objects to their Core cells is under way, and changes the build-on statements that decision 6
   lists. The staged traces, the whole-cell heap relation, the payload relation, the compiler
   receipts, the heads and the accepted rows have the array expressions; the element writes
-  follow. Arrays stay outside `StaticProfile`.
+  have their heads, and their place in the body shape follows. Arrays stay outside
+  `StaticProfile`.
 - **User collections indexed through `RValueIdxAccess`.** They need std's traits, and `Typedef` at
   a type parameter, which is row 1's open gap. Generic code over std's `Length` (`where c: Length`)
   waits for the same: Lean declares neither trait, so both are rejected with `unknownTrait`.

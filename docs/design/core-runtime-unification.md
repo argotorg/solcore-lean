@@ -134,11 +134,11 @@ These theorems keep explicit premises:
   - `for` headers are closed over the compiler's header items
     (`CellAwareInvocationAcceptedForItems`), with their declarations authenticated by the original
     compilation receipt.
-  - Matches are closed under the same Source view (`CellAwareInvocationAcceptedMatches`). The tree
-    does not record a match receipt's compilation context, so `Covered` requires it to be admitted
-    (`Admitted`: the checked catalog's initial values, the body's own allocator and definitions
-    extended by the indexed layouts). `AcceptedNamedBodyFlow.Tree.refine` builds its match receipts
-    at its policy-success context but does not state it.
+  - Matches are closed under the same Source view (`CellAwareInvocationAcceptedMatches`).
+    `Covered` requires a match receipt's compilation context to be admitted (`Admitted`: the
+    checked catalog's initial values, the body's own allocator and definitions extended by the
+    indexed layouts). `AcceptedNamedBodyFlow.Tree.refine_matches` refines a tree with every
+    match receipt at its match policy's context and states it (`Tree.MatchContexts`).
   - Generalized declarations are closed through `CellAwareInvocationGeneralizedAcceptedAllocation`
     when their initializer is a direct lambda without requirements or coercions and the
     `CellAwareInvocationAcceptedInputs.Generalized` inputs hold: the captured-scope descriptor
@@ -321,18 +321,26 @@ program.
   that the compiler refines (`Assignable`), bare in-place `~` that it refines
   (`BitNotAssignable`), assignments and in-place `~` through mapping indices that it refines
   (`ProjectedAssignable`, `ProjectedBitNotAssignable`), expression statements, blocks,
-  conditionals, `while` and `for` loops, `break` and `continue`, and a function body's final
-  value whose node has the declared result type (`Shape.tail`), with every expression and key in
-  a given predicate. A `for` header is a vector of the same declarations, expression items and
-  refined writes (`ItemsShape`). A list that may end without returning is a branch or block
-  body, or belongs to a Unit function. `covered` shows that every refined accepted tree of such a
-  list is covered; a refined tree keeps the unrefined assignment branch only for writes that are not
-  `ValueAssignable`, and the unrefined `~=` branch only for those that are not `UnaryAssignable`.
+  conditionals, matches whose arms and default are branch bodies (`Shape.matched`), `while` and
+  `for` loops, `break` and `continue`, and a function body's final value whose node has the
+  declared result type (`Shape.tail`), with every expression and key in a given predicate. A
+  `for` header is a vector of the same declarations, expression items and refined writes
+  (`ItemsShape`). A list that may end without returning is a branch or block body, or belongs
+  to a Unit function. `covered` shows that every refined accepted tree of such a list whose
+  match receipts are at admitted contexts (`Tree.MatchContexts`) is covered. At a match it
+  gives the receipt's admitted context, the original Source view, and the covered branches and
+  suffix. A refined tree keeps the unrefined assignment branch only for writes that are not
+  `ValueAssignable`, and the unrefined `~=` branch only for those that are not
+  `UnaryAssignable`.
   It also covers the loop trees and their headers, and refutes the header boundary, which no
   header reaches. `shape?` checks a shape with subset-site expressions on an actually compiled
   row.
 - **The receipts.** `CellAwarePublicAcceptedNamedRoot.refined_body` refines the actual body receipt
   at a prepared header with the header's own assignment, bit-not and match policies.
+  The refined tree also records that every match receipt is at a context that
+  `CellAwareInvocationAcceptedMatches.Admitted` admits for the header's own index
+  (`Tree.MatchContexts`): the header's match context, with the checked catalog's initial values,
+  the header's own allocator and the indexed layouts' definitions.
   `CellAwarePublicAcceptedNamedRoot.compilation_receipts` derives the original compilation receipt
   from the checked program, its public compilation and the issued recipe.
 - **Lifting**, also in `AcceptedShapes`. `CellAwareInvocationAcceptedSourceLifting.expression_value`
@@ -359,7 +367,9 @@ program.
   reference to one to the staged atomic value. A tuple lifts to the staged `tupleValue` and
   `tupleFault`, and a constructor application to `constructorValue`, `constructorFault` and
   `constructorMetadataFault`. The last mirrors the Source's constructor metadata fault, and the
-  constructor heads refute it from the metadata's validity.
+  constructor heads refute it from the metadata's validity. A match lifts to the staged `Match`
+  from its scrutinee's and its selected body's liftings, a selected arm or default being one
+  of the match's own (`selected_body`).
 - **Fault lifting.** `CellAwareInvocationAcceptedFaultLifting`, in the same file, lifts the
   original fault executions of the same bodies with the same reason and heap (`body_fault`). The
   staged traces express every reason but a type mismatch and a missing declaration
@@ -431,8 +441,6 @@ On the accepted-body route above, the next connected steps are:
 
 - **Close the remaining compiler branches in `Covered`:** writes and matches under contextual
   metadata views.
-  - Record the match compilation context in the refined tree, so that `Admitted` follows from the
-    body policy.
   - Derive the lambda shape of generalized initializers from the compiler's initializer receipt.
   - Derive the `Generalized` issuer at actual headers from the public diagnostic receipt, as
     `CellAwareNamedDiagnosticIssuer.of_prepared` does.
@@ -458,7 +466,7 @@ On the accepted-body route above, the next connected steps are:
     pairs. This needs a fixture with the older root's receipts and an independent Source trace of
     that body, or a proof-producing Source evaluator for the closed subset.
   - Extend the shape, its coverage and the lifting to the statement forms it does not have yet,
-    such as matches.
+    such as writes to an array's element.
   - Carry the accepted instance model through public histories, so that later calls chain.
   - Issue program support from the compiler receipt for every accepted program, rather than from an
     observation of its typings.
