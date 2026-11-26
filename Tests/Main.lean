@@ -2,6 +2,7 @@ import Solcore.Test.Frontend.Source.Inference
 import Solcore.Test.SourceSemantics.CompiledOrigins
 import Solcore.Test.SourceSemantics.CoreLowering.Generalized.Export
 import Solcore.Test.SourceSemantics.CoreLowering.Accepted.OneCall
+import Solcore.Test.SourceSemantics.CoreLowering.Accepted.Indirect
 import Solcore.Test.SourceSemantics.CoreLowering.Selected.Faulting
 import Solcore.Test.SourceSemantics.CoreLowering.Generalized.Body
 import Solcore.Test.SourceSemantics.CoreLowering.Mixed.Reads
@@ -2302,6 +2303,7 @@ def main : IO UInt32 := do
   Tests.SourceCoreAcceptedOneCall.AcceptedFixedShiftRuntime.run
   Tests.SourceCoreAcceptedOneCall.AcceptedFixedBitNotRuntime.run
   Tests.SourceCoreAcceptedOneCall.AcceptedFaultRuntime.run
+  Tests.SourceCoreAcceptedIndirect.AcceptedIndirectRuntime.run
   Tests.SourceCoreShiftSubset.run
   Tests.SourceCoreCompoundShiftSubset.run
   Tests.SourceCoreBitNotSubset.run
