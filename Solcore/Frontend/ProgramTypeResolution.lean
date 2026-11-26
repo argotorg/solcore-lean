@@ -87,10 +87,12 @@ def validateProgramTypeScope
   | none => .ok ()
   | some error => .error error
 
+/-- Upstream's builtin type names (`builtin_type_or_class`): `bool`, `word` and the twelve
+fixed-width integer types. `()` is the empty tuple type; `Bool`, `Word`, `Unit` and `unit` name
+nothing builtin, as upstream's `SC0103` refuses them, and a program may declare them. -/
 private def builtinTypeName? : String → Option TypeSystem.BuiltinType
-  | "Unit" | "unit" => some .unit
-  | "Bool" | "bool" => some .bool
-  | "Word" | "word" => some .word
+  | "bool" => some .bool
+  | "word" => some .word
   | name => (TypeSystem.FixedInteger.ofName? name).map .fixed
 
 private def declaredType
@@ -148,28 +150,29 @@ private def resolveNamedProgramType
           else
             .error (.typeParameterApplied name index arguments.length)
       | none =>
-          match builtinTypeName? name with
-          | some builtin =>
-              if arguments.isEmpty then
-                .ok (.constructor (.builtin builtin))
-              else
-                .error (.typeArityMismatch components 0 arguments.length)
-          | none =>
-              match environment.localTypesNamed scope.currentModule name with
-              | [] =>
-                  match buildProgramImports environment scope.currentModule with
-                  | .error errors => .error (.importVisibility errors)
-                  | .ok visibility =>
-                      match visibility.typesNamed name with
-                      | [] =>
+          -- A module's own types, then its imports', then the builtins, as upstream's
+          -- `lookup_type` takes them: a program's own `word` or `Word` is its own.
+          match environment.localTypesNamed scope.currentModule name with
+          | [] =>
+              match buildProgramImports environment scope.currentModule with
+              | .error errors => .error (.importVisibility errors)
+              | .ok visibility =>
+                  match visibility.typesNamed name with
+                  | [] =>
+                      match builtinTypeName? name with
+                      | some builtin =>
+                          if arguments.isEmpty then
+                            .ok (.constructor (.builtin builtin))
+                          else
+                            .error (.typeArityMismatch components 0 arguments.length)
+                      | none =>
                           match environment.builtinTypesNamed name with
                           | [] => resolveBuiltinFallback components name arguments
                           | builtin => uniqueDeclaredType components arguments builtin
-                      | importedCandidates =>
-                          uniqueDeclaredType components arguments
-                            importedCandidates
-              | localCandidates =>
-                  uniqueDeclaredType components arguments localCandidates
+                  | importedCandidates =>
+                      uniqueDeclaredType components arguments importedCandidates
+          | localCandidates =>
+              uniqueDeclaredType components arguments localCandidates
   | _ =>
       let name := components.getLast!
       let moduleComponents := components.dropLast
@@ -722,19 +725,19 @@ private theorem resolveNamedProgramType_variablesBelow
             · simp at success
           · split at success
             · split at success
-              · injection success with resolvedEq
-                subst resolved
-                simp
               · simp at success
-            · split at success
               · split at success
-                · simp at success
                 · split at success
+                  · split at success
+                    · injection success with resolvedEq
+                      subst resolved
+                      simp
+                    · simp at success
                   · split at success
                     · exact resolveBuiltinFallback_variablesBelow argumentsBelow success
                     · exact uniqueDeclaredType_variablesBelow argumentsBelow success
-                  · exact uniqueDeclaredType_variablesBelow argumentsBelow success
-              · exact uniqueDeclaredType_variablesBelow argumentsBelow success
+                · exact uniqueDeclaredType_variablesBelow argumentsBelow success
+            · exact uniqueDeclaredType_variablesBelow argumentsBelow success
       | cons second tail =>
           simp only [resolveNamedProgramType] at success
           split at success
