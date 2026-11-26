@@ -123,14 +123,20 @@ These theorems keep explicit premises:
   compiler fuel. The expression closure below discharges it for named-row bodies of a first subset
   with direct calls and the builtin conversions at any expression position.
 - **`Covered`** admits returns, final values, discards, `break`/`continue`, blocks, conditionals,
-  `while` and `for` loops, monomorphic initialized or uninitialized declarations, and bare and
-  projected assignments and bit-not updates when the compiler view is the original Source, as for
+  `while` and `for` loops, monomorphic initialized or uninitialized declarations, and bare,
+  projected and element assignments and bit-not updates (an element of a local memory array:
+  `a[i] = v`, `a[i] op= v`, `a[i] ~=;`) when the compiler view is the original Source, as for
   named rows. It excludes writes and matches under contextual metadata views, and it requires a
   function-mode fallthrough to have Unit result and a final bare value to have the declared result
   type.
   - Write heads come from the tree's assignment receipts, the compiler's own key and right-hand
     lowerings and the body's actual assignment policy
     (`ActualBodyInvocation.Index.assignment_policy` and `bitNot_policy`).
+  - An element write's head comes from its tree receipt
+    (`AcceptedElementAssignmentReceipt.Receipt`, `AcceptedElementBitNotReceipt.Receipt`) and
+    its site's token for a root not yet initialized from the reached diagnostics'
+    `Ready.element`. Its reflect direction keeps the array's length across the right side by
+    the selected bodies, which `correct`, `body_preserves` and `body_reflects` take.
   - `for` headers are closed over the compiler's header items
     (`CellAwareInvocationAcceptedForItems`), with their declarations authenticated by the original
     compilation receipt.
@@ -320,7 +326,9 @@ program.
   the Source statement lists of value and unit returns, monomorphic declarations, bare assignments
   that the compiler refines (`Assignable`), bare in-place `~` that it refines
   (`BitNotAssignable`), assignments and in-place `~` through mapping indices that it refines
-  (`ProjectedAssignable`, `ProjectedBitNotAssignable`), expression statements, blocks,
+  (`ProjectedAssignable`, `ProjectedBitNotAssignable`), assignments and in-place `~` at one
+  element of a local array (`ElementAssignable`, `ElementBitNotAssignable`), expression
+  statements, blocks,
   conditionals, matches whose arms and default are branch bodies (`Shape.matched`), `while` and
   `for` loops, `break` and `continue`, and a function body's final value whose node has the
   declared result type (`Shape.tail`), with every expression and key in a given predicate. A
@@ -329,9 +337,10 @@ program.
   to a Unit function. `covered` shows that every refined accepted tree of such a list whose
   match receipts are at admitted contexts (`Tree.MatchContexts`) is covered. At a match it
   gives the receipt's admitted context, the original Source view, and the covered branches and
-  suffix. A refined tree keeps the unrefined assignment branch only for writes that are not
-  `ValueAssignable`, and the unrefined `~=` branch only for those that are not
-  `UnaryAssignable`.
+  suffix. A refined tree keeps the unrefined assignment branch only for writes that are neither
+  `ValueAssignable` nor `ElementAssignable`, and the unrefined `~=` branch only for those that
+  are neither `UnaryAssignable` nor `ElementBitNotAssignable`; a `for` header keeps an element
+  write unrefined.
   It also covers the loop trees and their headers, and refutes the header boundary, which no
   header reaches. `shape?` checks a shape with subset-site expressions on an actually compiled
   row.
@@ -466,7 +475,7 @@ On the accepted-body route above, the next connected steps are:
     pairs. This needs a fixture with the older root's receipts and an independent Source trace of
     that body, or a proof-producing Source evaluator for the closed subset.
   - Extend the shape, its coverage and the lifting to the statement forms it does not have yet,
-    such as writes to an array's element.
+    such as a write to an element in a `for` header or to a nested element.
   - Carry the accepted instance model through public histories, so that later calls chain.
   - Issue program support from the compiler receipt for every accepted program, rather than from an
     observation of its typings.

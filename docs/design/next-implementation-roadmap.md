@@ -159,9 +159,9 @@ The last two are recorded without investigation, and the generators avoid them.
    forms and the element writes, the selected preservation keeps every array object's length,
    the heap and payload relations relate array objects and views to their Core cells, and the
    compiler's receipts and the cell-aware heads take the array forms as nested sites, which
-   accepted rows run through the public root. The writes to an element have their heads and
-   the flows from a Core run back to the Source; next come the flows from the Source and their
-   place in the body shape. This unit takes
+   accepted rows run through the public root. The writes to an element are closed at named
+   rows, with a row that runs them through the public root; a write in a `for` header and a
+   write to a nested element are not. This unit takes
    a memref only as the
    operand of a load or a store, and `toArray` only of slices made where it is called. The
    public compiler rejects a root whose signature holds an array, a slice or a memref, and a
@@ -280,16 +280,33 @@ below come from running upstream's own test programs through Lean's native front
     whose main type matches its subject, before a literal defaults and after; a program's own
     `Coerce` keeps its target for Lean's coercion search;
   - an impl method's results are compared with its trait method's as one tuple, so
-    `returns (a, b)` and `returns ((a, b))` are one result (`SC0221`).
+    `returns (a, b)` and `returns ((a, b))` are one result (`SC0221`);
+  - two functions of one name in a module the entry reaches are refused, whatever their
+    parameters, and a function and a type may share a name (`SC0108`);
+  - an operator in generic code reaches the trait declared with its name under any name an
+    import gives it, so `where t: Plus` with `{ Add as Plus }` runs `Add`'s method.
 
-  To come, each as a checker rule:
+  To come, as checker rules:
   - `.true` or `.false` as a call's argument, a tuple's element or an operand of `&&` or
     `||`, where Lean's inference passes no expected type yet;
-  - an unannotated lambda's result.
+  - an unannotated lambda's result, with a call's arguments inferred against its one
+    function's parameter types;
+  - the spellings `Word`, `Bool` and `Unit` are refused, and a program's own type names come
+    before the builtins.
+
+  To come, with a Source rule each:
+  - a match binder takes the stage of the scrutinee part it binds, where the scrutinees are
+    written as two or more;
+  - a compound assignment at a program's own type or at a type variable runs the operator's
+    trait method, with its place evaluated once;
+  - a trait method is called by its name, with upstream's lookup order: a local, a function
+    or builtin, the method, then a same-name constructor.
 
   `case .true` and `case .false` wait for a case of the Source's pattern relation.
 - **Lean keeps its own rule:**
   - mutually recursive data is accepted, as directly recursive data is;
+  - an operator's trait is the one declared with its name, so a trait imported as `Add` under
+    another declared name gives `+` no trait, where upstream calls its method;
   - a binder repeated in one pattern and cyclic superclasses are refused;
   - an implementation's type parameter that occurs nowhere is refused;
   - a two-parameter trait named `Coerce` gives implicit coercions, which upstream does not
@@ -311,18 +328,24 @@ below come from running upstream's own test programs through Lean's native front
   whether the use runs or not. An implementation of `Shl` or `Shr` at those types is refused
   where it is declared, since Lean never runs one. Generic code keeps the program's
   implementation, as upstream runs it.
-- **To measure first:** the spellings `Word`, `Bool` and `Unit` beside `word`, `bool` and `()`,
-  two functions of one name (`SC0108`), a match binder's stage, which Lean takes from the
-  whole scrutinee where upstream takes it from the part it binds (the `SC0240` class),
-  and two uses that Lean refuses where upstream runs the implementation: compound assignment
-  at a type variable or at a program's own type, and an operator in generic code whose trait
-  an import renames. Also `let` generalization: upstream leaves a `let`'s open type for later
-  statements to fix and refuses it where nothing does (`SC0299`), and Lean generalizes it, so
-  a type that nothing fixes is refused only where specialization reaches it. And an
+- **Measured, to decide:** `let` generalization: upstream leaves a `let`'s open type for
+  later statements to fix and refuses it where nothing does (`SC0299`), and Lean generalizes
+  it, so a type that nothing fixes is refused only where specialization reaches it. An
   initializer that Lean's staging defers, an ordinary function's call or a lambda, is refused
-  at a comptime local, where upstream evaluates it while staged. And an operator whose trait
+  at a comptime local, where upstream evaluates it while staged. An operator whose trait
   method does not have the operator's own shape is refused, a method written `returns (a, b)`
-  at a pair among them, where upstream calls the method whatever it returns.
+  at a pair among them, where upstream calls the method whatever it returns. And a trait
+  method's own type parameters are refused, where upstream instantiates them at each call.
+- **Forms Lean's native frontend lacks,** in the order planned after the rules above:
+  `struct` declarations with field reads and writes; a trait method's own type parameters;
+  the `Int` trait at a program's own types and in `where`; two-parameter operator traits, for
+  shifts on declared types; std's errors and reverts; std's own types and traits; strings
+  and bytes; `#[derive]`; inline assembly; and contracts, with storage, dispatch and the ABI.
+- **The integer types stay builtin for now.** Upstream defines them in std, over `word` and
+  the opcode functions. Whether Lean takes them from std's code is decided by differential
+  testing, once the forms that std's integers need are in: a native mode with std's integers
+  is compared with the builtin mode and with upstream. The builtin rules would then stay as
+  the specification of std's integer module.
 
 ## Handoff rules
 

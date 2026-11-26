@@ -321,9 +321,10 @@ So `toArray(m[1:3])` has the type `uint256[]` where `m` has, `lidx(m, 1)`'s inde
     `ResolvedPlaceWrites` keeps its text. The compound rules take any place, so a compound
     assignment to an element evaluates its place once
     ([decision 3](#3-compound-assignment-to-an-element)).
-  - Before the right side, the place faults with its leading place's fault, the index's, an index
-    that is not a word, `0x32` from the length on, or `uninitializedLocation` when its leading is a
-    local not yet initialized, as reading that local does.
+  - Before the right side, the place faults with its leading place's fault, or with
+    `uninitializedLocation` when its leading is a local not yet initialized, as reading that local
+    does, before the index. Only a leading that holds a value reaches the index, which faults with
+    its own fault, when it is not a word, or with `0x32` from the length on.
   - The staged traces stage an element place with `Staging.Recursive.ElementTarget`: the root
     local, then each element, with the place's faults. `StatementsIn` and `ForItems` write
     through it (`assignElement`, `bitNotElement`, `elementAssignment`, `elementBitNot`).
@@ -552,12 +553,16 @@ Decision 2 changes a result only for lengths just below 2^251 − 1 (difference 
   like an array's reference it is a view (`ViewCarrier.memref`), so no comparison takes one.
   `CanStore.load(r)` and `CanStore.store(r, v)` are sites only when `r` is a `lidx(a, i)` made
   on the spot (`MemrefSite`). The writes to an element, `a[i] = v`, `a[i] op= v` and
-  `a[i] ~=`, have their heads in both directions and their statement flows from a Core run
-  back to the Source (`CellAwareInvocationElementAssignmentFlow.reflects`,
-  `CellAwareInvocationElementBitNotFlow.reflects`). At an element a compound write's operands
-  and a `~`'s operand are never invalid, since the snapshot is the element present or the
-  array's default, so those Source faults are refuted there, not mapped. The flows from the
-  Source to Core, the body shape and their accepted row follow.
+  `a[i] ~=`, have their heads and their statement flows in both directions
+  (`CellAwareInvocationElementAssignmentFlow`, `CellAwareInvocationElementBitNotFlow`,
+  `preserves` and `reflects`). At an element a compound write's operands and a `~`'s operand
+  are never invalid, since the snapshot is the element present or the array's default, so
+  those Source faults are refuted there, not mapped. They are closed at named rows: the
+  compiler tree's element nodes carry `lowerElements`' receipt, the statement closure runs
+  them through their heads and flows, the place's one fault word is its site's None-place
+  entry, decoded as a root not yet initialized, and the row `bumped` runs them through the
+  public root. A write to an element in a `for` header and a write to a nested element
+  (`a[i][j]`) are not closed.
   The unit takes a memref only as the operand of a load or a store, and `toArray` only of
   slices made where it is called: the Source has no rule for a load, a store or a copy out of
   bounds, and the bound of a stored memref or slice would be an invariant over the heap. The
@@ -570,7 +575,9 @@ Decision 2 changes a result only for lengths just below 2^251 − 1 (difference 
   change. These are build-on table changes:
   - `GenericHeap.HeapRepresents` gains the array objects;
   - the premises of `CellAwareInvocationAcceptedFlow.body_preserves` and `body_reflects`
-    (`Covered`, `Expressions`) gain the array forms.
+    (`Covered`, `Expressions`) gain the array forms, and they and `correct` take the selected
+    bodies (`SelectedBodies`), which keep an array's length across the right side of a write
+    to its element.
 
 ## Differences from upstream that Lean would keep
 
@@ -716,9 +723,8 @@ rejection in 22 to 24, as it could the open `Typedef` call. Nothing schedules it
 - **The meaning proofs for arrays** ([decision 6](#6-meaning-proofs)). The unit that relates array
   objects to their Core cells is under way, and changes the build-on statements that decision 6
   lists. The staged traces, the whole-cell heap relation, the payload relation, the compiler
-  receipts, the heads and the accepted rows have the array expressions; the element writes
-  have their heads, and their place in the body shape follows. Arrays stay outside
-  `StaticProfile`.
+  receipts, the heads and the accepted rows have the array expressions, and the element
+  writes are closed at named rows. Arrays stay outside `StaticProfile`.
 - **User collections indexed through `RValueIdxAccess`.** They need std's traits, and `Typedef` at
   a type parameter, which is row 1's open gap. Generic code over std's `Length` (`where c: Length`)
   waits for the same: Lean declares neither trait, so both are rejected with `unknownTrait`.

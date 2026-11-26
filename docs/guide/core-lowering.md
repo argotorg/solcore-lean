@@ -65,7 +65,7 @@ Each directory is one family, merged by topic; each file opens with a module doc
 | `RecursiveNamed/` | The finite named-call catalog, the staged profile's primitives and calls, and their public results |
 | `Generalized/` | Generalized local functions: compilation, formation, reads and body meaning |
 | `Accepted/` | Accepted expressions and programs, invocation allocation, scoped Source bodies |
-| `CellAware/` | Bodies over heaps that mix value cells and function descriptors: invocations, scopes, Source lifting, public handles; the heads of the memory array forms (`InvocationArrays`, `InvocationArrayCells`, `InvocationArrayMemrefs`) and of the writes to an element, with their statement flows from a Core run back to the Source (`InvocationElementHeads` to `InvocationElementFlows`) |
+| `CellAware/` | Bodies over heaps that mix value cells and function descriptors: invocations, scopes, Source lifting, public handles; the heads of the memory array forms (`InvocationArrays`, `InvocationArrayCells`, `InvocationArrayMemrefs`) and of the writes to an element, with their statement flows in both directions (`InvocationElementHeads` to `InvocationElementPreserveFlows`) |
 | `Selected/` | Selected compilations: admission, calls, public steps, and lifting to staged Source |
 
 **Words.** Names are systematic:
@@ -89,7 +89,7 @@ compiler-accepted syntax.
 | Name | Reading | Used by |
 | --- | --- | --- |
 | `CellAwareInvocationAcceptedFlow.correct` | Induction over the accepted tree closes the statement flows that `Covered` admits | `body_preserves`, `body_reflects` |
-| `CellAwareInvocationAcceptedFlow.body_preserves`, `body_reflects` | An accepted body of an `ActualBodyInvocation.Index` and a staged Source execution of its statements imply each other, with the result, the heap relation and the protocol state. Premises: `Expressions`, `Writes`, `Covered`, the compiler artifact, the checker run, fixed-control typing and Core typing of the body | `AcceptedExpressions`, `AcceptedCalls` |
+| `CellAwareInvocationAcceptedFlow.body_preserves`, `body_reflects` | An accepted body of an `ActualBodyInvocation.Index` and a staged Source execution of its statements imply each other, with the result, the heap relation and the protocol state. Premises: `Expressions`, `Writes`, the selected bodies (`SelectedBodies`, which keep an array's length across the right side of a write to its element), `Covered`, the compiler artifact, the checker run, fixed-control typing and Core typing of the body | `AcceptedExpressions`, `AcceptedCalls` |
 | `CellAwareInvocationAcceptedExpressions.expressions`, `body_preserves`, `body_reflects` | `Closed` gives `Expressions` at every budget, so the body theorems hold without it for the first subset | `CellAwareInvocationAcceptedNamedInvocation.preserves_selected` |
 | `CellAwareInvocationAcceptedCallFamily.preserves`, `reflects`, `expressions` | One strong induction on the grade closes a family of rows with direct calls and the conversions of a word at any expression position | The call root in `AcceptedPublicRoots` |
 | `CellAwarePublicAcceptedNamedRoot.checkpoint_has_sufficient_fuel_selected`, `checkpoint_reflects_selected` | A staged Source trace and the native completion of the actual public start imply each other | Test `Generalized/Export` |
@@ -253,8 +253,7 @@ work, under "Remaining work for the second goal". In short:
   ([decision 6](../design/memory-arrays-slices.md#6-meaning-proofs)). Relating array objects to
   their Core cells, and slices and memrefs to their Core products, is under way: the staged
   traces, the heap and payload relations, the compiler receipts, the heads and the accepted
-  rows have the array expressions. The writes to an element have their heads and are not yet
-  in the body shape.
+  rows have the array expressions, and the writes to an element are closed at named rows.
 
 ## Pitfalls
 
