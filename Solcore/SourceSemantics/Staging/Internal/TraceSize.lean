@@ -1298,6 +1298,7 @@ mutual
         (leadingTarget : ElementTarget program registry prefixSize scope context environment before
           { place with projections := leading, type := TypeSystem.Ty.array place.type } (.resolved prefixTarget)
           middle)
+        (prefix_initialized : prefixTarget.selected ≠ none)
         (indexed : Expression program registry indexSize scope context environment middle index (.fault failure)
           after) :
         ElementTarget program registry (stepSize [prefixSize, indexSize]) scope context environment before place
@@ -1308,6 +1309,7 @@ mutual
         (leadingTarget : ElementTarget program registry prefixSize scope context environment before
           { place with projections := leading, type := TypeSystem.Ty.array place.type } (.resolved prefixTarget)
           middle)
+        (prefix_initialized : prefixTarget.selected ≠ none)
         (indexed : Expression program registry indexSize scope context environment middle index (.value value)
           after)
         (not_word : ¬ WordValue value) (actual_type : ValueRuntimeType value actual) :
@@ -2100,14 +2102,15 @@ local macro "construct_stage_grade" : tactic =>
     case elementUninitialized projections_eq leadingTarget prefix_empty leadingIH =>
       obtain ⟨_, leadingGraded⟩ := leadingIH
       exact ⟨_, .elementUninitialized projections_eq leadingGraded prefix_empty⟩
-    case elementIndexFault projections_eq leadingTarget indexed leadingIH indexIH =>
+    case elementIndexFault projections_eq leadingTarget prefix_initialized indexed leadingIH indexIH =>
       obtain ⟨_, leadingGraded⟩ := leadingIH
       obtain ⟨_, indexGraded⟩ := indexIH
-      exact ⟨_, .elementIndexFault projections_eq leadingGraded indexGraded⟩
-    case elementIndexType projections_eq leadingTarget indexed not_word actual_type leadingIH indexIH =>
+      exact ⟨_, .elementIndexFault projections_eq leadingGraded prefix_initialized indexGraded⟩
+    case elementIndexType projections_eq leadingTarget prefix_initialized indexed not_word actual_type leadingIH
+        indexIH =>
       obtain ⟨_, leadingGraded⟩ := leadingIH
       obtain ⟨_, indexGraded⟩ := indexIH
-      exact ⟨_, .elementIndexType projections_eq leadingGraded indexGraded not_word actual_type⟩
+      exact ⟨_, .elementIndexType projections_eq leadingGraded prefix_initialized indexGraded not_word actual_type⟩
     case elementOutOfBounds projections_eq leadingTarget prefix_selected indexed read stored out_of_bounds leadingIH
         indexIH =>
       obtain ⟨_, leadingGraded⟩ := leadingIH

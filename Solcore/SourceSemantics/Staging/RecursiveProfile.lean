@@ -163,8 +163,8 @@ theorem bitNot_fault_heap {program : Program} {context : Context}
       cases evaluated
       rfl
     | elementPrefix projectionsEq _
-    | elementIndex projectionsEq _ _
-    | elementIndexType projectionsEq _ _ _ _
+    | elementIndex projectionsEq _ _ _
+    | elementIndexType projectionsEq _ _ _ _ _
     | elementOutOfBounds projectionsEq _ _ _ _ _ _
     | elementUninitialized projectionsEq _ _ =>
       rw [bare] at projectionsEq
@@ -1807,8 +1807,8 @@ mutual
   then the array object's own cell, whose element at the index is the snapshot.
   The leading place of the first element is the bare root. Its faults mirror
   `SourcePlaceFaults`: the root's, the leading place's, a root not yet
-  initialized, the index's, an index that is not a word, and `0x32` from the
-  array's length on. -/
+  initialized, and, once the leading holds a value, the index's, an index that
+  is not a word, and `0x32` from the array's length on. -/
   inductive ElementTarget (program : Program) (registry : Registry) :
       Scope → Context → Environment → Heap → PlaceResolution → TargetOutcome → Heap → Prop where
     | elementRoot {scope context environment heap place location cell initial}
@@ -1855,6 +1855,7 @@ mutual
         (leadingTarget : ElementTarget program registry scope context environment before
           { place with projections := leading, type := TypeSystem.Ty.array place.type } (.resolved prefixTarget)
           middle)
+        (prefix_initialized : prefixTarget.selected ≠ none)
         (indexed : Expression program registry scope context environment middle index (.fault failure) after) :
         ElementTarget program registry scope context environment before place (.fault failure) after
     | elementIndexType {scope context environment before middle after place leading index prefixTarget value actual}
@@ -1862,6 +1863,7 @@ mutual
         (leadingTarget : ElementTarget program registry scope context environment before
           { place with projections := leading, type := TypeSystem.Ty.array place.type } (.resolved prefixTarget)
           middle)
+        (prefix_initialized : prefixTarget.selected ≠ none)
         (indexed : Expression program registry scope context environment middle index (.value value) after)
         (not_word : ¬ WordValue value) (actual_type : ValueRuntimeType value actual) :
         ElementTarget program registry scope context environment before place
@@ -1990,7 +1992,7 @@ local macro "retain_stage_origin" : tactic =>
       intro s c r same
       cases same
       exact ih s c r rfl
-    case elementIndexFault projections_eq leadingTarget indexed leadingIH indexIH =>
+    case elementIndexFault projections_eq leadingTarget prefix_initialized indexed leadingIH indexIH =>
       intro s c r same
       cases same
       exact indexIH s c r rfl

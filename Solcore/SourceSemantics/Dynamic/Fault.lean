@@ -2380,7 +2380,8 @@ mutual
           reason after) :
         SourcePlaceFaults program context evidence source environment before place
           reason after
-    /-- An element place's index faults. -/
+    /-- An element place's index faults, once its leading holds a value: a leading not
+    yet initialized faults before the index (`elementUninitialized`). -/
     | elementIndex
         {context evidence source environment before middle after place leading index
           prefixTarget reason}
@@ -2389,11 +2390,12 @@ mutual
           environment before
           { place with projections := leading, type := TypeSystem.Ty.array place.type }
           prefixTarget middle)
+        (prefix_initialized : prefixTarget.selected ≠ none)
         (fault : ExpressionFaults program context evidence source environment middle
           index reason after) :
         SourcePlaceFaults program context evidence source environment before place
           reason after
-    /-- An element place's index is not a word. -/
+    /-- An element place's index is not a word, once its leading holds a value. -/
     | elementIndexType
         {context evidence source environment before middle after place leading index
           prefixTarget value actual}
@@ -2402,6 +2404,7 @@ mutual
           environment before
           { place with projections := leading, type := TypeSystem.Ty.array place.type }
           prefixTarget middle)
+        (prefix_initialized : prefixTarget.selected ≠ none)
         (index_evaluates : ExpressionEvaluates program context evidence source
           environment middle index value after)
         (not_word : ¬ WordValue value)

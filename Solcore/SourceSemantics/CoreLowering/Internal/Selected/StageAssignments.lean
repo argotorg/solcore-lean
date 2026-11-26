@@ -191,8 +191,8 @@ private theorem target_fault_excluded {program : Program} {source : TypedSource}
     | dangling lookup missing =>
       cases lookup.functional present
       exact missing.excludes_read cell
-    | elementPrefix projectionsEq _ | elementIndex projectionsEq _ _
-    | elementIndexType projectionsEq _ _ _ _ | elementOutOfBounds projectionsEq _ _ _ _ _ _
+    | elementPrefix projectionsEq _ | elementIndex projectionsEq _ _ _
+    | elementIndexType projectionsEq _ _ _ _ _ | elementOutOfBounds projectionsEq _ _ _ _ _ _
     | elementUninitialized projectionsEq _ _ =>
       rw [bare] at projectionsEq; simp at projectionsEq
     | projectionExpression _ _ failed => rw [bare] at failed; cases failed

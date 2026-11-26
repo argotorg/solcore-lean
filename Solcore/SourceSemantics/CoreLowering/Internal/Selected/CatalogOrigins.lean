@@ -1739,8 +1739,8 @@ theorem failed
         (ProjectedTarget.keys place.projections) values after ∧
       ProjectedTarget.GetterFault environment before after place values reason) := by
   cases trace with
-  | elementPrefix projectionsEq _ | elementIndex projectionsEq _ _
-  | elementIndexType projectionsEq _ _ _ _ | elementOutOfBounds projectionsEq _ _ _ _ _ _
+  | elementPrefix projectionsEq _ | elementIndex projectionsEq _ _ _
+  | elementIndexType projectionsEq _ _ _ _ _ | elementOutOfBounds projectionsEq _ _ _ _ _ _
   | elementUninitialized projectionsEq _ _ =>
     exact (free _ (Dynamic.element_mem_of_projections_eq projectionsEq)).elim
   | unbound missing => exact .inl ⟨rfl, .unbound missing⟩

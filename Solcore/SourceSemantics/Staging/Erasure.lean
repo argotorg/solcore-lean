@@ -819,13 +819,14 @@ local macro "erase_recursive_plain" : tactic =>
       | semantic => exact .elementPrefix projections_eq leadingIH
     case elementUninitialized projections_eq leadingTarget prefix_empty leadingIH =>
       exact .elementUninitialized projections_eq leadingIH prefix_empty
-    case elementIndexFault projections_eq leadingTarget indexed leadingIH indexIH =>
+    case elementIndexFault projections_eq leadingTarget prefix_initialized indexed leadingIH indexIH =>
       rename_i failure
       cases failure with
       | stage => trivial
-      | semantic => exact .elementIndex projections_eq leadingIH indexIH
-    case elementIndexType projections_eq leadingTarget indexed not_word actual_type leadingIH indexIH =>
-      exact .elementIndexType projections_eq leadingIH indexIH not_word actual_type
+      | semantic => exact .elementIndex projections_eq leadingIH prefix_initialized indexIH
+    case elementIndexType projections_eq leadingTarget prefix_initialized indexed not_word actual_type leadingIH
+        indexIH =>
+      exact .elementIndexType projections_eq leadingIH prefix_initialized indexIH not_word actual_type
     case elementOutOfBounds projections_eq leadingTarget prefix_selected indexed read stored out_of_bounds leadingIH
         indexIH =>
       exact .elementOutOfBounds projections_eq leadingIH prefix_selected indexIH read stored out_of_bounds

@@ -860,14 +860,14 @@ theorem element_target_preserved {program : Program} {registry : Registry} (budg
       obtain ⟨afterTyped, prefixExtends, _⟩ := element_target_preserved budget unique keptRefl keptTrans values faults
         (Nat.lt_trans (Size.child_lt_stepSize (by simp)) bound) locals heap prefixTyped leadingTarget
       exact ⟨afterTyped, prefixExtends, by intro _ equal; cases equal⟩
-  | elementIndexFault projections_eq leadingTarget indexed =>
+  | elementIndexFault projections_eq leadingTarget _ indexed =>
       obtain ⟨prefixTyped, _, indexTyped⟩ := element_place_typed typed projections_eq
       obtain ⟨middleTyped, prefixExtends, _⟩ := element_target_preserved budget unique keptRefl keptTrans values faults
         (Nat.lt_trans (Size.child_lt_stepSize (by simp)) bound) locals heap prefixTyped leadingTarget
       obtain ⟨afterTyped, indexExtends⟩ := faults (Nat.lt_trans (Size.child_lt_stepSize (by simp)) bound)
         (locals.mono prefixExtends) middleTyped indexTyped indexed
       exact ⟨afterTyped, prefixExtends.trans indexExtends, by intro _ equal; cases equal⟩
-  | elementIndexType projections_eq leadingTarget indexed _ _
+  | elementIndexType projections_eq leadingTarget _ indexed _ _
   | elementOutOfBounds projections_eq leadingTarget _ indexed _ _ _ =>
       obtain ⟨prefixTyped, _, indexTyped⟩ := element_place_typed typed projections_eq
       obtain ⟨middleTyped, prefixExtends, _⟩ := element_target_preserved budget unique keptRefl keptTrans values faults

@@ -972,8 +972,8 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
       have same := lookup.functional sourceLookup
       cases same
       exact (missing.excludes_read sourceRead).elim
-    | elementPrefix projectionsEq _ | elementIndex projectionsEq _ _
-    | elementIndexType projectionsEq _ _ _ _ | elementOutOfBounds projectionsEq _ _ _ _ _ _
+    | elementPrefix projectionsEq _ | elementIndex projectionsEq _ _ _
+    | elementIndexType projectionsEq _ _ _ _ _ | elementOutOfBounds projectionsEq _ _ _ _ _ _
     | elementUninitialized projectionsEq _ _ =>
       exact (layout.path.elementFree _ (Dynamic.element_mem_of_projections_eq projectionsEq)).elim
     | projectionExpression lookup read fault =>

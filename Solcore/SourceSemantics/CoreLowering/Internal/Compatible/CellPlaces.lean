@@ -962,8 +962,8 @@ private theorem excludes_target_fault {heap after : Dynamic.Heap} {location : Dy
   cases fault with
   | unbound missing => exact missing.excludes_lookup lookup
   | dangling found missing => exact missing.excludes_read (found.functional lookup ▸ read)
-  | elementPrefix projectionsEq _ | elementIndex projectionsEq _ _
-  | elementIndexType projectionsEq _ _ _ _ | elementOutOfBounds projectionsEq _ _ _ _ _ _
+  | elementPrefix projectionsEq _ | elementIndex projectionsEq _ _ _
+  | elementIndexType projectionsEq _ _ _ _ _ | elementOutOfBounds projectionsEq _ _ _ _ _ _
   | elementUninitialized projectionsEq _ _ =>
     rw [bare] at projectionsEq; simp at projectionsEq
   | projectionExpression found initialRead fault => rw [bare] at fault; cases fault

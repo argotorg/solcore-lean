@@ -1002,8 +1002,8 @@ theorem preserves_numeric
       have same := found.functional lookup
       subst_vars
       exact (missing.excludes_read initialRead).elim
-    | elementPrefix projectionsEq _ | elementIndex projectionsEq _ _
-    | elementIndexType projectionsEq _ _ _ _ | elementOutOfBounds projectionsEq _ _ _ _ _ _
+    | elementPrefix projectionsEq _ | elementIndex projectionsEq _ _ _
+    | elementIndexType projectionsEq _ _ _ _ _ | elementOutOfBounds projectionsEq _ _ _ _ _ _
     | elementUninitialized projectionsEq _ _ =>
       exact (layout.path.elementFree _ (Dynamic.element_mem_of_projections_eq projectionsEq)).elim
     | projectionExpression found read failed =>

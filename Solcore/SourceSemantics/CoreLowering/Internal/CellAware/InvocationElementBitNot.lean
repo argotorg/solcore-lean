@@ -960,7 +960,8 @@ theorem reflects_bitNot_bounded [RecursiveStageMeaning.FaultTokens faults] (budg
       -- The index's fault: the Source's target faults at the index, as the Core run does.
       obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete
         (CompatibleElementWrites.index_failure reference coreRead indexed)
-      exact .targetFault (.elementIndexFault projectionsEq (.elementRoot rfl lookup read .initialized) indexTrace)
+      exact .targetFault (.elementIndexFault projectionsEq (.elementRoot rfl lookup read .initialized)
+          (Option.some_ne_none _) indexTrace)
         rfl matched keyHeaps keyMaps keyWorlds keyFrame keyMetadata keyEffect keyReached keyRelated keyPost.rows
     | @value _ _ indexPayload =>
       rw [head.keyType] at indexPayload

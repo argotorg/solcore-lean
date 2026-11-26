@@ -2790,8 +2790,8 @@ private theorem bare_target_fault {mode : Bool} {id : StatementId} {rest : List 
     cases evaluated
     exact absurd rfl projected
   | elementPrefix projectionsEq _
-  | elementIndex projectionsEq _ _
-  | elementIndexType projectionsEq _ _ _ _
+  | elementIndex projectionsEq _ _ _
+  | elementIndexType projectionsEq _ _ _ _ _
   | elementOutOfBounds projectionsEq _ _ _ _ _ _
   | elementUninitialized projectionsEq _ _ =>
     rw [bare] at projectionsEq
@@ -2982,8 +2982,8 @@ private theorem items_bare_target_fault {assignment : AssignmentResolution} {ope
     cases evaluated
     exact absurd rfl projected
   | elementPrefix projectionsEq _
-  | elementIndex projectionsEq _ _
-  | elementIndexType projectionsEq _ _ _ _
+  | elementIndex projectionsEq _ _ _
+  | elementIndexType projectionsEq _ _ _ _ _
   | elementOutOfBounds projectionsEq _ _ _ _ _ _
   | elementUninitialized projectionsEq _ _ =>
     rw [bare] at projectionsEq
@@ -3129,8 +3129,8 @@ private theorem items_fault_lift {child : ExpressionId → Prop} {bound : Nat}
             exact .projectedAssignmentGetterFault assignable.2.1 staged
               (.uninitialized lookup initialRead ordered currentRead empty notMapping nonempty)
           | elementPrefix projectionsEq _
-          | elementIndex projectionsEq _ _
-          | elementIndexType projectionsEq _ _ _ _
+          | elementIndex projectionsEq _ _ _
+          | elementIndexType projectionsEq _ _ _ _ _
           | elementOutOfBounds projectionsEq _ _ _ _ _ _
           | elementUninitialized projectionsEq _ _ =>
             exact absurd projectionsEq (CellAwareInvocationAcceptedBodyShape.indices_no_element keys)
@@ -3228,8 +3228,8 @@ private theorem items_fault_lift {child : ExpressionId → Prop} {bound : Nat}
             exact .projectedBitNotGetterFault assignable.2.1 staged
               (.uninitialized lookup initialRead ordered currentRead empty notMapping nonempty)
           | elementPrefix projectionsEq _
-          | elementIndex projectionsEq _ _
-          | elementIndexType projectionsEq _ _ _ _
+          | elementIndex projectionsEq _ _ _
+          | elementIndexType projectionsEq _ _ _ _ _
           | elementOutOfBounds projectionsEq _ _ _ _ _ _
           | elementUninitialized projectionsEq _ _ =>
             exact absurd projectionsEq (CellAwareInvocationAcceptedBodyShape.indices_no_element keys)
@@ -3543,8 +3543,8 @@ theorem statements_fault (unique : NodeOccurrencesUnique scope.source) {child : 
           exact .assignProjectedGetterFault contains form assignable.2.1 staged
             (.uninitialized lookup initialRead ordered currentRead empty notMapping nonempty)
         | elementPrefix projectionsEq _
-        | elementIndex projectionsEq _ _
-        | elementIndexType projectionsEq _ _ _ _
+        | elementIndex projectionsEq _ _ _
+        | elementIndexType projectionsEq _ _ _ _ _
         | elementOutOfBounds projectionsEq _ _ _ _ _ _
         | elementUninitialized projectionsEq _ _ =>
           exact absurd projectionsEq (CellAwareInvocationAcceptedBodyShape.indices_no_element keys)
@@ -3636,8 +3636,8 @@ theorem statements_fault (unique : NodeOccurrencesUnique scope.source) {child : 
           exact .bitNotProjectedGetterFault contains form assignable.2.1 staged
             (.uninitialized lookup initialRead ordered currentRead empty notMapping nonempty)
         | elementPrefix projectionsEq _
-        | elementIndex projectionsEq _ _
-        | elementIndexType projectionsEq _ _ _ _
+        | elementIndex projectionsEq _ _ _
+        | elementIndexType projectionsEq _ _ _ _ _
         | elementOutOfBounds projectionsEq _ _ _ _ _ _
         | elementUninitialized projectionsEq _ _ =>
           exact absurd projectionsEq (CellAwareInvocationAcceptedBodyShape.indices_no_element keys)

@@ -628,7 +628,7 @@ theorem reflects_plain_bounded [RecursiveStageMeaning.FaultTokens faults] (budge
       cases keyRep with
       | fault matched =>
         exact .indexFault (.elementIndexFault (leading := []) (index := head.key) head.single
-            (.elementRoot rfl lookup read .initialized) keyTrace)
+            (.elementRoot rfl lookup read .initialized) (Option.some_ne_none _) keyTrace)
           rfl matched keyHeaps keyMaps keyWorlds keyFrame keyMetadata keyEffect keyReached keyRelated keyPost.rows
     | outOfBounds full indexed indexBound checked =>
       -- `0x32`: the index's word is not below the array's length on either side.

@@ -238,7 +238,7 @@ theorem bare_fault {program : Program} {registry : Registry} {size : Nat} {scope
   cases trace with
   | elementRootFault _ failed => exact ⟨rfl, rfl, _, rfl, failed⟩
   | elementPrefixFault projections_eq _ | elementUninitialized projections_eq _ _
-  | elementIndexFault projections_eq _ _ | elementIndexType projections_eq _ _ _ _
+  | elementIndexFault projections_eq _ _ _ | elementIndexType projections_eq _ _ _ _ _
   | elementOutOfBounds projections_eq _ _ _ _ _ _ =>
       exact (nil_ne_append_element (bare.symm.trans projections_eq)).elim
 
@@ -264,7 +264,8 @@ inductive SingleResolved (program : Program) (registry : Registry) (scope : Scop
         after
 
 /-- The faults of the place `root[key]` of one element, each at its size: the bare root's, a root not
-yet initialized, the key's, a key that is not a word, and `0x32` from the array's length on. -/
+yet initialized, the key's and a key that is not a word at a root that holds a value, and `0x32` from the
+array's length on. -/
 inductive SingleFault (program : Program) (registry : Registry) (scope : Scope)
     (context : SourceSemantics.Context) (environment : Dynamic.Environment) (before : Dynamic.Heap)
     (place : PlaceResolution) (key : ExpressionId) : Nat → Failure → Dynamic.Heap → Prop where
@@ -278,18 +279,18 @@ inductive SingleFault (program : Program) (registry : Registry) (scope : Scope)
       (initialValue : Dynamic.RootInitialValue cell none) :
       SingleFault program registry scope context environment before place key
         (Size.stepSize [Size.stepSize []]) (.semantic (.uninitializedLocation location)) before
-  | index {indexSize location cell initial failure after}
+  | index {indexSize location cell rootValue failure after}
       (lookup : Dynamic.Environment.LooksUp environment place.root location)
       (read : Dynamic.Heap.Reads before location cell)
-      (initialValue : Dynamic.RootInitialValue cell initial)
+      (initialValue : Dynamic.RootInitialValue cell (some rootValue))
       (indexed : Size.Expression program registry indexSize scope context environment before key
         (.fault failure) after) :
       SingleFault program registry scope context environment before place key
         (Size.stepSize [Size.stepSize [], indexSize]) failure after
-  | indexType {indexSize location cell initial value actual after}
+  | indexType {indexSize location cell rootValue value actual after}
       (lookup : Dynamic.Environment.LooksUp environment place.root location)
       (read : Dynamic.Heap.Reads before location cell)
-      (initialValue : Dynamic.RootInitialValue cell initial)
+      (initialValue : Dynamic.RootInitialValue cell (some rootValue))
       (indexed : Size.Expression program registry indexSize scope context environment before key
         (.value value) after)
       (not_word : ¬ Dynamic.WordValue value) (actual_type : Dynamic.ValueRuntimeType value actual) :
@@ -346,16 +347,22 @@ theorem single_fault {program : Program} {registry : Registry} {size : Nat} {sco
       have empty : initial = none := prefix_empty
       subst empty
       exact .uninitialized lookup read initialValue
-  | elementIndexFault projections_eq leadingTarget indexed =>
+  | elementIndexFault projections_eq leadingTarget prefix_initialized indexed =>
       obtain ⟨rfl, rfl⟩ := single_split (single.symm.trans projections_eq)
       obtain ⟨rfl, rfl, location, cell, initial, lookup, read, initialValue, rfl⟩ :=
         bare_resolved rfl leadingTarget
-      exact .index lookup read initialValue indexed
-  | elementIndexType projections_eq leadingTarget indexed not_word actual_type =>
+      have initialized : initial ≠ none := prefix_initialized
+      cases initial with
+      | none => exact absurd rfl initialized
+      | some _ => exact .index lookup read initialValue indexed
+  | elementIndexType projections_eq leadingTarget prefix_initialized indexed not_word actual_type =>
       obtain ⟨rfl, rfl⟩ := single_split (single.symm.trans projections_eq)
       obtain ⟨rfl, rfl, location, cell, initial, lookup, read, initialValue, rfl⟩ :=
         bare_resolved rfl leadingTarget
-      exact .indexType lookup read initialValue indexed not_word actual_type
+      have initialized : initial ≠ none := prefix_initialized
+      cases initial with
+      | none => exact absurd rfl initialized
+      | some _ => exact .indexType lookup read initialValue indexed not_word actual_type
   | elementOutOfBounds projections_eq leadingTarget prefix_selected indexed arrayRead stored out_of_bounds =>
       obtain ⟨rfl, rfl⟩ := single_split (single.symm.trans projections_eq)
       obtain ⟨rfl, rfl, location, cell, initial, lookup, read, initialValue, rfl⟩ :=

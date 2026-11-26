@@ -3840,6 +3840,7 @@ mutual
         (prefix_resolves : SourcePlaceResolves program size_leading context evidence source
           environment before { place with projections := leading, type := TypeSystem.Ty.array place.type }
           prefixTarget middle)
+        (prefix_initialized : prefixTarget.selected ≠ none)
         (fault : ExpressionFaults program size_fault context evidence source environment
           middle index reason after) :
         SourcePlaceFaults program (stepSize [size_leading, size_fault]) context evidence
@@ -3852,6 +3853,7 @@ mutual
         (prefix_resolves : SourcePlaceResolves program size_leading context evidence source
           environment before { place with projections := leading, type := TypeSystem.Ty.array place.type }
           prefixTarget middle)
+        (prefix_initialized : prefixTarget.selected ≠ none)
         (index_evaluates : ExpressionEvaluates program size_index context evidence source
           environment middle index value after)
         (not_word : ¬ WordValue value)
@@ -4538,11 +4540,11 @@ theorem SourcePlaceFaults.sound {program : Program} {size : Nat} {a0 : Context} 
     exact .uninitialized lookup initial_read (SourceProjectionsEvaluate.sound evaluate) current_read empty not_mapping has_projection
   | .elementPrefix projections_eq fault =>
     exact .elementPrefix projections_eq (SourcePlaceFaults.sound fault)
-  | .elementIndex projections_eq prefix_resolves fault =>
-    exact .elementIndex projections_eq (SourcePlaceResolves.sound prefix_resolves)
+  | .elementIndex projections_eq prefix_resolves prefix_initialized fault =>
+    exact .elementIndex projections_eq (SourcePlaceResolves.sound prefix_resolves) prefix_initialized
       (ExpressionFaults.sound fault)
-  | .elementIndexType projections_eq prefix_resolves index_evaluates not_word actual_type =>
-    exact .elementIndexType projections_eq (SourcePlaceResolves.sound prefix_resolves)
+  | .elementIndexType projections_eq prefix_resolves prefix_initialized index_evaluates not_word actual_type =>
+    exact .elementIndexType projections_eq (SourcePlaceResolves.sound prefix_resolves) prefix_initialized
       (ExpressionEvaluates.sound index_evaluates) not_word actual_type
   | .elementOutOfBounds projections_eq prefix_resolves prefix_selected index_evaluates read stored
       out_of_bounds =>
@@ -5104,14 +5106,14 @@ theorem SourcePlaceFaults.has_size {program : Program} {a0 : Context} {a1 : Evid
   | .elementPrefix projections_eq fault =>
     obtain ⟨_, fault⟩ := SourcePlaceFaults.has_size fault
     exact ⟨_, .elementPrefix projections_eq fault⟩
-  | .elementIndex projections_eq prefix_resolves fault =>
+  | .elementIndex projections_eq prefix_resolves prefix_initialized fault =>
     obtain ⟨_, prefix_resolves⟩ := SourcePlaceResolves.has_size prefix_resolves
     obtain ⟨_, fault⟩ := ExpressionFaults.has_size fault
-    exact ⟨_, .elementIndex projections_eq prefix_resolves fault⟩
-  | .elementIndexType projections_eq prefix_resolves index_evaluates not_word actual_type =>
+    exact ⟨_, .elementIndex projections_eq prefix_resolves prefix_initialized fault⟩
+  | .elementIndexType projections_eq prefix_resolves prefix_initialized index_evaluates not_word actual_type =>
     obtain ⟨_, prefix_resolves⟩ := SourcePlaceResolves.has_size prefix_resolves
     obtain ⟨_, index_evaluates⟩ := ExpressionEvaluates.has_size index_evaluates
-    exact ⟨_, .elementIndexType projections_eq prefix_resolves index_evaluates not_word
+    exact ⟨_, .elementIndexType projections_eq prefix_resolves prefix_initialized index_evaluates not_word
       actual_type⟩
   | .elementOutOfBounds projections_eq prefix_resolves prefix_selected index_evaluates read stored
       out_of_bounds =>
@@ -5690,9 +5692,9 @@ theorem SourcePlaceFaults.children_below {program : Program} {size : Nat} {a0 : 
     exact ⟨[size_evaluate], rfl, fun _ member => child_lt_stepSize member⟩
   | @elementPrefix size_fault _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_fault], rfl, fun _ member => child_lt_stepSize member⟩
-  | @elementIndex size_leading size_fault _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+  | @elementIndex size_leading size_fault _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_leading, size_fault], rfl, fun _ member => child_lt_stepSize member⟩
-  | @elementIndexType size_leading size_index _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+  | @elementIndexType size_leading size_index _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_leading, size_index], rfl, fun _ member => child_lt_stepSize member⟩
   | @elementOutOfBounds size_leading size_index _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_leading, size_index], rfl, fun _ member => child_lt_stepSize member⟩
