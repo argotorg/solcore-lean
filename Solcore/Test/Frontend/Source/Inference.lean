@@ -2114,7 +2114,7 @@ private def testAssumptionAndImplementationKeepPathIds : IO Unit := do
   | _ => throw (IO.userError
       "assumption and implementation evidence changed requirement order")
 
-private def testCandidateForkCommitsOnlySelectedIds : IO Unit := do
+private def testGenericCallCommitsItsIds : IO Unit := do
   let fixture ← check (String.intercalate "\n" [
     "trait Ready<T> {}",
     "trait Coerce<From, To> {}",
@@ -2129,8 +2129,8 @@ private def testCandidateForkCommitsOnlySelectedIds : IO Unit := do
     "impl Eq<Token> {",
     "  function eq(left: Token, right: Token) returns (Bool) { return true; }",
     "}",
-    "function choose(value: Box) returns (Bool) { return true; }",
-    "function choose(value: Flag) returns (Bool) { return true; }",
+    "function chooseBox(value: Box) returns (Bool) { return true; }",
+    "function chooseFlag(value: Flag) returns (Bool) { return true; }",
     "function choose<T>(value: T) returns (Bool) where T: Ready {",
     "  return true;",
     "}",
@@ -2144,7 +2144,7 @@ private def testCandidateForkCommitsOnlySelectedIds : IO Unit := do
   let ready ← namedTrait fixture.environment "Ready"
   let equality ← namedTrait fixture.environment "Eq"
   assertTrue (aligned run [predicate ready .word, predicate equality token])
-    "failed or higher-cost candidates consumed committed requirement identities"
+    "a generic call's where requirement or the operator's lost its committed identity"
 
 private def testIntegerLiteralOwnsImmediateRequirementId : IO Unit := do
   let fixture ← check (String.intercalate "\n" [
@@ -2187,11 +2187,11 @@ private def testRepeatedPredicatesKeepDistinctIds : IO Unit := do
   assertTrue (aligned compareTwice [equalityOnToken, equalityOnToken])
     "repeated identical predicates were merged or shared a requirement identity"
 
-/-- Exercise identity order across coercion paths, transactional overload
-selection, and immediate integer-literal requirement allocation. -/
+/-- Exercise identity order across coercion paths, a generic call's where requirement,
+and immediate integer-literal requirement allocation. -/
 def testSourceRequirementIdentity : IO Unit := do
   testAssumptionAndImplementationKeepPathIds
-  testCandidateForkCommitsOnlySelectedIds
+  testGenericCallCommitsItsIds
   testIntegerLiteralOwnsImmediateRequirementId
   testRepeatedPredicatesKeepDistinctIds
 
@@ -2203,8 +2203,8 @@ section
 /-!
 End-to-end coverage for the occurrence-addressed typed source produced by
 source inference.  The fixture deliberately combines lexical shadowing,
-generic overload selection, rejected overload candidates, a two-edge coercion
-path, an operator obligation, and an explicit builtin-Int literal carrier.
+a generic call with a where requirement, a two-edge coercion path, an operator
+obligation, and an explicit builtin-Int literal carrier.
 -/
 
 set_option autoImplicit false
@@ -2422,7 +2422,7 @@ private def testTypedInferenceFacts (fixture : Fixture)
       predicate coerce mid [box],
       predicate addition box
     ]))
-    "speculative overload requirements leaked or committed requirements reordered"
+    "requirements leaked or committed requirements reordered"
 
   let chooseCall ← findCall source genericChoose
   match chooseCall.form with
@@ -2434,17 +2434,17 @@ private def testTypedInferenceFacts (fixture : Fixture)
           selected.predicates = [predicate ready word] ∧
           chooseCall.requirements = [readySolved.id] ∧
           chooseCall.coercions = []))
-        "generic overload selection lost its closed instantiation or requirement"
+        "the generic call lost its closed instantiation or requirement"
       match source.lookupExpression? callee with
       | some { form := .reference "choose" (.declaration reference), .. } =>
           assertTrue (decide (reference = selected))
             "the semantic choose reference disagrees with its call resolution"
       | _ => throw (IO.userError
-          "the chosen overload has no matching semantic callee reference")
+          "the generic call has no matching semantic callee reference")
       match source.lookupExpression? argument with
       | some { form := .reference "item" (.local binder), requirements, coercions, .. } =>
           assertTrue (binder == inner.id && requirements.isEmpty && coercions.isEmpty)
-            "a rejected choose overload leaked coercions or requirements"
+            "the generic call's argument gained coercions or requirements"
       | _ => throw (IO.userError
           "the chosen generic argument lost its shadowed local resolution")
   | _ => throw (IO.userError "the chosen generic call changed shape")
@@ -2538,7 +2538,7 @@ private def testIndirectArgumentBundleCoercion : IO Unit := do
       s!"expected one indirect call with bundle metadata, found {calls.length}")
 
 /-- Check that the real source-inference traversal produces a complete,
-occurrence-addressed semantic carrier without leaking speculative candidates. -/
+occurrence-addressed semantic carrier. -/
 def testSourceTypedIRInference : IO Unit := do
   let fixture ← check (String.intercalate "\n" [
     "trait Ready<T> {}",
@@ -2555,8 +2555,8 @@ def testSourceTypedIRInference : IO Unit := do
     "impl Add<Box> {",
     "  function add(left: Box, right: Box) returns (Box) { return left; }",
     "}",
-    "function choose(value: Box) returns (Bool) { return true; }",
-    "function choose(value: Flag) returns (Bool) { return true; }",
+    "function chooseBox(value: Box) returns (Bool) { return true; }",
+    "function chooseFlag(value: Flag) returns (Bool) { return true; }",
     "function choose<T>(value: T) returns (Bool) where T: Ready {",
     "  return true;",
     "}",

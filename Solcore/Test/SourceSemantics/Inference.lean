@@ -1849,7 +1849,8 @@ private def testDiscardedPolymorphicReferenceResidual : IO Unit := do
   assertTrue retainedResidual
     "discarded polymorphic reference did not retain an independent residual type"
 
-private def testAmbiguousOverload : IO Unit := do
+/-- Two functions of one name are refused at the load (`SC0108`), so no call sees both. -/
+private def testDuplicateFunctionRefused : IO Unit := do
   let source := String.intercalate "\n" [
     "function choose(value: Word) returns (Word) { return value; }",
     "function choose(other: Word) returns (Word) { return other + 1; }",
@@ -1857,11 +1858,12 @@ private def testAmbiguousOverload : IO Unit := do
   ]
   match SourceInference.loadAndCheckProgram (workspace source) with
   | .error errors =>
-      assertTrue (errors.any fun error => match error with
-        | .body { error := .ambiguousOverload "choose" candidates, .. } =>
-            candidates.length == 2
-        | _ => false) "ambiguous overload was not reported explicitly"
-  | .ok _ => throw (IO.userError "ambiguous overload was selected")
+      assertTrue (errors.any fun
+          | .loading (.imports found) => found.any fun
+              | .duplicateFunction _ name declarations => name == "choose" && declarations.length == 2
+              | _ => false
+          | _ => false) s!"two functions named choose were refused otherwise: {reprStr errors}"
+  | .ok _ => throw (IO.userError "two functions named choose were both accepted")
 
 private def testIntegerLiteralExpectedType : IO Unit := do
   let source := "function bad() returns (Bool) { return 1; }"
@@ -3105,7 +3107,7 @@ def testSourceInference : IO Unit := do
   testRecoveryBodyAnnotationFormation
   testLambdaLetTupleConditional
   testDiscardedPolymorphicReferenceResidual
-  testAmbiguousOverload
+  testDuplicateFunctionRefused
   testIntegerLiteralExpectedType
   testClosedUnsupportedIntegerLiteralTarget
   testIntegerLiteralLedgerValidation

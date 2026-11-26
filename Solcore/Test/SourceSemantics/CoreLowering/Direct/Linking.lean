@@ -1034,7 +1034,7 @@ private def testNamedOperatorFunctionsAndOrd : IO Unit := do
     "function lt<T>(left: T, right: T) returns (Bool) where T: Ord {",
     "  return false;",
     "}",
-    "function lt(left: Word, right: Word) returns (Word) { return 77; }",
+    "function ltWord(left: Word, right: Word) returns (Word) { return 77; }",
     "function le<T>(left: T, right: T) returns (Bool) where T: Ord {",
     "  return true;",
     "}",

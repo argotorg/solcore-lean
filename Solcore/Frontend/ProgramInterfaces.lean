@@ -1061,6 +1061,12 @@ inductive ProgramInterfaceError where
   | duplicateExportModule
       (owner : Workspace.ModuleId)
       (name : String)
+  /-- Two top-level functions of one name in one module, which upstream refuses (`SC0108`): one
+  function per name, so no call or value chooses among functions. -/
+  | duplicateFunction
+      (owner : Workspace.ModuleId)
+      (name : String)
+      (declarations : List Resolved.DeclarationId)
   deriving Repr, DecidableEq
 
 namespace ProgramDeclaration
@@ -2209,7 +2215,7 @@ def ProgramInterfaceError.reportedAtLoad : ProgramInterfaceError → Bool
   | .unknownImportName _ _ _ | .importedNameConflict _ _ _ | .duplicateImportName _ _
   | .ambiguousImport _ _ _ | .importQualifierConflict _ _ | .unknownExportName _ _
   | .unknownExportConstructor _ _ _ | .duplicateImportQualifier _ _ | .duplicateExportName _ _
-  | .duplicateExportModule _ _ =>
+  | .duplicateExportModule _ _ | .duplicateFunction _ _ _ =>
       true
   | .fixedPointExhausted => false
 
@@ -2219,7 +2225,8 @@ def ProgramInterfaceError.owner? : ProgramInterfaceError → Option Workspace.Mo
   | .unknownExportConstructor owner _ _ | .importedNameConflict owner _ _
   | .duplicateImportName owner _ | .ambiguousImport owner _ _
   | .importQualifierConflict owner _ | .duplicateImportQualifier owner _
-  | .duplicateExportName owner _ | .duplicateExportModule owner _ => some owner
+  | .duplicateExportName owner _ | .duplicateExportModule owner _
+  | .duplicateFunction owner _ _ => some owner
   | .fixedPointExhausted => none
 
 /-- The modules that a module's imports and re-exports name, where they resolve. -/
@@ -2434,10 +2441,23 @@ private def duplicateImportQualifiers (module : ProgramModule) : List ProgramInt
     if (qualifiers.take index).contains name then some name else none
   repeated.eraseDups.map (.duplicateImportQualifier module.id ·)
 
+/-- The names that two or more of a module's top-level functions share, each with its functions in
+declaration order, as upstream's `SC0108` refuses them: a function and a type of one name live in
+two namespaces. -/
+def duplicateFunctionErrors (environment : ProgramEnvironment) (module : Workspace.ModuleId) :
+    List ProgramInterfaceError :=
+  let functions := environment.declarations.filter fun declaration =>
+    decide (declaration.id.moduleId = module) && declaration.kind == .function
+  let names := (functions.filterMap (·.name)).eraseDups
+  names.filterMap fun name =>
+    match functions.filter (·.name == some name) with
+    | declarations@(_ :: _ :: _) => some (.duplicateFunction module name (declarations.map (·.id)))
+    | _ => none
+
 /-- The import rules a load checks in each module, as upstream's validation does: a name brought
 beside a declaration (`SC0108`), a name listed twice (`SC0117`), a name from two modules
 (`SC0120`), a qualifier beside a value (`SC0121`) and two imports under one qualifier
-(`SC0116`). -/
+(`SC0116`); and two functions of one name (`SC0108`, `duplicateFunctionErrors`). -/
 private def importRuleErrors (environment : ProgramEnvironment) (interfaces : ProgramInterfaces)
     (module : ProgramModule) : List ProgramInterfaceError :=
   importConflicts environment interfaces module (localEntities environment module.id) ++
@@ -2446,12 +2466,13 @@ private def importRuleErrors (environment : ProgramEnvironment) (interfaces : Pr
     duplicateImportNames module ++
     ambiguousImports environment interfaces module ++
     importQualifierConflicts environment interfaces module ++
-    duplicateImportQualifiers module
+    duplicateImportQualifiers module ++
+    duplicateFunctionErrors environment module.id
 
 /-- The import and export errors of a program that its load reports, for the modules reachable
 from its entry, as upstream validates only those: the interface errors reported where the import or
 export is (`reportedAtLoad`), in `buildProgramInterfaces`' order, then each module's import
-rules. -/
+rules and its functions of one name (`duplicateFunctionErrors`). -/
 def programImportErrors (environment : ProgramEnvironment) (entry : Workspace.ModuleId) :
     List ProgramInterfaceError :=
   let reachable := reachableProgramModules environment entry

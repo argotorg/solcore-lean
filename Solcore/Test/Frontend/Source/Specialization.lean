@@ -42,6 +42,13 @@ private def check (content : String) :
   | .error errors =>
       throw (IO.userError s!"source inference failed: {reprStr errors}")
 
+/-- Whether a check refused a program at its load for two functions named `name` (`SC0108`). -/
+private def duplicateFunction (name : String) : SourceInference.ProgramCheckError → Bool
+  | .loading (.imports errors) => errors.any fun
+      | .duplicateFunction _ found _ => found == name
+      | _ => false
+  | _ => false
+
 private def finalFunction
     (checked : List SourceInference.CheckedFunction) :
     IO SourceInference.CheckedFunction :=
@@ -97,19 +104,21 @@ private def testTupleArgumentStaysWhole : IO Unit := do
   | .ok _ =>
       throw (IO.userError "element coercions were incorrectly applied inside a tuple")
 
-private def testExactOverloadWins : IO Unit := do
-  let checked ← check (String.intercalate "\n" [
+/-- An exact and a coercible function of one name no longer compete: the load refuses the two
+(`SC0108`), so no call ranks them. -/
+private def testExactOverloadRefused : IO Unit := do
+  match SourceInference.loadAndCheckProgram (workspace (String.intercalate "\n" [
     "trait Coerce<From, To> {}",
     "enum Box { Only }",
     "impl Coerce<Word, Box> {}",
     "function choose(value: Box) returns (Bool) { return true; }",
     "function choose(value: Word) returns (Word) { return value; }",
     "function select(value: Word) returns (Word) { return choose(value); }"
-  ])
-  let function ← finalFunction checked
-  assertTrue (function.inferredBodyType == TypeSystem.Ty.word &&
-      function.predicates.isEmpty && function.evidence.isEmpty)
-    "a coercible overload competed with an exact overload"
+  ])) with
+  | .error errors =>
+      assertTrue (errors.any (duplicateFunction "choose"))
+        s!"an exact and a coercible choose were not refused at the load: {reprStr errors}"
+  | .ok _ => throw (IO.userError "an exact and a coercible choose were both accepted")
 
 private def testMissingPerArgumentCoercion : IO Unit := do
   let source := String.intercalate "\n" [
@@ -160,9 +169,9 @@ private def testMethodProofCountDoesNotDistortEdgeCost : IO Unit := do
     "  function coerce(value: Mid) returns (C)",
     "      where Mid: Ready, Mid: Stable { return value; }",
     "}",
-    "function choose(value: B) returns (Word) { return 1; }",
-    "function choose(value: C) returns (Word) { return 2; }",
-    "function run(value: A) returns (Word) { return choose(value); }"
+    "function chooseB(value: B) returns (Word) { return 1; }",
+    "function chooseC(value: C) returns (Word) { return 2; }",
+    "function run(value: A) returns (Word) { return chooseB(value); }"
   ]
   let loaded ← match loadProgram (workspace source) with
     | .ok loaded => pure loaded
@@ -230,14 +239,14 @@ private def testMethodProofCountDoesNotDistortEdgeCost : IO Unit := do
     { trait := stable, subject := a, arguments := [] }
   ]
   assertTrue (decide (run.predicates = expected))
-    "a two-edge overload outranked the one-edge overload with method evidence"
+    "the one-edge coercion lost its method evidence"
 
 /-- Exercise direct coercion per source argument without flattening tuple values. -/
 def testSourceCoercionRanking : IO Unit := do
   testTwoArgumentsBothCoerced
   testOneExactOneCoerced
   testTupleArgumentStaysWhole
-  testExactOverloadWins
+  testExactOverloadRefused
   testMissingPerArgumentCoercion
   testMethodProofCountDoesNotDistortEdgeCost
 
@@ -247,10 +256,9 @@ end
 section
 -- leanmerge: from Solcore.Test.SourceLiteralOverloadRanking
 /-!
-Focused end-to-end regressions for overload selection with the builtin
-`Int<target>` obligation owned by an integer-literal argument.  Candidate
-checking specializes that existing obligation without allocating a second
-one or preferring Word over another supported builtin target.
+Integer-literal arguments where overloads once met. Two functions of one name are refused at the
+load (`SC0108`), so no literal ranks candidates; a sole deferred generic candidate's literal still
+defaults through its builtin `Int<target>` obligation.
 -/
 
 set_option autoImplicit false
@@ -296,114 +304,52 @@ private def expectLastChecked (lines : List String) :
   | some function => pure function
   | none => throw (IO.userError "literal overload fixture checked no functions")
 
-private def testWordAndIntegerStayAmbiguous : IO Unit := do
-  let lines := [
-    "function choose(value: Word) returns (Bool) { return true; }",
-    "function choose(value: integer) returns (Bool) { return false; }",
-    "function run() returns (Bool) { return choose(1); }"
-  ]
-  match SourceInference.loadAndCheckProgram (rawWorkspace lines) with
-  | .error errors =>
-      assertTrue (errors.any fun error => match error with
-        | .body { error := .ambiguousOverload "choose" candidates, .. } =>
-            candidates.length == 2
-        | _ => false)
-        "Word and integer literal targets acquired an artificial preference"
-  | .ok _ =>
-      throw (IO.userError "Word and integer literal overloads were ranked")
+/-- Whether a check refused a program at its load for two functions named `name` (`SC0108`). -/
+private def duplicateFunction (name : String) : SourceInference.ProgramCheckError → Bool
+  | .loading (.imports errors) => errors.any fun
+      | .duplicateFunction _ found _ => found == name
+      | _ => false
+  | _ => false
 
-private def testResultContextSelectsBuiltinTarget : IO Unit := do
-  let wordRun ← expectLastChecked [
-    "function choose(value: Word) returns (Word) { return value; }",
-    "function choose(value: integer) returns (integer) { return value; }",
-    "function run() returns (Word) { return choose(1); }"
-  ]
-  assertTrue (hasBuiltinIntEvidence wordRun .word .intWord)
-    "Word result context did not select Int<Word> evidence"
-  let integerRun ← expectLastChecked [
-    "function choose(value: Word) returns (Word) { return value; }",
-    "function choose(value: integer) returns (integer) { return value; }",
-    "function run() returns (integer) { return choose(1); }"
-  ]
-  assertTrue (hasBuiltinIntEvidence integerRun .integer .intInteger)
-    "integer result context did not select Int<integer> evidence"
-
-private def testInapplicableBoolDoesNotBlockWord : IO Unit := do
-  let run ← expectLastChecked [
-    "function choose(value: Bool) returns (Bool) { return value; }",
-    "function choose(value: Word) returns (Bool) { return true; }",
-    "function run() returns (Bool) { return choose(1); }"
-  ]
-  assertTrue (decide (run.inferredBodyType = TypeSystem.Ty.bool))
-    "inapplicable Bool overload blocked the Word literal candidate"
-  assertTrue (hasBuiltinIntEvidence run .word .intWord)
-    "viable Word candidate lost the literal's unique Int<Word> evidence"
-  let literals := run.typedBody.nodes.filterMap fun
-    | .expression node => match node.form with
-        | .integerLiteral _ resolution => some (node, resolution)
-        | _ => none
-    | .statement _ => none
-  match run.solvedRequirements, literals with
-  | [solved], [(node, resolution)] =>
-      assertTrue (decide (solved.id = ⟨0⟩ ∧
-          solved.predicate = ProgramSignatures.builtinIntPredicate .word ∧
-          resolution.requirement = solved.id ∧
-          node.requirements = [solved.id]))
-        "speculative overload candidates duplicated the literal requirement"
-  | solved, carriers => throw (IO.userError
-      s!"expected one literal row/carrier, found {solved.length}/{carriers.length}")
-
-private def testOpenGenericDoesNotBlockWord : IO Unit := do
-  let run ← expectLastChecked [
-    "function choose<T>(value: T) returns (Bool) { return true; }",
-    "function choose(value: Word) returns (Bool) { return true; }",
-    "function run() returns (Bool) { return choose(1); }"
-  ]
-  assertTrue (hasBuiltinIntEvidence run .word .intWord)
-    "an unresolved generic literal target blocked the concrete Word candidate"
-
-private def testGroundCandidateOutranksCheaperDeferredCandidate : IO Unit := do
-  let run ← expectLastChecked [
-    "trait Coerce<From, To> {}",
-    "impl Coerce<Bool, Word> {}",
-    "function choose(value: Word) returns (Bool) { return true; }",
-    "function choose<T>(value: T) returns (Word) { return 0; }",
-    "function run() returns (Word) { return choose(1); }"
-  ]
-  assertTrue (hasBuiltinIntEvidence run .word .intWord)
-    "a cheaper deferred generic candidate outranked a ground Word candidate"
-  assertTrue (run.solvedRequirements.any fun solved =>
-      solved.predicate.subject == TypeSystem.Ty.bool &&
-        solved.predicate.arguments == [TypeSystem.Ty.word])
-    "the selected ground candidate lost its Bool-to-Word result coercion"
-
-private def testNestedGenericDefersUntilOuterCandidate : IO Unit := do
-  let run ← expectLastChecked [
-    "trait Eq<T> {}",
-    "impl Eq<Word> {}",
-    "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
-    "function choose(value: Word) returns (Bool) { return true; }",
-    "function choose(value: integer) returns (Bool) { return false; }",
-    "function run() returns (Bool) { return choose(keep(1)); }"
-  ]
-  assertTrue (hasBuiltinIntEvidence run .word .intWord)
-    "an inner generic call rejected its literal before the outer Word candidate"
-  assertTrue (run.solvedRequirements.any fun solved =>
-      solved.predicate.trait != ProgramTraitId.builtin .int &&
-        solved.predicate.subject == TypeSystem.Ty.word)
-    "the outer candidate did not revalidate the inner generic Eq requirement"
-
-private def testLetBoundLiteralParticipatesInRanking : IO Unit := do
-  let run ← expectLastChecked [
-    "function choose<T>(value: T) returns (Bool) { return true; }",
-    "function choose(value: Word) returns (Bool) { return true; }",
-    "function run() returns (Bool) {",
-    "  let value = 1;",
-    "  return choose(value);",
-    "}"
-  ]
-  assertTrue (hasBuiltinIntEvidence run .word .intWord)
-    "a let-bound flexible literal made a generic overload look ground"
+/-- No literal ranks functions of one name any more: the load refuses two of them (`SC0108`). Each
+former ranking fixture is refused there: a `Word` and an `integer` target, a result context, an
+inapplicable `Bool` candidate, an open generic one, a cheaper deferred one, a nested generic call
+and a `let`-bound literal. -/
+private def testLiteralOverloadsRefused : IO Unit := do
+  let fixtures : List (List String) := [
+    ["function choose(value: Word) returns (Bool) { return true; }",
+      "function choose(value: integer) returns (Bool) { return false; }",
+      "function run() returns (Bool) { return choose(1); }"],
+    ["function choose(value: Word) returns (Word) { return value; }",
+      "function choose(value: integer) returns (integer) { return value; }",
+      "function run() returns (Word) { return choose(1); }"],
+    ["function choose(value: Word) returns (Word) { return value; }",
+      "function choose(value: integer) returns (integer) { return value; }",
+      "function run() returns (integer) { return choose(1); }"],
+    ["function choose(value: Bool) returns (Bool) { return value; }",
+      "function choose(value: Word) returns (Bool) { return true; }",
+      "function run() returns (Bool) { return choose(1); }"],
+    ["function choose<T>(value: T) returns (Bool) { return true; }",
+      "function choose(value: Word) returns (Bool) { return true; }",
+      "function run() returns (Bool) { return choose(1); }"],
+    ["trait Coerce<From, To> {}", "impl Coerce<Bool, Word> {}",
+      "function choose(value: Word) returns (Bool) { return true; }",
+      "function choose<T>(value: T) returns (Word) { return 0; }",
+      "function run() returns (Word) { return choose(1); }"],
+    ["trait Eq<T> {}", "impl Eq<Word> {}",
+      "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
+      "function choose(value: Word) returns (Bool) { return true; }",
+      "function choose(value: integer) returns (Bool) { return false; }",
+      "function run() returns (Bool) { return choose(keep(1)); }"],
+    ["function choose<T>(value: T) returns (Bool) { return true; }",
+      "function choose(value: Word) returns (Bool) { return true; }",
+      "function run() returns (Bool) {", "  let value = 1;", "  return choose(value);", "}"]]
+  for lines in fixtures do
+    match SourceInference.loadAndCheckProgram (rawWorkspace lines) with
+    | .error errors =>
+        assertTrue (errors.any (duplicateFunction "choose"))
+          s!"a literal overload fixture was refused otherwise: {reprStr errors}"
+    | .ok _ => throw (IO.userError "two functions named choose were both accepted")
 
 /-- A sole deferred generic candidate leaves its literal open. Unconstrained,
 the literal is ambiguous; under a pending `Mark` bound it defaults to `uint256`,
@@ -438,16 +384,10 @@ private def testSoleDeferredCandidateDefaultsToUint256 : IO Unit := do
         instantiation.type = .function (.fixed .uint256) (.fixed .uint256)))
     "literal defaulting did not close the selected generic instantiation"
 
-/-- Exercise builtin-Int overload viability, equal-cost ambiguity, contextual
-selection, and nonblocking unsupported candidates. -/
+/-- Literal overloads refused at the load (`SC0108`), and a sole deferred generic
+candidate's literal defaulting. -/
 def testSourceLiteralOverloadRanking : IO Unit := do
-  testWordAndIntegerStayAmbiguous
-  testResultContextSelectsBuiltinTarget
-  testInapplicableBoolDoesNotBlockWord
-  testOpenGenericDoesNotBlockWord
-  testGroundCandidateOutranksCheaperDeferredCandidate
-  testNestedGenericDefersUntilOuterCandidate
-  testLetBoundLiteralParticipatesInRanking
+  testLiteralOverloadsRefused
   testSoleDeferredCandidateDefaultsToUint256
 
 end Tests.SourceLiteralOverloadRanking

@@ -13,8 +13,10 @@ constructor its type does not show (`SC0114`), a re-export that its module does 
 (`SC0115`), std's modules by their export tables, std types by the constructors they show, one
 public name for items of two origins (`SC0111`), std's names by the modules that declare them,
 and one public name for two modules (`SC0112`); a std name that a user module re-exports binds on
-through its importers, `std.opcodes`' functions to their builtins; and a module that no import or
-re-export reaches from the entry is not checked, as upstream validates only the reachable ones.
+through its importers, `std.opcodes`' functions to their builtins; two functions of one name in one
+module are refused (`SC0108`), used or not, and a function and a type of one name are not; and a
+module that no import or re-export reaches from the entry is not checked, as upstream validates only
+the reachable ones.
 Each case is a source that upstream's pinned checker was probed with, and gives upstream's
 answer. -/
 
@@ -82,6 +84,7 @@ private def describe : ProgramInterfaceError → String
   | .duplicateImportQualifier _ name => s!"qualifier twice {name}"
   | .duplicateExportName _ name => s!"exported twice {name}"
   | .duplicateExportModule _ name => s!"exported module twice {name}"
+  | .duplicateFunction _ name _ => s!"function twice {name}"
   | error => reprStr error
 
 /-- What a load refuses at the imports, described; none when it loads, and `other` when it fails
@@ -267,6 +270,33 @@ private def testUnreachableModules : IO Unit := do
   expectLoaded "an unreachable module with import errors" [] [] loose
   expectRefused "the same module, imported" ["import { f as h } from loose;"] []
     ["item nosuch", "module nosuchmodule", "item f", "value f", "duplicate k", "ambiguous f"] loose
+
+/-- `SC0108` for two functions of one name in one module (C201 to C209): whatever their parameters,
+arities and uses, in the entry or in an imported module, but not in a module nothing imports, and
+not for a function and a type of one name. -/
+private def testDuplicateFunctions : IO Unit := do
+  let byWord := "function choose(x: word) returns (word) { return x; }"
+  let byBool := "function choose(x: bool) returns (word) { return 1; }"
+  expectRefused "two parameter types" [] [byWord, byBool] ["function twice choose"]
+  expectRefused "two parameter types, both called" []
+    [byWord, byBool, "function both(x: word) returns (word) { return choose(x) + choose(true); }"]
+    ["function twice choose"]
+  expectRefused "one signature twice" [] [byWord, byWord] ["function twice choose"]
+  expectRefused "two arities" []
+    [byWord, "function choose(x: word, y: word) returns (word) { return y; }"]
+    ["function twice choose"]
+  expectRefused "neither called" [] [byWord, byBool, localF] ["function twice choose"]
+  let duplicates : List Workspace.RawSourceFile := [
+    { path := "dup.solc", content := String.intercalate "\n" ["pragma solcore;", "export { h };",
+        "function h(x: word) returns (word) { return x; }",
+        "function h(x: bool) returns (word) { return 1; }"] }]
+  expectRefused "in an imported module, selected" ["import { h } from dup;"] [] ["function twice h"]
+    duplicates
+  expectLoaded "in a module nothing imports" [] [] duplicates
+  expectRefused "one of them named as a value" []
+    [byWord, byBool, "function pick() returns (function (word) returns (word)) { return choose; }"]
+    ["function twice choose"]
+  expectLoaded "a function and a type of one name" [] [byWord, "enum choose { C }"]
 
 /-- Modules beside std's: one exporting a function named like std's `not`, one a function named like
 std's constructor `Empty`, and a module whose path ends in a name std exports as a function. -/
@@ -666,6 +696,7 @@ def testImportParity : IO Unit := do
   testAmbiguousImports
   testQualifierConflicts
   testUnreachableModules
+  testDuplicateFunctions
   testStandardModules
   testLocalExports
   testExportedConstructors

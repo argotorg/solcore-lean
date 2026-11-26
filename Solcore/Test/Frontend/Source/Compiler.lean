@@ -1371,13 +1371,19 @@ private def testProgramOrchestration : IO Unit := do
     }]
     externalLibraries := []
   }
+  -- Two exported functions of one name never reach the ABI: the load refuses them (`SC0108`).
   match compileStaticWord duplicateAbi with
-  | .error (.discovery
-      (.duplicateSignature "same" "same" "same(uint256)")) => pure ()
+  | .error (.compilation (.checking errors)) =>
+      assertTrue (errors.any fun
+          | .loading (.imports found) => found.any fun
+              | .duplicateFunction _ name _ => name == "same"
+              | _ => false
+          | _ => false)
+        s!"two exported functions named same were refused otherwise: {reprStr errors}"
   | .error error => throw (IO.userError
-      s!"duplicate ABI signature changed diagnostic: {reprStr error}")
+      s!"two exported functions named same changed diagnostic: {reprStr error}")
   | .ok _ => throw (IO.userError
-      "duplicate ABI signatures were silently accepted")
+      "two exported functions named same were silently accepted")
 
   let collisionAbi : Workspace.RawWorkspace := {
     entry := "collision.solc"
@@ -2453,20 +2459,26 @@ private def testSeedErrors : IO Unit := do
   | result => throw (IO.userError
       s!"unknown declaration root was accepted: {reprStr result}")
 
-private def testAmbiguousAndNonFunctionSeeds : IO Unit := do
+private def testDuplicateAndNonFunctionSeeds : IO Unit := do
   let moduleId ← mainModule "main.solc"
+  -- Two functions of one name are refused at the load (`SC0108`), before a seed names either.
   let overloaded := rawWorkspace "main.solc" [("main.solc",
     String.intercalate "\n" [
       "function choose(value: Word) returns (Word) { return value; }",
       "function choose(value: Bool) returns (Bool) { return value; }"
     ])]
   match prepare overloaded (Seed.named moduleId "choose") with
-  | .error (.seed (.ambiguousName actual name candidates)) =>
-      assertTrue (decide (actual = moduleId ∧ name = "choose" ∧
-          candidates.map (·.declarationIndex) = [1, 2]))
-        "ambiguous name did not retain its ordered overload declarations"
+  | .error (.checking errors) =>
+      assertTrue (errors.any fun
+          | .loading (.imports found) => found.any fun
+              | .duplicateFunction actual name candidates =>
+                  decide (actual = moduleId ∧ name = "choose" ∧
+                    candidates.map (·.declarationIndex) = [1, 2])
+              | _ => false
+          | _ => false)
+        s!"two functions named choose were refused otherwise: {reprStr errors}"
   | result => throw (IO.userError
-      s!"ambiguous root name was accepted: {reprStr result}")
+      s!"two functions named choose reached the seed: {reprStr result}")
   let traitWorkspace := rawWorkspace "main.solc" [("main.solc",
     String.intercalate "\n" [
       "trait Marker<T> {}",
@@ -2671,7 +2683,7 @@ def testSourceProgramExecution : IO Unit := do
   testDefaultedIntegerLiterals
   testDefaultImplementationPriority
   testSeedErrors
-  testAmbiguousAndNonFunctionSeeds
+  testDuplicateAndNonFunctionSeeds
   testStageErrors
   testRuntimeBoundary
   IO.println "explicit raw-source check/specialize/link/run pipeline GREEN"

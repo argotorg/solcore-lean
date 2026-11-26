@@ -1395,10 +1395,15 @@ def run : IO Unit := do
   match discoverStaticWordRoots invalid.program invalid.moduleId with
   | .error (.unsupportedParameters _ "bad" [.bool] [false]) => pure ()
   | _ => throw (IO.userError "unsupported ABI parameter was skipped")
-  let duplicate ← get "duplicate ABI check" (checkEntry (single "function same(value: Word) returns (Word) { return value; } function same(value: Word) returns (Word) { return value + 1; } export {same};"))
-  match discoverStaticWordRoots duplicate.program duplicate.moduleId with
-  | .error (.duplicateSignature "same" "same" "same(uint256)") => pure ()
-  | _ => throw (IO.userError "duplicate ABI signature diagnostic changed")
+  -- Two exported functions of one name never reach the ABI: the load refuses them (`SC0108`).
+  match checkEntry (single "function same(value: Word) returns (Word) { return value; } function same(value: Word) returns (Word) { return value + 1; } export {same};") with
+  | .error errors =>
+      require (errors.any fun
+          | .loading (.imports found) => found.any fun
+              | .duplicateFunction _ name _ => name == "same"
+              | _ => false
+          | _ => false) s!"two functions named same were refused otherwise: {reprStr errors}"
+  | .ok _ => throw (IO.userError "two functions named same reached ABI discovery")
   let collision ← get "selector collision check" (checkEntry (single "function f116643(value: Word) returns (Word) { return value; } function f38491(value: Word) returns (Word) { return value; } export {f38491, f116643};"))
   match discoverStaticWordRoots collision.program collision.moduleId with
   | .error (.selectorCollision "f116643" "f38491" "f116643(uint256)" "f38491(uint256)" selector) =>

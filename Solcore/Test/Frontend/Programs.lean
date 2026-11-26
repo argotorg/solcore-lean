@@ -1233,7 +1233,7 @@ private def successfulWorkspace : Workspace.RawWorkspace := {
         "import {Eq} from traits;",
         "export {keep, choose};",
         "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
-        "function choose(value: Bool) returns (Bool) { return value; }",
+        "function chooseBool(value: Bool) returns (Bool) { return value; }",
         "function choose(value: Word) returns (Word) { return value + 1; }"
       ]
     },
@@ -1257,7 +1257,7 @@ private def testSuccessfulProgram : IO Unit := do
       checked.signatures.functions.length = 4 ∧
       checked.signatures.implRules.length = 1 ∧
       checked.functions.length = 4 ∧ checked.methods.isEmpty))
-    "whole-program summary omitted modules, overloads, impls, or bodies"
+    "whole-program summary omitted modules, functions, impls, or bodies"
   assertTrue (decide (checked.functions.map (·.declaration) =
       checked.signatures.functions.map (·.id)))
     "checked functions did not preserve declaration order"
@@ -1277,7 +1277,7 @@ private def testSuccessfulProgram : IO Unit := do
       let integerPredicate :=
         ProgramSignatures.builtinIntPredicate TypeSystem.Ty.word
       assertTrue (decide (function.inferredBodyType = TypeSystem.Ty.word))
-        "overload selection or integer-literal resolution changed run's type"
+        "the call or integer-literal resolution changed run's type"
       assertTrue (function.solvedRequirements.any fun solved =>
           solved.predicate == equalityPredicate &&
             match solved.evidence with
