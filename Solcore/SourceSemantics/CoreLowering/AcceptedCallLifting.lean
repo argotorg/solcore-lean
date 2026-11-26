@@ -25,8 +25,8 @@ Main declarations:
 - `CellAwareInvocationAcceptedCallLifting.nested_value` and
   `CellAwareInvocationAcceptedCallLifting.nested_roots`, the value execution of
   every nested site, given the facts an indirect call reads (`IndirectFacts`):
-  the guard frame of its scope (`Framed`) and the arity of the plan's named
-  contracts (`Aligned`);
+  the guard frame of its scope (`Framed`), the arity of the plan's named
+  contracts (`Aligned`) and that the mode stores no closure;
 - `CellAwareInvocationAcceptedCallLifting.bodies` and
   `CellAwareInvocationAcceptedCallLifting.body`, the induction across bodies and
   the staged trace of a call-containing body, given the static receipts of the
@@ -70,18 +70,20 @@ def Original (program : Program) (size : Nat) : Bool → SourceSemantics.Context
 /-- The staged lifting of the value executions of the expressions that `child`
 admits, below a size, which keep the stored functions of a mode. -/
 def ChildLifts (program : Program) (registry : Staging.Recursive.Registry) (scope : Staging.Recursive.Scope)
-    (child : ExpressionId → Prop) (bound : Nat) (plan : SourceCompilationPlan.Plan) (guard : Prop) : Prop :=
+    (child : ExpressionId → Prop) (bound : Nat) (plan : SourceCompilationPlan.Plan) (closures : Dynamic.Closure → Prop)
+    (guard : Prop) : Prop :=
   ∀ {id : ExpressionId}, child id → ∀ {size : Nat} {context : SourceSemantics.Context}
     {environment : Dynamic.Environment} {before after : Dynamic.Heap} {value : Dynamic.Value}, size < bound →
     SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment before id
       value after →
-    Kept plan guard before → Kept plan guard after ∧ KeptValue plan guard value ∧
+    Kept plan closures guard before → Kept plan closures guard after ∧ KeptValue plan closures guard value ∧
     Staging.Recursive.Expression program registry scope context environment before id (.value value) after
 
 theorem ChildLifts.mono {program : Program} {registry : Staging.Recursive.Registry} {scope : Staging.Recursive.Scope}
-    {child : ExpressionId → Prop} {smaller larger : Nat} {plan : SourceCompilationPlan.Plan} {guard : Prop}
-    (lifts : ChildLifts program registry scope child larger plan guard)
-    (le : smaller ≤ larger) : ChildLifts program registry scope child smaller plan guard := by
+    {child : ExpressionId → Prop} {smaller larger : Nat} {plan : SourceCompilationPlan.Plan}
+    {closures : Dynamic.Closure → Prop} {guard : Prop}
+    (lifts : ChildLifts program registry scope child larger plan closures guard)
+    (le : smaller ≤ larger) : ChildLifts program registry scope child smaller plan closures guard := by
   intro _ admitted _ _ _ _ _ _ less trace
   exact lifts admitted (Nat.lt_of_lt_of_le less le) trace
 
@@ -364,12 +366,12 @@ private theorem for_inv (unique : NodeOccurrencesUnique source) (found : source.
 end Inversion
 
 variable {program : Program} {registry : Staging.Recursive.Registry} {scope : Staging.Recursive.Scope}
-  {expected : TypeSystem.Ty} {plan : SourceCompilationPlan.Plan} {guard : Prop}
+  {expected : TypeSystem.Ty} {plan : SourceCompilationPlan.Plan} {closures : Dynamic.Closure → Prop} {guard : Prop}
 
 /-- A bare target has no keys. -/
 private theorem bare_keys {environment : Dynamic.Environment} {heap : Dynamic.Heap} {place : PlaceResolution}
     {target : Dynamic.ResolvedPlace} (snapshot : Staging.Recursive.BareTarget environment heap place target) :
-    KeptKeys plan guard target.projections := by
+    KeptKeys plan closures guard target.projections := by
   cases snapshot
   exact fun _ _ member => nomatch member
 
@@ -386,10 +388,11 @@ the staged `ElementTarget` that resolves it, given the lifting of `child` within
 the bound: the bare root, then the key from the same heap, then the array's own
 cell. -/
 private theorem element_resolved {child : ExpressionId → Prop} {bound : Nat}
-    (lift : ChildLifts program registry scope child bound plan guard) {place : PlaceResolution} {key : ExpressionId}
+    (lift : ChildLifts program registry scope child bound plan closures guard) {place : PlaceResolution}
+    {key : ExpressionId}
     (single : place.projections = [.element key]) (admitted : child key) {size : Nat}
     {context : SourceSemantics.Context} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
-    {target : Dynamic.ResolvedPlace} (within : size ≤ bound) (kept : Kept plan guard before)
+    {target : Dynamic.ResolvedPlace} (within : size ≤ bound) (kept : Kept plan closures guard before)
     (resolve : SourceExecutionSize.SourcePlaceResolves program size context scope.evidence scope.source environment
       before place target after) :
     Staging.Recursive.ElementTarget program registry scope context environment before place (.resolved target)
@@ -410,13 +413,14 @@ private theorem element_resolved {child : ExpressionId → Prop} {bound : Nat}
 /-- The sized resolution of a place of one element whose key `child` admits
 keeps the stored functions, and its path has no keys. -/
 private theorem element_kept {child : ExpressionId → Prop} {bound : Nat}
-    (lift : ChildLifts program registry scope child bound plan guard) {place : PlaceResolution} {key : ExpressionId}
+    (lift : ChildLifts program registry scope child bound plan closures guard) {place : PlaceResolution}
+    {key : ExpressionId}
     (single : place.projections = [.element key]) (admitted : child key) {size : Nat}
     {context : SourceSemantics.Context} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
     {target : Dynamic.ResolvedPlace} (within : size ≤ bound)
     (resolve : SourceExecutionSize.SourcePlaceResolves program size context scope.evidence scope.source environment
-      before place target after) (kept : Kept plan guard before) :
-    Kept plan guard after ∧ KeptKeys plan guard target.projections := by
+      before place target after) (kept : Kept plan closures guard before) :
+    Kept plan closures guard after ∧ KeptKeys plan closures guard target.projections := by
   cases resolve with
   | intro _ _ evaluate =>
     rw [single] at evaluate
@@ -431,7 +435,7 @@ private theorem element_kept {child : ExpressionId → Prop} {bound : Nat}
 staged match at its entry context. The outcome is the selected body's, restored to the entry bindings; without
 a selected body it falls through. -/
 private theorem match_lift {child : ExpressionId → Prop} {bound : Nat} (unique : NodeOccurrencesUnique scope.source)
-    (lift : ChildLifts program registry scope child bound plan guard) {id : StatementId} {node : StatementNode}
+    (lift : ChildLifts program registry scope child bound plan closures guard) {id : StatementId} {node : StatementNode}
     (found : scope.source.lookupStatement? id = some node) {resolution : MatchResolution}
     (form : node.form = .matchWith resolution) (scrutinee : child resolution.scrutinee)
     (body : ∀ {statements : List StatementId}, ((∃ arm ∈ resolution.cases, arm.body = statements) ∨
@@ -439,15 +443,15 @@ private theorem match_lift {child : ExpressionId → Prop} {bound : Nat} (unique
       ∀ {size : Nat} {context environment before innerContext inner after}, size ≤ bound →
       SourceExecutionSize.StatementsExecute program size context scope.evidence scope.source environment before
         statements innerContext inner after →
-      Kept plan guard before → Kept plan guard after ∧ KeptOutcome plan guard inner ∧
+      Kept plan closures guard before → Kept plan closures guard after ∧ KeptOutcome plan closures guard inner ∧
       Staging.Recursive.StatementsIn program registry false scope context environment before statements
         innerContext (control inner) after)
     {size : Nat} {context finalContext : SourceSemantics.Context} {environment : Dynamic.Environment}
     {before after : Dynamic.Heap} {outcome : Dynamic.ControlOutcome} (within : size ≤ bound)
     (head : SourceExecutionSize.StatementExecutes program size context scope.evidence scope.source environment
-      before id finalContext outcome after) (kept : Kept plan guard before) :
+      before id finalContext outcome after) (kept : Kept plan closures guard before) :
     finalContext = context ∧ ∃ inner, outcome = Dynamic.restoreControl environment inner ∧
-      Kept plan guard after ∧ KeptOutcome plan guard inner ∧
+      Kept plan closures guard after ∧ KeptOutcome plan closures guard inner ∧
       Staging.Recursive.Match program registry scope context environment before resolution
         ((control inner).restore environment) after := by
   cases head with
@@ -499,20 +503,20 @@ private theorem sequence {mode : Bool} {id : StatementId} {rest : List Statement
         middleContext (.fallthrough nextEnvironment) middle →
       Original program tailSize mode middleContext scope.evidence scope.source nextEnvironment middle rest finalContext
         outcome after →
-      Kept plan guard before → Kept plan guard after ∧ KeptOutcome plan guard outcome ∧
+      Kept plan closures guard before → Kept plan closures guard after ∧ KeptOutcome plan closures guard outcome ∧
       Staging.Recursive.StatementsIn program registry mode scope context environment before (id :: rest)
         finalContext (control outcome) after)
     (stop : ∀ {context environment before finalContext outcome after} {headSize : Nat}, headSize < size →
       SourceExecutionSize.StatementExecutes program headSize context scope.evidence scope.source environment before id
         finalContext outcome after →
       Dynamic.TerminalControl outcome →
-      Kept plan guard before → Kept plan guard after ∧ KeptOutcome plan guard outcome ∧
+      Kept plan closures guard before → Kept plan closures guard after ∧ KeptOutcome plan closures guard outcome ∧
       Staging.Recursive.StatementsIn program registry mode scope context environment before (id :: rest)
         finalContext (control outcome) after) :
     ∀ {context environment before finalContext outcome after},
       Original program size mode context scope.evidence scope.source environment before (id :: rest) finalContext
         outcome after →
-      Kept plan guard before → Kept plan guard after ∧ KeptOutcome plan guard outcome ∧
+      Kept plan closures guard before → Kept plan closures guard after ∧ KeptOutcome plan closures guard outcome ∧
       Staging.Recursive.StatementsIn program registry mode scope context environment before (id :: rest)
         finalContext (control outcome) after := by
   intro context environment before finalContext outcome after original
@@ -543,14 +547,14 @@ private theorem sequence {mode : Bool} {id : StatementId} {rest : List Statement
 admits is the staged evaluation of its keys, in order, given the lifting of
 `child` below the size. -/
 private theorem projections_values {child : ExpressionId → Prop} {bound : Nat}
-    (lift : ChildLifts program registry scope child bound plan guard) {context : SourceSemantics.Context}
+    (lift : ChildLifts program registry scope child bound plan closures guard) {context : SourceSemantics.Context}
     {environment : Dynamic.Environment} :
     ∀ {projections : List PlaceProjection},
     (∀ projection ∈ projections, ∃ key, projection = .index key ∧ child key) →
     ∀ {size : Nat} {before after : Dynamic.Heap} {evaluated : List Dynamic.EvaluatedProjection}, size ≤ bound →
       SourceExecutionSize.SourceProjectionsEvaluate program size context scope.evidence scope.source environment
         before projections evaluated after →
-      Kept plan guard before →
+      Kept plan closures guard before →
       ∃ values, Staging.Recursive.Expressions program registry scope context environment before
           (Staging.Recursive.ProjectedTarget.keys projections) (.values values) after ∧
         Staging.Recursive.ProjectedTarget.Values projections values evaluated := by
@@ -575,14 +579,14 @@ private theorem projections_values {child : ExpressionId → Prop} {bound : Nat}
 /-- The sized Source evaluation of a path of mapping indices whose keys `child`
 admits keeps the stored functions, and its keys are stored. -/
 private theorem projections_kept {child : ExpressionId → Prop} {bound : Nat}
-    (lift : ChildLifts program registry scope child bound plan guard) {context : SourceSemantics.Context}
+    (lift : ChildLifts program registry scope child bound plan closures guard) {context : SourceSemantics.Context}
     {environment : Dynamic.Environment} :
     ∀ {projections : List PlaceProjection},
     (∀ projection ∈ projections, ∃ key, projection = .index key ∧ child key) →
     ∀ {size : Nat} {before after : Dynamic.Heap} {evaluated : List Dynamic.EvaluatedProjection}, size ≤ bound →
       SourceExecutionSize.SourceProjectionsEvaluate program size context scope.evidence scope.source environment
         before projections evaluated after →
-      Kept plan guard before → Kept plan guard after ∧ KeptKeys plan guard evaluated := by
+      Kept plan closures guard before → Kept plan closures guard after ∧ KeptKeys plan closures guard evaluated := by
   intro projections
   induction projections with
   | nil =>
@@ -608,12 +612,12 @@ private theorem projections_kept {child : ExpressionId → Prop} {bound : Nat}
 `child` admits is the staged evaluation of its keys followed by its staged
 snapshot, given the lifting of `child` below the size. -/
 private theorem projected_target {child : ExpressionId → Prop} {bound : Nat}
-    (lift : ChildLifts program registry scope child bound plan guard) {context : SourceSemantics.Context}
+    (lift : ChildLifts program registry scope child bound plan closures guard) {context : SourceSemantics.Context}
     {environment : Dynamic.Environment} {place : PlaceResolution}
     (keys : ∀ projection ∈ place.projections, ∃ key, projection = .index key ∧ child key)
     {size : Nat} {before after : Dynamic.Heap} {target : Dynamic.ResolvedPlace} (within : size ≤ bound)
     (resolve : SourceExecutionSize.SourcePlaceResolves program size context scope.evidence scope.source environment
-      before place target after) (kept : Kept plan guard before) :
+      before place target after) (kept : Kept plan closures guard before) :
     ∃ values, Staging.Recursive.Expressions program registry scope context environment before
         (Staging.Recursive.ProjectedTarget.keys place.projections) (.values values) after ∧
       Staging.Recursive.ProjectedTarget.Snapshot environment before after place values target := by
@@ -627,13 +631,13 @@ private theorem projected_target {child : ExpressionId → Prop} {bound : Nat}
 /-- The sized Source resolution of a place through mapping indices whose keys
 `child` admits keeps the stored functions, and its keys are stored. -/
 private theorem target_kept {child : ExpressionId → Prop} {bound : Nat}
-    (lift : ChildLifts program registry scope child bound plan guard) {context : SourceSemantics.Context}
+    (lift : ChildLifts program registry scope child bound plan closures guard) {context : SourceSemantics.Context}
     {environment : Dynamic.Environment} {place : PlaceResolution}
     (keys : ∀ projection ∈ place.projections, ∃ key, projection = .index key ∧ child key)
     {size : Nat} {before after : Dynamic.Heap} {target : Dynamic.ResolvedPlace} (within : size ≤ bound)
     (resolve : SourceExecutionSize.SourcePlaceResolves program size context scope.evidence scope.source environment
-      before place target after) (kept : Kept plan guard before) :
-    Kept plan guard after ∧ KeptKeys plan guard target.projections := by
+      before place target after) (kept : Kept plan closures guard before) :
+    Kept plan closures guard after ∧ KeptKeys plan closures guard target.projections := by
   cases resolve with
   | intro _ _ evaluate =>
     simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within
@@ -645,12 +649,12 @@ admits and whose body lifts within the bound are the staged iterations, with
 the same outcome and heap. The loop falls through at its own bindings or
 returns. -/
 private theorem while_lift {child : ExpressionId → Prop} {bound : Nat}
-    (lift : ChildLifts program registry scope child bound plan guard) {condition : ExpressionId}
+    (lift : ChildLifts program registry scope child bound plan closures guard) {condition : ExpressionId}
     {body : List StatementId} (test : child condition)
     (inner : ∀ {size : Nat} {context environment before innerContext outcome after}, size ≤ bound →
       SourceExecutionSize.StatementsExecute program size context scope.evidence scope.source environment before body
         innerContext outcome after →
-      Kept plan guard before → Kept plan guard after ∧ KeptOutcome plan guard outcome ∧
+      Kept plan closures guard before → Kept plan closures guard after ∧ KeptOutcome plan closures guard outcome ∧
       Staging.Recursive.StatementsIn program registry false scope context environment before body innerContext
         (control outcome) after) :
     ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
@@ -658,7 +662,7 @@ private theorem while_lift {child : ExpressionId → Prop} {bound : Nat}
       size ≤ bound →
       SourceExecutionSize.WhileExecutes program size context scope.evidence scope.source environment before condition
         body loopContext outcome after →
-      Kept plan guard before → Kept plan guard after ∧ KeptOutcome plan guard outcome ∧
+      Kept plan closures guard before → Kept plan closures guard after ∧ KeptOutcome plan closures guard outcome ∧
       Staging.Recursive.While program registry scope context environment before condition body (control outcome)
           after ∧
         (outcome = .fallthrough environment ∨ ∃ value, outcome = .returned value) := by
@@ -703,14 +707,14 @@ private theorem while_lift {child : ExpressionId → Prop} {bound : Nat}
 bindings and heap, given the lifting of `child` within the bound. The vector
 keeps the signatures of its context. -/
 private theorem items_lift {child : ExpressionId → Prop} {bound : Nat}
-    (lift : ChildLifts program registry scope child bound plan guard) {items : List ForItemForm}
+    (lift : ChildLifts program registry scope child bound plan closures guard) {items : List ForItemForm}
     (shape : CellAwareInvocationAcceptedBodyShape.ItemsShape scope.source child items) :
     ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
       {before after : Dynamic.Heap} {finalContext : SourceSemantics.Context} {finalEnvironment : Dynamic.Environment},
       size ≤ bound →
       SourceExecutionSize.ForItemsExecute program size context scope.evidence scope.source environment before items
         finalContext finalEnvironment after →
-      Kept plan guard before → Kept plan guard after ∧
+      Kept plan closures guard before → Kept plan closures guard after ∧
       Staging.Recursive.ForItems program registry scope context environment before items finalContext
           (.done finalEnvironment) after ∧
         finalContext.signatures = context.signatures := by
@@ -825,12 +829,12 @@ whose body lifts within the bound and whose post header is supported are the
 staged iterations, with the same outcome and heap. The loop falls through at
 its own bindings or returns. -/
 private theorem for_lift {child : ExpressionId → Prop} {bound : Nat}
-    (lift : ChildLifts program registry scope child bound plan guard) {condition : ExpressionId}
+    (lift : ChildLifts program registry scope child bound plan closures guard) {condition : ExpressionId}
     {post : List ForItemForm} {body : List StatementId} (test : child condition)
     (inner : ∀ {size : Nat} {context environment before innerContext outcome after}, size ≤ bound →
       SourceExecutionSize.StatementsExecute program size context scope.evidence scope.source environment before body
         innerContext outcome after →
-      Kept plan guard before → Kept plan guard after ∧ KeptOutcome plan guard outcome ∧
+      Kept plan closures guard before → Kept plan closures guard after ∧ KeptOutcome plan closures guard outcome ∧
       Staging.Recursive.StatementsIn program registry false scope context environment before body innerContext
         (control outcome) after)
     (postShape : CellAwareInvocationAcceptedBodyShape.ItemsShape scope.source child post) :
@@ -839,7 +843,7 @@ private theorem for_lift {child : ExpressionId → Prop} {bound : Nat}
       size ≤ bound →
       SourceExecutionSize.ForLoopExecutes program size context scope.evidence scope.source environment before
         condition post body loopContext outcome after →
-      Kept plan guard before → Kept plan guard after ∧ KeptOutcome plan guard outcome ∧
+      Kept plan closures guard before → Kept plan closures guard after ∧ KeptOutcome plan closures guard outcome ∧
       Staging.Recursive.ForLoop program registry scope context environment before condition post body
           (control outcome) after ∧
         (outcome = .fallthrough environment ∨ ∃ value, outcome = .returned value) := by
@@ -888,14 +892,15 @@ execution with the same context, outcome and heap, given the lifting of its
 expressions below the size. It keeps the stored functions, and a returned value
 is stored. -/
 theorem statements (unique : NodeOccurrencesUnique scope.source) {child : ExpressionId → Prop} {bound : Nat}
-    (lift : ChildLifts program registry scope child bound plan guard) {mode : Bool} {statements : List StatementId}
+    (lift : ChildLifts program registry scope child bound plan closures guard) {mode : Bool}
+    {statements : List StatementId}
     (shape : Shape scope.source expected child mode statements) :
     ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
       {before after : Dynamic.Heap} {finalContext : SourceSemantics.Context} {outcome : Dynamic.ControlOutcome},
       size ≤ bound →
       Original program size mode context scope.evidence scope.source environment before statements finalContext
         outcome after →
-      Kept plan guard before → Kept plan guard after ∧ KeptOutcome plan guard outcome ∧
+      Kept plan closures guard before → Kept plan closures guard after ∧ KeptOutcome plan closures guard outcome ∧
       Staging.Recursive.StatementsIn program registry mode scope context environment before statements finalContext
         (control outcome) after := by
   induction shape with
@@ -1139,7 +1144,7 @@ theorem statements (unique : NodeOccurrencesUnique scope.source) {child : Expres
         innerSize ≤ bound →
         SourceExecutionSize.StatementsExecute program innerSize context scope.evidence scope.source environment before
           (if truth then thenBody else elseBody.getD []) innerContext inner after →
-        Kept plan guard before → Kept plan guard after ∧ KeptOutcome plan guard inner ∧
+        Kept plan closures guard before → Kept plan closures guard after ∧ KeptOutcome plan closures guard inner ∧
         Staging.Recursive.StatementsIn program registry false scope context environment before
           (if truth then thenBody else elseBody.getD []) innerContext (control inner) after := by
       intro truth innerSize context environment before innerContext inner after within executes
@@ -1184,7 +1189,7 @@ theorem statements (unique : NodeOccurrencesUnique scope.source) {child : Expres
         ∀ {innerSize : Nat} {context environment before innerContext inner after}, innerSize ≤ bound →
         SourceExecutionSize.StatementsExecute program innerSize context scope.evidence scope.source environment
           before statements innerContext inner after →
-        Kept plan guard before → Kept plan guard after ∧ KeptOutcome plan guard inner ∧
+        Kept plan closures guard before → Kept plan closures guard after ∧ KeptOutcome plan closures guard inner ∧
         Staging.Recursive.StatementsIn program registry false scope context environment before statements
           innerContext (control inner) after := by
       intro statements selected innerSize context environment before innerContext inner after within executes
@@ -1320,7 +1325,8 @@ value, and an uncoerced indirect call applies its callee's value as the staged
 rule does: the mode holds in a Source with one, so the value is a builtin or a
 named function at a planned instantiation with the empty dictionary, whose body
 the induction lifts and whose runtime contract the scope's guard frame accepts
-at the call's arity (`IndirectFacts`).
+at the call's arity, and not a closure, which the mode does not yet store
+(`IndirectFacts`).
 Inside one
 body, a nested site is lifted by induction on the site, over the sized
 derivations of its operands, branches, elements and arguments. The admitted
@@ -1385,7 +1391,8 @@ def Callees : Prop :=
 /-- Every admitted callee's original body derivation below a size is a staged
 execution in the registry scope of its global view, which keeps the stored
 functions of a mode. -/
-def BodiesLift (bound : Nat) (plan : SourceCompilationPlan.Plan) (guard : Prop) : Prop :=
+def BodiesLift (bound : Nat) (plan : SourceCompilationPlan.Plan) (closures : Dynamic.Closure → Prop) (guard : Prop) :
+    Prop :=
   ∀ {instantiation : DeclarationInstantiation} {bodyInstance : Dynamic.BodyInstance} {roots : List StatementId},
     called instantiation → Dynamic.FunctionInstantiates program instantiation bodyInstance →
     Dynamic.StatementRoots bodyInstance.source.roots roots →
@@ -1396,7 +1403,7 @@ def BodiesLift (bound : Nat) (plan : SourceCompilationPlan.Plan) (guard : Prop) 
         size < bound →
         SourceExecutionSize.FunctionStatementsExecute program size context [] bodyInstance.source environment before
           roots finalContext outcome after →
-        Kept plan guard before → Kept plan guard after ∧ KeptOutcome plan guard outcome ∧
+        Kept plan closures guard before → Kept plan closures guard after ∧ KeptOutcome plan closures guard outcome ∧
         Staging.Recursive.StatementsIn program registry true child context environment before roots finalContext
           (control outcome) after
 
@@ -1436,11 +1443,12 @@ def Aligned (plan : SourceCompilationPlan.Plan) (program : Program) : Prop :=
     contract.parameters.length = bodyInstance.source.inputs.length
 
 /-- The facts an indirect call of a scope's Source reads, asked only when the
-Source has one: the mode, the scope's frame and the alignment of the plan with
-the program. -/
-def IndirectFacts (plan : SourceCompilationPlan.Plan) (program : Program) (guard : Prop)
-    (scope : Staging.Recursive.Scope) : Prop :=
-  HasIndirect scope.source → guard ∧ Framed plan scope ∧ Aligned plan program
+Source has one: the mode, the scope's frame, the alignment of the plan with
+the program, and that the mode stores no closure, as the lifting does not yet
+apply one. -/
+def IndirectFacts (plan : SourceCompilationPlan.Plan) (program : Program) (closures : Dynamic.Closure → Prop)
+    (guard : Prop) (scope : Staging.Recursive.Scope) : Prop :=
+  HasIndirect scope.source → guard ∧ Framed plan scope ∧ Aligned plan program ∧ ∀ function, ¬ closures function
 
 /-- Every closure scope of the stages registry of a compilation is framed by its
 plan: it is the scope of a sidecar the plan prepares. -/
@@ -1517,7 +1525,7 @@ theorem Aligned.of_wellFormed {plan : SourceCompilationPlan.Plan} {program : Pro
           simpa [SourceCoreStageContracts.Sidecar.source, ← same, StructuralSubstitution.applyTypedSource] using lengths
 
 variable {program registry called}
-variable {plan : SourceCompilationPlan.Plan} {guard : Prop}
+variable {plan : SourceCompilationPlan.Plan} {closures : Dynamic.Closure → Prop} {guard : Prop}
 
 private theorem node_unique {scope : Staging.Recursive.Scope} (unique : NodeOccurrencesUnique scope.source)
     {id : ExpressionId} {left right : ExpressionNode} (first : ContainsExpression scope.source id left)
@@ -1561,8 +1569,8 @@ private theorem leaf_kept {form : ExpressionForm}
     {environment : Dynamic.Environment} {before after : Dynamic.Heap} {requirements : List RequirementId}
     {value : Dynamic.Value}
     (raw : SourceExecutionSize.ExpressionFormEvaluates program size context evidence source environment before form
-      requirements [] value after) (kept : Kept plan guard before) :
-    Kept plan guard after ∧ KeptValue plan guard value := by
+      requirements [] value after) (kept : Kept plan closures guard before) :
+    Kept plan closures guard after ∧ KeptValue plan closures guard value := by
   rcases leaf with atomic | ⟨_, _, rfl⟩
   · cases atomic with
     | unit =>
@@ -1588,8 +1596,8 @@ private theorem read_kept {scope : Staging.Recursive.Scope} (unique : NodeOccurr
     (form : node.form = .reference name (.local binder)) {size : Nat} {context : SourceSemantics.Context}
     {environment : Dynamic.Environment} {before after : Dynamic.Heap} {value : Dynamic.Value}
     (trace : SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment
-      before id value after) (kept : Kept plan guard before) :
-    Kept plan guard after ∧ KeptValue plan guard value := by
+      before id value after) (kept : Kept plan closures guard before) :
+    Kept plan closures guard after ∧ KeptValue plan closures guard value := by
   have contains := lookupExpression?_sound found
   cases trace with
   | intro traceFound raw path =>
@@ -1643,13 +1651,13 @@ private theorem arguments_value {scope : Staging.Recursive.Scope} {bound : Nat} 
       {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
       SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment before
         argument value after →
-      Kept plan guard before → Kept plan guard after ∧ KeptValue plan guard value ∧
+      Kept plan closures guard before → Kept plan closures guard after ∧ KeptValue plan closures guard value ∧
       Staging.Recursive.Expression program registry scope context environment before argument (.value value) after) →
     ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
       {before after : Dynamic.Heap} {values : List Dynamic.Value}, size ≤ bound →
       SourceExecutionSize.ExpressionsEvaluate program size context scope.evidence scope.source environment before ids
         values after →
-      Kept plan guard before → Kept plan guard after ∧ KeptValues plan guard values ∧
+      Kept plan closures guard before → Kept plan closures guard after ∧ KeptValues plan closures guard values ∧
       Staging.Recursive.Expressions program registry scope context environment before ids (.values values) after := by
   intro ids
   induction ids with
@@ -1688,20 +1696,20 @@ private theorem reference_value {named : SourceCoreGeneralFunctions.Function} {s
       {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
       SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment before
         site.base value after →
-      Kept plan guard before → Kept plan guard after ∧ KeptValue plan guard value ∧
+      Kept plan closures guard before → Kept plan closures guard after ∧ KeptValue plan closures guard value ∧
       Staging.Recursive.Expression program registry scope context environment before site.base (.value value) after)
     (second : ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
       {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
       SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment before
         site.subscript value after →
-      Kept plan guard before → Kept plan guard after ∧ KeptValue plan guard value ∧
+      Kept plan closures guard before → Kept plan closures guard after ∧ KeptValue plan closures guard value ∧
       Staging.Recursive.Expression program registry scope context environment before site.subscript (.value value)
         after) :
     ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
       {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
       SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment before
         reference value after →
-      Kept plan guard before → Kept plan guard after ∧ KeptValue plan guard value ∧
+      Kept plan closures guard before → Kept plan closures guard after ∧ KeptValue plan closures guard value ∧
       Staging.Recursive.Expression program registry scope context environment before reference (.value value) after := by
   intro size context environment before after value within trace
   intro kept
@@ -1725,11 +1733,12 @@ of the admitted callee bodies below a bound of its size and the facts its call
 reads. The mode holds, so the callee's value is stored: a builtin applies as
 the staged builtin, and a named function is at a planned instantiation with the
 empty dictionary, which `covers` admits, so its body lifts below the call, and
-the scope's guard frame accepts its runtime contract at the call's arity. -/
+the scope's guard frame accepts its runtime contract at the call's arity; the
+mode stores no closure. -/
 private theorem indirect_value {named : SourceCoreGeneralFunctions.Function} {scope : Staging.Recursive.Scope}
     (unique : NodeOccurrencesUnique scope.source) {bound : Nat}
-    (bodies : BodiesLift program registry called bound prepared.base.plan guard)
-    (indirect : IndirectFacts prepared.base.plan program guard scope)
+    (bodies : BodiesLift program registry called bound prepared.base.plan closures guard)
+    (indirect : IndirectFacts prepared.base.plan program closures guard scope)
     {id callee : ExpressionId} {ids : List ExpressionId} {metadata : IndirectCallResolution}
     (site : CellAwareInvocationAcceptedIndirectSites.IndirectSite prepared named scope.source id callee ids metadata)
     (covers : CellAwareInvocationAcceptedIndirectPremises.CoversPlan prepared.base.plan called)
@@ -1738,26 +1747,26 @@ private theorem indirect_value {named : SourceCoreGeneralFunctions.Function} {sc
       {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
       SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment before
         callee value after →
-      Kept prepared.base.plan guard before →
-      Kept prepared.base.plan guard after ∧ KeptValue prepared.base.plan guard value ∧
+      Kept prepared.base.plan closures guard before →
+      Kept prepared.base.plan closures guard after ∧ KeptValue prepared.base.plan closures guard value ∧
       Staging.Recursive.Expression program registry scope context environment before callee (.value value) after)
     (arguments : ∀ argument ∈ ids, ∀ {size : Nat} {context : SourceSemantics.Context}
       {environment : Dynamic.Environment} {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
       SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment before
         argument value after →
-      Kept prepared.base.plan guard before →
-      Kept prepared.base.plan guard after ∧ KeptValue prepared.base.plan guard value ∧
+      Kept prepared.base.plan closures guard before →
+      Kept prepared.base.plan closures guard after ∧ KeptValue prepared.base.plan closures guard value ∧
       Staging.Recursive.Expression program registry scope context environment before argument (.value value)
         after) :
     ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
       {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
       SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment before id
         value after →
-      Kept prepared.base.plan guard before →
-      Kept prepared.base.plan guard after ∧ KeptValue prepared.base.plan guard value ∧
+      Kept prepared.base.plan closures guard before →
+      Kept prepared.base.plan closures guard after ∧ KeptValue prepared.base.plan closures guard value ∧
       Staging.Recursive.Expression program registry scope context environment before id (.value value) after := by
   intro size context environment before after value within trace kept
-  obtain ⟨active, framed, aligned⟩ := indirect ⟨id, site.node, site.found, callee, ids, metadata, site.form⟩
+  obtain ⟨active, framed, aligned, noClosures⟩ := indirect ⟨id, site.node, site.found, callee, ids, metadata, site.form⟩
   have contains := lookupExpression?_sound site.found
   have occurrence : Staging.Recursive.Occurrence scope id (.call callee ids (.indirect metadata)) :=
     ⟨site.node, contains, site.form, site.requirements, site.coercions⟩
@@ -1824,7 +1833,9 @@ private theorem indirect_value {named : SourceCoreGeneralFunctions.Function} {sc
             exact .applied occurrence site.uncoerced lifted.2.2 accepted passed.2.2 sourceArity
               (.global instantiates covered rootsEq closure parameters allocate ran.2.2
                 (by rw [resultUnit]; exact .unit))
-      | closure | closureUnit => cases lifted.2.1 active
+      | closure | closureUnit =>
+        cases lifted.2.1 active with
+        | closure stored => exact absurd stored (noClosures _)
 
 /-- A sized value execution of a nested site is a staged execution with the
 same value and heap, given the lifting of the admitted callee bodies below a
@@ -1832,15 +1843,15 @@ bound of its size and, in a Source with an indirect call, the facts its calls
 read. It keeps the stored functions, and its value is stored. -/
 theorem nested_value {named : SourceCoreGeneralFunctions.Function} {scope : Staging.Recursive.Scope}
     (unique : NodeOccurrencesUnique scope.source) {bound : Nat}
-    (bodies : BodiesLift program registry called bound prepared.base.plan guard)
-    (indirect : IndirectFacts prepared.base.plan program guard scope)
+    (bodies : BodiesLift program registry called bound prepared.base.plan closures guard)
+    (indirect : IndirectFacts prepared.base.plan program closures guard scope)
     {id : ExpressionId} (nested : Nested prepared named scope.source called id) :
     ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
       {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
       SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment before id
         value after →
-      Kept prepared.base.plan guard before →
-      Kept prepared.base.plan guard after ∧ KeptValue prepared.base.plan guard value ∧
+      Kept prepared.base.plan closures guard before →
+      Kept prepared.base.plan closures guard after ∧ KeptValue prepared.base.plan closures guard value ∧
       Staging.Recursive.Expression program registry scope context environment before id (.value value) after := by
   induction nested with
   | literal site atomic =>
@@ -2272,23 +2283,26 @@ theorem nested_value {named : SourceCoreGeneralFunctions.Function} {scope : Stag
 the callee bodies below it and the facts the Source's indirect calls read. -/
 theorem nested_roots {named : SourceCoreGeneralFunctions.Function} {scope : Staging.Recursive.Scope}
     (unique : NodeOccurrencesUnique scope.source) {bound : Nat}
-    (bodies : BodiesLift program registry called bound prepared.base.plan guard)
-    (indirect : IndirectFacts prepared.base.plan program guard scope) :
-    ChildLifts program registry scope (Nested prepared named scope.source called) bound prepared.base.plan guard := by
+    (bodies : BodiesLift program registry called bound prepared.base.plan closures guard)
+    (indirect : IndirectFacts prepared.base.plan program closures guard scope) :
+    ChildLifts program registry scope (Nested prepared named scope.source called) bound prepared.base.plan closures
+      guard := by
   intro id nested size context environment before after value below trace
   exact nested_value prepared unique bodies indirect nested (Nat.le_of_lt below) trace
 
 /-- Every admitted callee's original body derivation is a staged execution at
 every size: one strong induction on the size across bodies, given, for a body
-with an indirect call, the mode, the frames of the registry's closure scopes
-and the alignment of the plan with the program. -/
+with an indirect call, the mode, the frames of the registry's closure scopes,
+the alignment of the plan with the program and that the mode stores no
+closure. -/
 theorem bodies (callees : Callees prepared program registry called)
     (indirect : ∀ {instantiation : DeclarationInstantiation} {bodyInstance : Dynamic.BodyInstance},
       called instantiation → Dynamic.FunctionInstantiates program instantiation bodyInstance →
       HasIndirect bodyInstance.source →
-      guard ∧ ClosuresFramed prepared.base.plan registry ∧ Aligned prepared.base.plan program)
+      guard ∧ ClosuresFramed prepared.base.plan registry ∧ Aligned prepared.base.plan program ∧
+        ∀ function, ¬ closures function)
     (bound : Nat) :
-    BodiesLift program registry called bound prepared.base.plan guard := by
+    BodiesLift program registry called bound prepared.base.plan closures guard := by
   induction bound using Nat.strongRecOn with
   | ind bound ih =>
     intro instantiation bodyInstance statements admitted instantiates rootsEq
@@ -2301,11 +2315,11 @@ theorem bodies (callees : Callees prepared program registry called)
     have childShape : Shape child.source expected (Nested prepared named child.source called) true statements := by
       rw [sourceEq]
       exact shape
-    have facts : IndirectFacts prepared.base.plan program guard child := fun indirectAt =>
+    have facts : IndirectFacts prepared.base.plan program closures guard child := fun indirectAt =>
       have read := indirect admitted instantiates (sourceEq ▸ indirectAt)
       ⟨read.1, read.2.1 closure, read.2.2⟩
     have lift : ChildLifts program registry child (Nested prepared named child.source called) size prepared.base.plan
-        guard :=
+        closures guard :=
       nested_roots prepared childUnique (ih size below) facts
     refine CellAwareInvocationAcceptedSizedLifting.statements childUnique lift childShape (Nat.le_refl size) ?_
     show SourceExecutionSize.FunctionStatementsExecute program size context child.evidence child.source environment
@@ -2317,8 +2331,9 @@ theorem bodies (callees : Callees prepared program registry called)
 are nested sites is a staged execution with the same context, outcome and
 heap, at any scope with the execution's Source and evidence, given the static
 receipts of the admitted callees and, in a family with an indirect call, the
-stored functions of its starting heap, the frames of its scope and of the
-registry's closure scopes and the alignment of the plan with the program. -/
+stored functions of its starting heap, which hold no closure, the frames of its
+scope and of the registry's closure scopes and the alignment of the plan with
+the program. -/
 theorem body {scope : Staging.Recursive.Scope} {source : TypedSource} {evidence : Dynamic.EvidenceEnvironment}
     (sourceEq : scope.source = source) (evidenceEq : scope.evidence = evidence)
     (unique : NodeOccurrencesUnique source) (callees : Callees prepared program registry called)
@@ -2329,7 +2344,7 @@ theorem body {scope : Staging.Recursive.Scope} {source : TypedSource} {evidence 
     (shape : Shape source expected (Nested prepared named source called) true statements)
     {context : SourceSemantics.Context} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
     {finalContext : SourceSemantics.Context} {outcome : Dynamic.ControlOutcome}
-    (kept : Kept prepared.base.plan (FamilyIndirect program called source) before)
+    (kept : Kept prepared.base.plan (fun _ => False) (FamilyIndirect program called source) before)
     (trace : Dynamic.FunctionStatementsExecute program context evidence source environment before statements
       finalContext outcome after) :
     ∃ size, Staging.Recursive.Size.Statements program registry size scope context environment before statements
@@ -2337,12 +2352,12 @@ theorem body {scope : Staging.Recursive.Scope} {source : TypedSource} {evidence 
   subst sourceEq evidenceEq
   obtain ⟨size, sized⟩ := SourceExecutionSize.FunctionStatementsExecute.has_size trace
   have lift : ChildLifts program registry scope (Nested prepared named scope.source called) size prepared.base.plan
-      (FamilyIndirect program called scope.source) :=
+      (fun _ => False) (FamilyIndirect program called scope.source) :=
     nested_roots prepared unique
       (bodies prepared callees (fun admitted instantiates indirect =>
         have family : FamilyIndirect program called scope.source := Or.inr ⟨_, _, admitted, instantiates, indirect⟩
-        ⟨family, closures family, aligned family⟩) size)
-      (fun indirect => ⟨Or.inl indirect, framed (Or.inl indirect), aligned (Or.inl indirect)⟩)
+        ⟨family, closures family, aligned family, fun _ none => none⟩) size)
+      (fun indirect => ⟨Or.inl indirect, framed (Or.inl indirect), aligned (Or.inl indirect), fun _ none => none⟩)
   exact Staging.Recursive.Size.Statements.of_trace
     (CellAwareInvocationAcceptedSizedLifting.statements unique lift shape (Nat.le_refl size) sized kept).2.2
 
@@ -2545,13 +2560,13 @@ variable {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared ch
 size, at contexts with the program's signatures, from heaps that keep the stored
 functions of a mode. -/
 def ChildFaultLifts (scope : Staging.Recursive.Scope) (child : ExpressionId → Prop) (bound : Nat)
-    (plan : SourceCompilationPlan.Plan) (guard : Prop) : Prop :=
+    (plan : SourceCompilationPlan.Plan) (closures : Dynamic.Closure → Prop) (guard : Prop) : Prop :=
   ∀ {id : ExpressionId}, child id → ∀ {size : Nat} {context : SourceSemantics.Context}
     {environment : Dynamic.Environment} {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault},
     size < bound → context.signatures = program.signatures → Expressible reason →
     SourceExecutionSize.ExpressionFaults program size context scope.evidence scope.source environment before id
       reason after →
-    Kept plan guard before →
+    Kept plan closures guard before →
     Staging.Recursive.Expression program registry scope context environment before id (.fault (.semantic reason)) after
 
 /-- The direct calls of every admitted callee's body have plain callees, and no
@@ -2565,7 +2580,8 @@ def CalleesFault : Prop :=
 below a size, at a context with the program's signatures and from a heap that
 keeps the stored functions of a mode, is a staged fault execution in the
 registry scope of its global view. -/
-def BodiesFaultLift (bound : Nat) (plan : SourceCompilationPlan.Plan) (guard : Prop) : Prop :=
+def BodiesFaultLift (bound : Nat) (plan : SourceCompilationPlan.Plan) (closures : Dynamic.Closure → Prop)
+    (guard : Prop) : Prop :=
   ∀ {instantiation : DeclarationInstantiation} {bodyInstance : Dynamic.BodyInstance} {roots : List StatementId},
     called instantiation → Dynamic.FunctionInstantiates program instantiation bodyInstance →
     Dynamic.StatementRoots bodyInstance.source.roots roots →
@@ -2576,12 +2592,12 @@ def BodiesFaultLift (bound : Nat) (plan : SourceCompilationPlan.Plan) (guard : P
         size < bound → context.signatures = program.signatures → Expressible reason →
         SourceExecutionSize.FunctionStatementsFault program size context [] bodyInstance.source environment before
           roots finalContext reason after →
-        Kept plan guard before →
+        Kept plan closures guard before →
         Staging.Recursive.StatementsIn program registry true child context environment before roots finalContext
           (.fault (.semantic reason)) after
 
 variable {program registry called}
-variable {plan : SourceCompilationPlan.Plan} {guard : Prop}
+variable {plan : SourceCompilationPlan.Plan} {closures : Dynamic.Closure → Prop} {guard : Prop}
 
 /-- The fault executions of argument lists whose elements lift. -/
 private theorem arguments_fault {scope : Staging.Recursive.Scope} {bound : Nat} :
@@ -2590,14 +2606,14 @@ private theorem arguments_fault {scope : Staging.Recursive.Scope} {bound : Nat} 
       {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
       SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment before
         argument value after →
-      Kept plan guard before → Kept plan guard after ∧ KeptValue plan guard value ∧
+      Kept plan closures guard before → Kept plan closures guard after ∧ KeptValue plan closures guard value ∧
       Staging.Recursive.Expression program registry scope context environment before argument (.value value) after) →
     (∀ argument ∈ ids, ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
       {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault}, size ≤ bound →
       context.signatures = program.signatures → Expressible reason →
       SourceExecutionSize.ExpressionFaults program size context scope.evidence scope.source environment before
         argument reason after →
-      Kept plan guard before →
+      Kept plan closures guard before →
       Staging.Recursive.Expression program registry scope context environment before argument
         (.fault (.semantic reason)) after) →
     ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
@@ -2605,7 +2621,7 @@ private theorem arguments_fault {scope : Staging.Recursive.Scope} {bound : Nat} 
       context.signatures = program.signatures → Expressible reason →
       SourceExecutionSize.ExpressionsFault program size context scope.evidence scope.source environment before ids
         reason after →
-      Kept plan guard before →
+      Kept plan closures guard before →
       Staging.Recursive.Expressions program registry scope context environment before ids
         (.fault (.semantic reason)) after := by
   intro ids
@@ -2643,13 +2659,13 @@ private theorem reference_fault {named : SourceCoreGeneralFunctions.Function} {s
       {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
       SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment before
         site.base value after →
-      Kept plan guard before → Kept plan guard after ∧ KeptValue plan guard value ∧
+      Kept plan closures guard before → Kept plan closures guard after ∧ KeptValue plan closures guard value ∧
       Staging.Recursive.Expression program registry scope context environment before site.base (.value value) after)
     (secondValue : ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
       {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
       SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment before
         site.subscript value after →
-      Kept plan guard before → Kept plan guard after ∧ KeptValue plan guard value ∧
+      Kept plan closures guard before → Kept plan closures guard after ∧ KeptValue plan closures guard value ∧
       Staging.Recursive.Expression program registry scope context environment before site.subscript (.value value)
         after)
     (firstFault : ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
@@ -2657,7 +2673,7 @@ private theorem reference_fault {named : SourceCoreGeneralFunctions.Function} {s
       context.signatures = program.signatures → Expressible reason →
       SourceExecutionSize.ExpressionFaults program size context scope.evidence scope.source environment before
         site.base reason after →
-      Kept plan guard before →
+      Kept plan closures guard before →
       Staging.Recursive.Expression program registry scope context environment before site.base
         (.fault (.semantic reason)) after)
     (secondFault : ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
@@ -2665,7 +2681,7 @@ private theorem reference_fault {named : SourceCoreGeneralFunctions.Function} {s
       context.signatures = program.signatures → Expressible reason →
       SourceExecutionSize.ExpressionFaults program size context scope.evidence scope.source environment before
         site.subscript reason after →
-      Kept plan guard before →
+      Kept plan closures guard before →
       Staging.Recursive.Expression program registry scope context environment before site.subscript
         (.fault (.semantic reason)) after) :
     ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
@@ -2673,7 +2689,7 @@ private theorem reference_fault {named : SourceCoreGeneralFunctions.Function} {s
       context.signatures = program.signatures → Expressible reason →
       SourceExecutionSize.ExpressionFaults program size context scope.evidence scope.source environment before
         reference reason after →
-      Kept plan guard before →
+      Kept plan closures guard before →
       Staging.Recursive.Expression program registry scope context environment before reference
         (.fault (.semantic reason)) after := by
   intro size context environment before after reason within signatures expressible trace
@@ -2711,21 +2727,21 @@ that the Source's direct calls have plain callees and the value and fault
 liftings of the admitted callee bodies below a bound of its size. -/
 theorem nested_fault {named : SourceCoreGeneralFunctions.Function} {scope : Staging.Recursive.Scope}
     (unique : NodeOccurrencesUnique scope.source) (plain : CalleesPlain scope.source) {bound : Nat}
-    (bodies : BodiesLift program registry called bound prepared.base.plan guard)
-    (faults : BodiesFaultLift program registry called bound prepared.base.plan guard)
+    (bodies : BodiesLift program registry called bound prepared.base.plan closures guard)
+    (faults : BodiesFaultLift program registry called bound prepared.base.plan closures guard)
     {id : ExpressionId} (nested : Nested prepared named scope.source called id) :
     ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
       {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault}, size ≤ bound →
       context.signatures = program.signatures → Expressible reason →
       SourceExecutionSize.ExpressionFaults program size context scope.evidence scope.source environment before id
         reason after →
-      Kept prepared.base.plan guard before →
+      Kept prepared.base.plan closures guard before →
       Staging.Recursive.Expression program registry scope context environment before id
         (.fault (.semantic reason)) after := by
   have nested_value {id : ExpressionId} (_ : Prepared checked) (_ : NodeOccurrencesUnique scope.source)
-      (bodies : BodiesLift program registry called bound prepared.base.plan guard)
+      (bodies : BodiesLift program registry called bound prepared.base.plan closures guard)
       (nested : Nested prepared named scope.source called id) :=
-    @CellAwareInvocationAcceptedCallLifting.nested_value _ prepared _ _ _ _ _ _ unique _ bodies
+    @CellAwareInvocationAcceptedCallLifting.nested_value _ prepared _ _ _ _ _ _ _ unique _ bodies
       (fun indirect => (plain.no_indirect indirect).elim) _ nested
   induction nested with
   | literal site atomic =>
@@ -2975,8 +2991,8 @@ theorem nested_fault {named : SourceCoreGeneralFunctions.Function} {scope : Stag
         {environment : Dynamic.Environment} {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
         SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment
           before other value after →
-        Kept prepared.base.plan guard before → Kept prepared.base.plan guard after ∧
-          KeptValue prepared.base.plan guard value ∧
+        Kept prepared.base.plan closures guard before → Kept prepared.base.plan closures guard after ∧
+          KeptValue prepared.base.plan closures guard value ∧
         Staging.Recursive.Expression program registry scope context environment before other (.value value)
           after := by
       intro other member
@@ -3070,8 +3086,8 @@ theorem nested_fault {named : SourceCoreGeneralFunctions.Function} {scope : Stag
         {environment : Dynamic.Environment} {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
         SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment
           before other value after →
-        Kept prepared.base.plan guard before → Kept prepared.base.plan guard after ∧
-          KeptValue prepared.base.plan guard value ∧
+        Kept prepared.base.plan closures guard before → Kept prepared.base.plan closures guard after ∧
+          KeptValue prepared.base.plan closures guard value ∧
         Staging.Recursive.Expression program registry scope context environment before other (.value value)
           after :=
       fun other member => nested_value prepared unique bodies (argumentsNested other member)
@@ -3102,8 +3118,8 @@ theorem nested_fault {named : SourceCoreGeneralFunctions.Function} {scope : Stag
         {environment : Dynamic.Environment} {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
         SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment
           before other value after →
-        Kept prepared.base.plan guard before → Kept prepared.base.plan guard after ∧
-          KeptValue prepared.base.plan guard value ∧
+        Kept prepared.base.plan closures guard before → Kept prepared.base.plan closures guard after ∧
+          KeptValue prepared.base.plan closures guard value ∧
         Staging.Recursive.Expression program registry scope context environment before other (.value value)
           after :=
       fun other member => nested_value prepared unique bodies (elementsNested other member)
@@ -3125,8 +3141,8 @@ theorem nested_fault {named : SourceCoreGeneralFunctions.Function} {scope : Stag
         {environment : Dynamic.Environment} {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
         SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment
           before other value after →
-        Kept prepared.base.plan guard before → Kept prepared.base.plan guard after ∧
-          KeptValue prepared.base.plan guard value ∧
+        Kept prepared.base.plan closures guard before → Kept prepared.base.plan closures guard after ∧
+          KeptValue prepared.base.plan closures guard value ∧
         Staging.Recursive.Expression program registry scope context environment before other (.value value)
           after :=
       fun other member => nested_value prepared unique bodies (argumentsNested other member)
@@ -3150,8 +3166,8 @@ theorem nested_fault {named : SourceCoreGeneralFunctions.Function} {scope : Stag
         {value : Dynamic.Value}, size ≤ bound →
         SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment
           before other value after →
-        Kept prepared.base.plan guard before → Kept prepared.base.plan guard after ∧
-          KeptValue prepared.base.plan guard value ∧
+        Kept prepared.base.plan closures guard before → Kept prepared.base.plan closures guard after ∧
+          KeptValue prepared.base.plan closures guard value ∧
         Staging.Recursive.Expression program registry scope context environment before other (.value value)
           after :=
       fun other member => nested_value prepared unique bodies (childrenNested other member)
@@ -3336,10 +3352,10 @@ Source's direct calls have plain callees and the value and fault liftings of
 the callee bodies below it. -/
 theorem nested_fault_roots {named : SourceCoreGeneralFunctions.Function} {scope : Staging.Recursive.Scope}
     (unique : NodeOccurrencesUnique scope.source) (plain : CalleesPlain scope.source) {bound : Nat}
-    (bodies : BodiesLift program registry called bound prepared.base.plan guard)
-    (faults : BodiesFaultLift program registry called bound prepared.base.plan guard) :
+    (bodies : BodiesLift program registry called bound prepared.base.plan closures guard)
+    (faults : BodiesFaultLift program registry called bound prepared.base.plan closures guard) :
     ChildFaultLifts program registry scope (Nested prepared named scope.source called) bound prepared.base.plan
-      guard := by
+      closures guard := by
   intro id nested size context environment before after reason below signatures expressible trace
   exact nested_fault prepared unique plain bodies faults nested (Nat.le_of_lt below) signatures expressible trace
 
@@ -3626,7 +3642,8 @@ end Inversion
 
 variable {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked) {program : Program}
   {registry : Staging.Recursive.Registry} {called : DeclarationInstantiation → Prop}
-  {scope : Staging.Recursive.Scope} {expected : TypeSystem.Ty} {plan : SourceCompilationPlan.Plan} {guard : Prop}
+  {scope : Staging.Recursive.Scope} {expected : TypeSystem.Ty} {plan : SourceCompilationPlan.Plan}
+  {closures : Dynamic.Closure → Prop} {guard : Prop}
 
 /-- An assignment whose bare target faults: its root is unbound or dangling. -/
 private theorem bare_target_fault {mode : Bool} {id : StatementId} {rest : List StatementId} {node : StatementNode}
@@ -3702,14 +3719,14 @@ fault liftings of `child` within the bound: the root's, through the bare
 leading place, a root not yet initialized, the key's from the same heap, a key
 that is not a word, and `0x32` from the array's length on. -/
 private theorem element_fault {child : ExpressionId → Prop} {bound : Nat}
-    (lift : ChildLifts program registry scope child bound plan guard)
-    (faultLift : ChildFaultLifts program registry scope child bound plan guard) {place : PlaceResolution}
+    (lift : ChildLifts program registry scope child bound plan closures guard)
+    (faultLift : ChildFaultLifts program registry scope child bound plan closures guard) {place : PlaceResolution}
     {key : ExpressionId} (single : place.projections = [.element key]) (admitted : child key) {size : Nat}
     {context : SourceSemantics.Context} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
     {reason : Dynamic.SemanticFault} (within : size ≤ bound)
     (signatures : context.signatures = program.signatures) (expressible : Expressible reason)
     (failed : SourceExecutionSize.SourcePlaceFaults program size context scope.evidence scope.source environment
-      before place reason after) (kept : Kept plan guard before) :
+      before place reason after) (kept : Kept plan closures guard before) :
     Staging.Recursive.ElementTarget program registry scope context environment before place
       (.fault (.semantic reason)) after := by
   have projectionsEq : place.projections = [] ++ [.element key] := single
@@ -3761,8 +3778,9 @@ private theorem element_fault {child : ExpressionId → Prop} {bound : Nat}
 is a staged fault of its keys, given the value and fault liftings of `child`
 below the size. -/
 private theorem projections_fault {child : ExpressionId → Prop} {bound : Nat}
-    (lift : ChildLifts program registry scope child bound plan guard)
-    (faultLift : ChildFaultLifts program registry scope child bound plan guard) {context : SourceSemantics.Context}
+    (lift : ChildLifts program registry scope child bound plan closures guard)
+    (faultLift : ChildFaultLifts program registry scope child bound plan closures guard)
+    {context : SourceSemantics.Context}
     {environment : Dynamic.Environment} :
     ∀ {projections : List PlaceProjection},
     (∀ projection ∈ projections, ∃ key, projection = .index key ∧ child key) →
@@ -3770,7 +3788,7 @@ private theorem projections_fault {child : ExpressionId → Prop} {bound : Nat}
       context.signatures = program.signatures → Expressible reason →
       SourceExecutionSize.SourceProjectionsFault program size context scope.evidence scope.source environment
         before projections reason after →
-      Kept plan guard before →
+      Kept plan closures guard before →
       Staging.Recursive.Expressions program registry scope context environment before
         (Staging.Recursive.ProjectedTarget.keys projections) (.fault (.semantic reason)) after := by
   intro projections
@@ -3833,20 +3851,20 @@ private theorem sequence_fault {mode : Bool} {id : StatementId} {rest : List Sta
         middleContext (.fallthrough nextEnvironment) middle →
       FaultOriginal program tailSize mode middleContext scope.evidence scope.source nextEnvironment middle rest
         finalContext reason after →
-      Kept plan guard before →
+      Kept plan closures guard before →
       Staging.Recursive.StatementsIn program registry mode scope context environment before (id :: rest)
         finalContext (.fault (.semantic reason)) after)
     (stop : ∀ {context environment before after} {headSize : Nat}, headSize < size →
       context.signatures = program.signatures →
       SourceExecutionSize.StatementFaults program headSize context scope.evidence scope.source environment before id
         reason after →
-      Kept plan guard before →
+      Kept plan closures guard before →
       Staging.Recursive.StatementsIn program registry mode scope context environment before (id :: rest)
         context (.fault (.semantic reason)) after) :
     ∀ {context environment before finalContext after}, context.signatures = program.signatures →
       FaultOriginal program size mode context scope.evidence scope.source environment before (id :: rest)
         finalContext reason after →
-      Kept plan guard before →
+      Kept plan closures guard before →
       Staging.Recursive.StatementsIn program registry mode scope context environment before (id :: rest)
         finalContext (.fault (.semantic reason)) after := by
   intro context environment before finalContext after signatures original
@@ -3874,20 +3892,20 @@ private theorem sequence_fault {mode : Bool} {id : StatementId} {rest : List Sta
 whose body lifts within the bound, with an expressible reason at a context with
 the program's signatures, is a staged fault of the loop with the same heap. -/
 private theorem while_fault_lift {child : ExpressionId → Prop} {bound : Nat}
-    (lift : ChildLifts program registry scope child bound plan guard)
-    (faultLift : ChildFaultLifts program registry scope child bound plan guard) {condition : ExpressionId}
+    (lift : ChildLifts program registry scope child bound plan closures guard)
+    (faultLift : ChildFaultLifts program registry scope child bound plan closures guard) {condition : ExpressionId}
     {body : List StatementId} (test : child condition)
     (inner : ∀ {size : Nat} {context environment before innerContext outcome after}, size ≤ bound →
       SourceExecutionSize.StatementsExecute program size context scope.evidence scope.source environment before body
         innerContext outcome after →
-      Kept plan guard before → Kept plan guard after ∧ KeptOutcome plan guard outcome ∧
+      Kept plan closures guard before → Kept plan closures guard after ∧ KeptOutcome plan closures guard outcome ∧
       Staging.Recursive.StatementsIn program registry false scope context environment before body innerContext
         (CellAwareInvocationAcceptedStatementLifting.control outcome) after)
     (innerFault : ∀ {size : Nat} {context environment before innerContext after} {reason : Dynamic.SemanticFault},
       size ≤ bound → context.signatures = program.signatures → Expressible reason →
       SourceExecutionSize.StatementsFault program size context scope.evidence scope.source environment before body
         innerContext reason after →
-      Kept plan guard before →
+      Kept plan closures guard before →
       Staging.Recursive.StatementsIn program registry false scope context environment before body innerContext
         (.fault (.semantic reason)) after) :
     ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
@@ -3895,7 +3913,7 @@ private theorem while_fault_lift {child : ExpressionId → Prop} {bound : Nat}
       size ≤ bound → context.signatures = program.signatures → Expressible reason →
       SourceExecutionSize.WhileFaults program size context scope.evidence scope.source environment before condition
         body reason after →
-      Kept plan guard before →
+      Kept plan closures guard before →
       Staging.Recursive.While program registry scope context environment before condition body
         (.fault (.semantic reason)) after := by
   intro size
@@ -3971,15 +3989,15 @@ private theorem items_bare_target_fault {assignment : AssignmentResolution} {ope
 signatures, is a staged fault of the vector with the same heap, given the value
 and fault liftings of `child` within the bound. -/
 private theorem items_fault_lift {child : ExpressionId → Prop} {bound : Nat}
-    (lift : ChildLifts program registry scope child bound plan guard)
-    (faultLift : ChildFaultLifts program registry scope child bound plan guard) {items : List ForItemForm}
+    (lift : ChildLifts program registry scope child bound plan closures guard)
+    (faultLift : ChildFaultLifts program registry scope child bound plan closures guard) {items : List ForItemForm}
     (shape : CellAwareInvocationAcceptedBodyShape.ItemsShape scope.source child items) :
     ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
       {before after : Dynamic.Heap} {failedContext : SourceSemantics.Context} {reason : Dynamic.SemanticFault},
       size ≤ bound → context.signatures = program.signatures → Expressible reason →
       SourceExecutionSize.ForItemsFault program size context scope.evidence scope.source environment before items
         failedContext reason after →
-      Kept plan guard before →
+      Kept plan closures guard before →
       Staging.Recursive.ForItems program registry scope context environment before items failedContext
         (.fault (.semantic reason)) after := by
   induction shape with
@@ -4265,20 +4283,20 @@ whose body lifts within the bound and whose post header is supported, with an
 expressible reason at a context with the program's signatures, is a staged
 fault of the loop with the same heap. -/
 private theorem for_fault_lift {child : ExpressionId → Prop} {bound : Nat}
-    (lift : ChildLifts program registry scope child bound plan guard)
-    (faultLift : ChildFaultLifts program registry scope child bound plan guard) {condition : ExpressionId}
+    (lift : ChildLifts program registry scope child bound plan closures guard)
+    (faultLift : ChildFaultLifts program registry scope child bound plan closures guard) {condition : ExpressionId}
     {post : List ForItemForm} {body : List StatementId} (test : child condition)
     (inner : ∀ {size : Nat} {context environment before innerContext outcome after}, size ≤ bound →
       SourceExecutionSize.StatementsExecute program size context scope.evidence scope.source environment before body
         innerContext outcome after →
-      Kept plan guard before → Kept plan guard after ∧ KeptOutcome plan guard outcome ∧
+      Kept plan closures guard before → Kept plan closures guard after ∧ KeptOutcome plan closures guard outcome ∧
       Staging.Recursive.StatementsIn program registry false scope context environment before body innerContext
         (CellAwareInvocationAcceptedStatementLifting.control outcome) after)
     (innerFault : ∀ {size : Nat} {context environment before innerContext after} {reason : Dynamic.SemanticFault},
       size ≤ bound → context.signatures = program.signatures → Expressible reason →
       SourceExecutionSize.StatementsFault program size context scope.evidence scope.source environment before body
         innerContext reason after →
-      Kept plan guard before →
+      Kept plan closures guard before →
       Staging.Recursive.StatementsIn program registry false scope context environment before body innerContext
         (.fault (.semantic reason)) after)
     (postShape : CellAwareInvocationAcceptedBodyShape.ItemsShape scope.source child post) :
@@ -4287,7 +4305,7 @@ private theorem for_fault_lift {child : ExpressionId → Prop} {bound : Nat}
       size ≤ bound → context.signatures = program.signatures → Expressible reason →
       SourceExecutionSize.ForLoopFaults program size context scope.evidence scope.source environment before
         condition post body reason after →
-      Kept plan guard before →
+      Kept plan closures guard before →
       Staging.Recursive.ForLoop program registry scope context environment before condition post body
         (.fault (.semantic reason)) after := by
   intro size
@@ -4344,8 +4362,8 @@ private theorem for_fault_lift {child : ExpressionId → Prop} {bound : Nat}
 within the bound, with an expressible reason at a context with the program's signatures, is a staged fault of
 the match with the same heap: a fault of its scrutinee, an invalid pattern, or a fault of its selected body. -/
 private theorem match_fault {child : ExpressionId → Prop} {bound : Nat} (unique : NodeOccurrencesUnique scope.source)
-    (lift : ChildLifts program registry scope child bound plan guard)
-    (faultLift : ChildFaultLifts program registry scope child bound plan guard) {id : StatementId}
+    (lift : ChildLifts program registry scope child bound plan closures guard)
+    (faultLift : ChildFaultLifts program registry scope child bound plan closures guard) {id : StatementId}
     {node : StatementNode} (found : scope.source.lookupStatement? id = some node) {resolution : MatchResolution}
     (form : node.form = .matchWith resolution) (scrutinee : child resolution.scrutinee)
     {reason : Dynamic.SemanticFault}
@@ -4355,14 +4373,14 @@ private theorem match_fault {child : ExpressionId → Prop} {bound : Nat} (uniqu
       context.signatures = program.signatures →
       SourceExecutionSize.StatementsFault program size context scope.evidence scope.source environment before
         statements innerContext reason after →
-      Kept plan guard before →
+      Kept plan closures guard before →
       Staging.Recursive.StatementsIn program registry false scope context environment before statements
         innerContext (.fault (.semantic reason)) after)
     {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
     {before after : Dynamic.Heap} (within : size ≤ bound) (signatures : context.signatures = program.signatures)
     (expressible : Expressible reason)
     (fault : SourceExecutionSize.StatementFaults program size context scope.evidence scope.source environment
-      before id reason after) (kept : Kept plan guard before) :
+      before id reason after) (kept : Kept plan closures guard before) :
     Staging.Recursive.Match program registry scope context environment before resolution
       (.fault (.semantic reason)) after := by
   cases fault with
@@ -4419,15 +4437,15 @@ reason, at a context with the program's signatures and from a heap that keeps
 the stored functions, is a staged fault execution with the same context, reason
 and heap, given the value and fault liftings of its expressions below the size. -/
 theorem statements_fault (unique : NodeOccurrencesUnique scope.source) {child : ExpressionId → Prop} {bound : Nat}
-    (lift : ChildLifts program registry scope child bound plan guard)
-    (faultLift : ChildFaultLifts program registry scope child bound plan guard) {mode : Bool}
+    (lift : ChildLifts program registry scope child bound plan closures guard)
+    (faultLift : ChildFaultLifts program registry scope child bound plan closures guard) {mode : Bool}
     {statements : List StatementId} (shape : Shape scope.source expected child mode statements) :
     ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
       {before after : Dynamic.Heap} {finalContext : SourceSemantics.Context} {reason : Dynamic.SemanticFault},
       size ≤ bound → context.signatures = program.signatures → Expressible reason →
       FaultOriginal program size mode context scope.evidence scope.source environment before statements finalContext
         reason after →
-      Kept plan guard before →
+      Kept plan closures guard before →
       Staging.Recursive.StatementsIn program registry mode scope context environment before statements finalContext
         (.fault (.semantic reason)) after := by
   induction shape with
@@ -4845,7 +4863,7 @@ theorem statements_fault (unique : NodeOccurrencesUnique scope.source) {child : 
         innerSize ≤ bound →
         SourceExecutionSize.StatementsExecute program innerSize context scope.evidence scope.source environment before
           (if truth then thenBody else elseBody.getD []) innerContext inner after →
-        Kept plan guard before → Kept plan guard after ∧ KeptOutcome plan guard inner ∧
+        Kept plan closures guard before → Kept plan closures guard after ∧ KeptOutcome plan closures guard inner ∧
         Staging.Recursive.StatementsIn program registry false scope context environment before
           (if truth then thenBody else elseBody.getD []) innerContext
           (CellAwareInvocationAcceptedStatementLifting.control inner) after := by
@@ -4857,7 +4875,7 @@ theorem statements_fault (unique : NodeOccurrencesUnique scope.source) {child : 
         innerSize ≤ bound → context.signatures = program.signatures →
         SourceExecutionSize.StatementsFault program innerSize context scope.evidence scope.source environment before
           (if truth then thenBody else elseBody.getD []) innerContext reason after →
-        Kept plan guard before →
+        Kept plan closures guard before →
         Staging.Recursive.StatementsIn program registry false scope context environment before
           (if truth then thenBody else elseBody.getD []) innerContext (.fault (.semantic reason)) after := by
       intro truth innerSize context environment before innerContext after within signatures failed
@@ -4895,7 +4913,7 @@ theorem statements_fault (unique : NodeOccurrencesUnique scope.source) {child : 
         ∀ {innerSize : Nat} {context environment before innerContext inner after}, innerSize ≤ bound →
         SourceExecutionSize.StatementsExecute program innerSize context scope.evidence scope.source environment
           before statements innerContext inner after →
-        Kept plan guard before → Kept plan guard after ∧ KeptOutcome plan guard inner ∧
+        Kept plan closures guard before → Kept plan closures guard after ∧ KeptOutcome plan closures guard inner ∧
         Staging.Recursive.StatementsIn program registry false scope context environment before statements
           innerContext (CellAwareInvocationAcceptedStatementLifting.control inner) after := by
       intro statements selected innerSize context environment before innerContext inner after within executes
@@ -4909,7 +4927,7 @@ theorem statements_fault (unique : NodeOccurrencesUnique scope.source) {child : 
         context.signatures = program.signatures →
         SourceExecutionSize.StatementsFault program innerSize context scope.evidence scope.source environment
           before statements innerContext reason after →
-        Kept plan guard before →
+        Kept plan closures guard before →
         Staging.Recursive.StatementsIn program registry false scope context environment before statements
           innerContext (.fault (.semantic reason)) after := by
       intro statements selected innerSize context environment before innerContext after within signatures failed
@@ -5028,7 +5046,7 @@ at every size: the strong induction on the size across bodies that lifts
 their values, given that their direct calls have plain callees. -/
 theorem bodies_fault (callees : Callees prepared program registry called)
     (plain : CalleesFault program called) (bound : Nat) :
-    BodiesFaultLift program registry called bound prepared.base.plan guard := by
+    BodiesFaultLift program registry called bound prepared.base.plan closures guard := by
   induction bound using Nat.strongRecOn with
   | ind bound ih =>
     intro instantiation bodyInstance statements admitted instantiates rootsEq
@@ -5042,7 +5060,7 @@ theorem bodies_fault (callees : Callees prepared program registry called)
     have childShape : Shape child.source expected (Nested prepared named child.source called) true statements := by
       rw [sourceEq]
       exact shape
-    have values : BodiesLift program registry called size prepared.base.plan guard :=
+    have values : BodiesLift program registry called size prepared.base.plan closures guard :=
       CellAwareInvocationAcceptedCallLifting.bodies prepared callees
         (fun admitted instantiates indirect => ((plain admitted instantiates).no_indirect indirect).elim) size
     refine statements_fault childUnique
@@ -5071,14 +5089,14 @@ theorem body_fault {scope : Staging.Recursive.Scope} {source : TypedSource} {evi
     {context : SourceSemantics.Context} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
     {finalContext : SourceSemantics.Context} {reason : Dynamic.SemanticFault}
     (signatures : context.signatures = program.signatures) (expressible : Expressible reason)
-    (kept : Kept prepared.base.plan (FamilyIndirect program called source) before)
+    (kept : Kept prepared.base.plan closures (FamilyIndirect program called source) before)
     (trace : Dynamic.FunctionStatementsFault program context evidence source environment before statements
       finalContext reason after) :
     ∃ size, Staging.Recursive.Size.Statements program registry size scope context environment before statements
       finalContext (.fault (.semantic reason)) after := by
   subst sourceEq evidenceEq
   obtain ⟨size, sized⟩ := SourceExecutionSize.FunctionStatementsFault.has_size trace
-  have values : BodiesLift program registry called size prepared.base.plan
+  have values : BodiesLift program registry called size prepared.base.plan closures
       (FamilyIndirect program called scope.source) :=
     CellAwareInvocationAcceptedCallLifting.bodies prepared callees
       (fun admitted instantiates indirect => ((calleesPlain admitted instantiates).no_indirect indirect).elim) size

@@ -5249,7 +5249,7 @@ theorem accepted_failure (selected : SelectedInventory whole row) {called : Decl
       CellAwareInvocationAcceptedCallFamily.Row (headers := headers whole.rows) called header :=
     fun _header member _ => Classical.choice (whole.family_row calls support entryMember member)
   obtain ⟨size, trace⟩ := CellAwareInvocationAcceptedFaultLifting.body_fault fixture.recipe.compiled.indexed
-    (registry := SelectedCompilationPhysicalProgramSupport.stages fixture.recipe.compiled)
+    (registry := SelectedCompilationPhysicalProgramSupport.stages fixture.recipe.compiled) (closures := fun _ => False)
     ((SelectedCompilationPhysicalProgramSupport.stages fixture.recipe.compiled).source bodySelected)
     ((SelectedCompilationPhysicalProgramSupport.stages fixture.recipe.compiled).evidence bodySelected)
     selected.packet.header.unique (selected.source_eq ▸ plain) (whole.callees calls wellFormed admitted)
