@@ -1055,13 +1055,53 @@ class HullRunnerTests(unittest.TestCase):
             self.assertEqual(fixtures.run_hull_sequence(args, fixture, exports, self.chain, deploy, entries, time.monotonic() - 1),
                              [fixtures.BUDGET] * 5)
 
+    @contextlib.contextmanager
+    def limits_from_each_stall(self, stalls: Path):
+        """Count each runner's limit from the moment it stalls, which it records in `stalls`, not from its launch: on a
+        loaded machine the interpreter's start alone can outlast a short limit, and a runner would be stopped before it
+        logged or reported anything. The harness is unchanged; only its `time` is seen through this clock, one runner
+        at a time, and the clock stands still for a minute at most."""
+        run_process = fixtures.run_process
+
+        def recorded() -> int:
+            return len(stalls.read_text().splitlines()) if stalls.exists() else 0
+
+        class Clock:
+            def __init__(self, monotonic):
+                self.monotonic = monotonic
+
+            def __getattr__(self, name):
+                return getattr(time, name)
+
+        def run_from_stall(command, timeout, *rest, **options):
+            expected, launched, stalled = recorded() + 1, time.monotonic(), None
+
+            def monotonic() -> float:
+                nonlocal stalled
+                if stalled is None:
+                    if recorded() < expected and time.monotonic() - launched < 60:
+                        return launched
+                    stalled = time.monotonic()
+                return launched + (time.monotonic() - stalled)
+
+            with patch.object(fixtures, "time", Clock(monotonic)):
+                return run_process(command, timeout, *rest, **options)
+
+        with patch.object(fixtures, "run_process", run_from_stall):
+            yield
+
     def test_a_buffering_runner_that_reports_nothing_is_resumed_entry_by_entry(self):
         with tempfile.TemporaryDirectory() as directory:
-            args, exports = self.prepare(Path(directory), self.ECHO.replace(", flush=True", ""))
+            # The runner records each stall, flushed, before it sleeps.
+            body = self.ECHO.replace(", flush=True", "").replace(
+                "time.sleep(60)", "print('stalled', file=open(sys.argv[0] + '.stalls', 'a', buffering=1)); time.sleep(60)")
+            args, exports = self.prepare(Path(directory), body)
             fixture = {"mode": "raw", "contract": "C", "fuel": 10, "availableGas": None}
             entries = [step(calldata="0x01"), {**step(calldata="0xdead"), "persist": False}, step(calldata="0x02")]
             args.hull_timeout = 1
-            observed = fixtures.run_hull(args, fixture, exports, self.chain, step(kind="deploy", index=0), entries)
+            # A limit runs only while a runner stalls, so the machine's load cannot use it up before then.
+            with self.limits_from_each_stall(Path(str(args.hull_runner) + ".stalls")):
+                observed = fixtures.run_hull(args, fixture, exports, self.chain, step(kind="deploy", index=0), entries)
             self.assertEqual([item["status"] for item in observed], ["returned", "returned", "timeout", "returned"])
             invocations = [json.loads(line) for line in Path(str(args.hull_runner) + ".log").read_text().splitlines()]
             self.assertEqual(invocations, [["0x01", "0xdead", "0x02"], [], ["0x01"], ["0x01", "0xdead", "0x02"],
