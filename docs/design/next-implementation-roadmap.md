@@ -273,13 +273,17 @@ below come from running upstream's own test programs through Lean's native front
     its own and imported names;
   - a local annotated `comptime<T>` holds a `T` whose binder Lean's own stage analysis must
     stage comptime, so a runtime initializer, a later assignment and a missing one are refused
-    as upstream refuses them (`SC0241`, `SC0411`, `SC0409`).
+    as upstream refuses them (`SC0241`, `SC0411`, `SC0409`);
+  - a requirement's open trait argument is fixed from the one given, ordinary impl or default
+    whose main type matches its subject, before a literal defaults and after; a program's own
+    `Coerce` keeps its target for Lean's coercion search;
+  - an impl method's results are compared with its trait method's as one tuple, so
+    `returns (a, b)` and `returns ((a, b))` are one result (`SC0221`).
 
   To come, each as a checker rule:
   - `.true` or `.false` as a call's argument, a tuple's element or an operand of `&&` or
     `||`, where Lean's inference passes no expected type yet;
-  - an unannotated lambda's result, and `returns (a, b)` for a trait's one tuple result;
-  - a weak trait argument is taken from the one implementation that fixes it.
+  - an unannotated lambda's result.
 
   `case .true` and `case .false` wait for a case of the Source's pattern relation.
 - **Lean keeps its own rule:**
@@ -314,7 +318,9 @@ below come from running upstream's own test programs through Lean's native front
   statements to fix and refuses it where nothing does (`SC0299`), and Lean generalizes it, so
   a type that nothing fixes is refused only where specialization reaches it. And an
   initializer that Lean's staging defers, an ordinary function's call or a lambda, is refused
-  at a comptime local, where upstream evaluates it while staged.
+  at a comptime local, where upstream evaluates it while staged. And an operator whose trait
+  method does not have the operator's own shape is refused, a method written `returns (a, b)`
+  at a pair among them, where upstream calls the method whatever it returns.
 
 ## Handoff rules
 
