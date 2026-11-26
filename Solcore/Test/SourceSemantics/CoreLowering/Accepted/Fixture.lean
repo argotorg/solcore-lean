@@ -586,6 +586,7 @@ theorem WholeInventory.family_row {fixture : CompiledFixture workspace options} 
     issuer := issuer
     closed := closed
     ports := ports
+    valuePorts := fun _ => CellAwareNamedValuePorts.ports whole.rows whole.complete prepared.compilation
     bodyScope := _
     bodySelected := bodySelected }⟩
 

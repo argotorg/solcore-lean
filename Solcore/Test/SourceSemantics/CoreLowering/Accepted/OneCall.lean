@@ -5025,7 +5025,11 @@ theorem accepted_call_returning (selected : SelectedInventory whole row) {called
     (registry := SelectedCompilationPhysicalProgramSupport.stages fixture.recipe.compiled)
     ((SelectedCompilationPhysicalProgramSupport.stages fixture.recipe.compiled).source bodySelected)
     ((SelectedCompilationPhysicalProgramSupport.stages fixture.recipe.compiled).evidence bodySelected)
-    selected.packet.header.unique (whole.callees calls wellFormed admitted) (calls.header_shape selected.packet)
+    selected.packet.header.unique (whole.callees calls wellFormed admitted)
+    (fun _ => CellAwareInvocationAcceptedCallLifting.ClosuresFramed.stages fixture.recipe.compiled bodySelected)
+    (fun _ => CellAwareInvocationAcceptedCallLifting.ClosuresFramed.stages fixture.recipe.compiled)
+    (fun _ => CellAwareInvocationAcceptedCallLifting.Aligned.of_wellFormed wellFormed)
+    (calls.header_shape selected.packet)
     (fun _ => CellAwareInvocationAcceptedStoredFunctions.Heap.empty.push fun _ same => by cases same; exact .word word)
     sourceTrace
   obtain ⟨_capture, _value, _finalStore, _finalMap, _finalWorld, requiredExecution, requiredOutput, _result, output⟩ :=
@@ -5036,7 +5040,8 @@ theorem accepted_call_returning (selected : SelectedInventory whole row) {called
       initial.heaps rfl start.started start.atCheckpoint
       (congrArg SourceCoreCompatibleValues.Context.registry initial.contextAt) initial.exportsReady allocated trace
       (CellAwarePublicAcceptedCallRoot.expressions_of_family callableProfile initial.issued prepared
-        selected.packet.aligned diagnostic support artifact checked closed ports wellFormed rows size)
+        selected.packet.aligned diagnostic support artifact checked closed ports
+        (fun _ => CellAwareNamedValuePorts.ports whole.rows whole.complete prepared.compilation) wellFormed rows size)
   obtain ⟨_capture, value, finalStore, _finalMap, _finalWorld, required, run, _result⟩ :=
     CellAwarePublicAcceptedCallRoot.checkpoint_has_sufficient_fuel_selected callableProfile initial.issued prepared
       selected.packet.aligned fixture.ready diagnostic support start.selected (owner fixture.recipe.compiled)
@@ -5044,7 +5049,8 @@ theorem accepted_call_returning (selected : SelectedInventory whole row) {called
       initial.heapTyped initial.argumentsTyped bodySelected artifact checked body covered initial.represented
       initial.heaps rfl start.started allocated trace
       (CellAwarePublicAcceptedCallRoot.expressions_of_family callableProfile initial.issued prepared
-        selected.packet.aligned diagnostic support artifact checked closed ports wellFormed rows size)
+        selected.packet.aligned diagnostic support artifact checked closed ports
+        (fun _ => CellAwareNamedValuePorts.ports whole.rows whole.complete prepared.compilation) wellFormed rows size)
   refine ⟨⟨start, ⟨requiredExecution, requiredOutput, ?_⟩, ⟨value, finalStore, required, run⟩, ?_⟩⟩
   · intro executionFuel outputFuel outcome enoughExecution enoughOutput resumed
     obtain ⟨returned, actual, generation, _reached, same, succeeded, indexed, _⟩ :=
@@ -5059,7 +5065,8 @@ theorem accepted_call_returning (selected : SelectedInventory whole row) {called
         initial.heapTyped initial.argumentsTyped bodySelected artifact checked body covered initial.represented
         initial.heaps rfl start.started completed
         (CellAwarePublicAcceptedCallRoot.expressions_of_family callableProfile initial.issued prepared
-          selected.packet.aligned diagnostic support artifact checked closed ports wellFormed rows)
+          selected.packet.aligned diagnostic support artifact checked closed ports
+          (fun _ => CellAwareNamedValuePorts.ports whole.rows whole.complete prepared.compilation) wellFormed rows)
     exact ⟨sidecar, size, environment, bound, finalContext, outcome, after, allocated, staged, result⟩
 
 /-- `accepted_call` at an original Source execution that ends in any context,
@@ -5169,7 +5176,8 @@ theorem accepted_reflection (selected : SelectedInventory whole row) {called : D
       initial.heapTyped initial.argumentsTyped bodySelected artifact checked body covered initial.represented
       initial.heaps rfl start.started completed
       (CellAwarePublicAcceptedCallRoot.expressions_of_family callableProfile initial.issued prepared
-        selected.packet.aligned diagnostic support artifact checked closed ports wellFormed rows)
+        selected.packet.aligned diagnostic support artifact checked closed ports
+        (fun _ => CellAwareNamedValuePorts.ports whole.rows whole.complete prepared.compilation) wellFormed rows)
   exact ⟨sidecar, size, environment, bound, finalContext, outcome, after, allocated, staged, result⟩
 
 /-- The first public call of a row whose original Source execution faults,
@@ -5257,7 +5265,8 @@ theorem accepted_failure (selected : SelectedInventory whole row) {called : Decl
       initial.heaps rfl start.started start.atCheckpoint
       (congrArg SourceCoreCompatibleValues.Context.registry initial.contextAt) initial.exportsReady allocated trace
       (CellAwarePublicAcceptedCallRoot.expressions_of_family callableProfile initial.issued prepared
-        selected.packet.aligned diagnostic support artifact checked closed ports wellFormed rows size)
+        selected.packet.aligned diagnostic support artifact checked closed ports
+        (fun _ => CellAwareNamedValuePorts.ports whole.rows whole.complete prepared.compilation) wellFormed rows size)
   refine ⟨⟨start, _, token, requiredExecution, represented, ?_⟩⟩
   intro executionFuel outputFuel outcome enough resumed
   obtain ⟨returned, actual, _reached, same, failed, indexed, _⟩ :=

@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.AcceptedConstructors
+import Solcore.SourceSemantics.CoreLowering.AcceptedIndirectCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationArrayMemrefs
 
 /-!
@@ -8,7 +9,9 @@ Extends the expression closure of named-row bodies to direct calls at every
 expression position: inside operators, conditionals, groups and pairs, and as
 the arguments of other direct calls, and to the builtin conversions, the
 mapping indices, the builtin closures and their calls, tuples beyond pairs,
-constructor applications and the memory array forms there. Closes a family of such rows by one strong induction on the grade.
+constructor applications and the memory array forms there, the named function
+values and the uncoerced indirect calls. Closes a family of such rows by one
+strong induction on the grade.
 
 Main declarations:
 - `CellAwareInvocationAcceptedTupleSites.TupleSite`, a tuple of more than two
@@ -16,18 +19,26 @@ Main declarations:
 - `CellAwareInvocationAcceptedArraySites.ArraySite`, a memory array form of a
   shape the heads take as a compiler site;
 - `CellAwareInvocationAcceptedNestedTrees.Nested`, the sites, and
-  `CellAwareInvocationAcceptedNestedTrees.NestedTree`, their receipt trees;
+  `CellAwareInvocationAcceptedNestedTrees.NestedTree`, their receipt trees, with
+  `CellAwareInvocationAcceptedNestedTrees.RuntimeContracts` and
+  `CellAwareInvocationAcceptedNestedTrees.RuntimeContracts.accepts` for the call
+  guard of an indirect call;
 - `CellAwareInvocationAcceptedNestedTrees.of_nested`, the receipt tree from the
-  compiler's acceptance;
+  compiler's acceptance, with `CellAwareInvocationAcceptedNestedTrees.NamedValuesOf`
+  guarding the authority of the named function values;
 - `CellAwareInvocationAcceptedNestedBounds.preserves_nested_tree` and
-  `CellAwareInvocationAcceptedNestedBounds.reflects_nested_tree`, their meaning;
+  `CellAwareInvocationAcceptedNestedBounds.reflects_nested_tree`, their meaning,
+  with `CellAwareInvocationAcceptedNestedBounds.IndirectFaults` for the gates of
+  the indirect calls;
 - `CellAwareInvocationAcceptedNestedExpressions.ClosedNested` and
   `CellAwareInvocationAcceptedNestedExpressions.expressions`, the closure, with
   `CellAwareInvocationAcceptedNestedExpressions.closedNested_of_closedCalls` for
   rows whose calls are at expression roots;
 - `CellAwareInvocationAcceptedCallFamily.Row`,
   `CellAwareInvocationAcceptedCallFamily.preserves` and
-  `CellAwareInvocationAcceptedCallFamily.reflects`, the family closure;
+  `CellAwareInvocationAcceptedCallFamily.reflects`, the family closure, with
+  `CellAwareInvocationAcceptedCallFamily.guard_frame` for the guard frame of
+  every registry scope of a header;
 - `CellAwareInvocationAcceptedNestedCheck.nodes?` and
   `CellAwareInvocationAcceptedNestedCheck.closedNested`, a finite check of the
   nested sites on an actually compiled row.
@@ -536,7 +547,12 @@ section
 calls of builtin closures, tuples and the memory array forms under one another:
 every operand, branch, pair and tuple element, every argument of a direct call
 or of a closure, the argument of a conversion and every child of an array form
-is again a `Nested` site.
+is again a `Nested` site. So are named function values and indirect calls; an
+indirect call also needs three whole-program premises, decidable but for the
+first: the family admits every planned instantiation (`CoversPlan`), the
+callable table records no lambda (`NoLambdas`) and every specialization of the
+plan has a named contract with an unstaged result and runtime parameters
+(`RuntimeContracts`), at which the call guard accepts every call.
 `NestedTree` keeps the first subset's receipts at its forms, the direct-call
 receipts of `CellAwareInvocationAcceptedCallTrees.CallTree` at its calls, and
 the node's metadata at `word` at its conversions. A call's argument receipts
@@ -564,15 +580,163 @@ open CellAwareInvocationAcceptedArraySites (ArraySite)
 open CellAwareInvocationAcceptedMemrefSites (MemrefSite)
 open CallableIndexedOwnedPreparedStagedDirectCallCertificates (Receipt Monomorphic)
 open CallableIndexedOwnedPreparedStagedDirectCallAuthority (Port)
+open CellAwareInvocationAcceptedValueSites (ValueSite)
+open CellAwareInvocationAcceptedIndirectSites (IndirectSite)
+open CellAwareInvocationAcceptedIndirectPremises (CoversPlan NoLambdas)
+
+/-- The plan records a reference edge from the row's key: a named function
+value of the row is selected through such an edge. -/
+def NamedValuesOf (plan : SourceCompilationPlan.Plan) (key : SourceSpecialization.SpecializationKey) : Prop :=
+  ∃ edge ∈ plan.referenceEdges, edge.caller = key
+
+instance (plan : SourceCompilationPlan.Plan) (key : SourceSpecialization.SpecializationKey) :
+    Decidable (NamedValuesOf plan key) :=
+  inferInstanceAs (Decidable (∃ edge ∈ plan.referenceEdges, edge.caller = key))
+
+/-- A named contract with an unstaged result whose every parameter is
+runtime: not marked comptime, and of a type that is not comptime-only. -/
+def RuntimeContract (contract : SourceCoreStageContracts.Contract) : Prop :=
+  contract.stagedResult = false ∧
+    ∀ parameter ∈ contract.parameters, parameter.comptime = false ∧ ¬ Staging.ComptimeOnlyType parameter.scheme.body
+
+/-- Every specialization the plan records has a runtime named contract, so
+every instantiation the plan records has one (`RuntimeContracts.contract`) and
+the call guard accepts every call of it at its arity
+(`RuntimeContracts.accepts`). -/
+def RuntimeContracts (plan : SourceCompilationPlan.Plan) : Prop :=
+  ∀ row ∈ plan.specializations, ∃ contract,
+    SourceCoreStageContracts.Contract.named plan row.key = .ok contract ∧ RuntimeContract contract
+
+private def runtimeContract? (contract : SourceCoreStageContracts.Contract) : Bool :=
+  !contract.stagedResult && contract.parameters.all fun parameter =>
+    !parameter.comptime && !SourceCompilationPlan.sourceTypeIsComptimeOnly parameter.scheme.body
+
+private def runtimeContracts? (plan : SourceCompilationPlan.Plan) : Bool :=
+  plan.specializations.all fun row =>
+    match SourceCoreStageContracts.Contract.named plan row.key with
+    | .ok contract => runtimeContract? contract
+    | .error _ => false
+
+private theorem comptimeOnly_iff (type : TypeSystem.Ty) :
+    SourceCompilationPlan.sourceTypeIsComptimeOnly type = true ↔ Staging.ComptimeOnlyType type :=
+  SourceStageAnalysis.typeIsComptimeOnly_eq_true_iff type
+
+private theorem runtimeParameter_iff (parameter : TypedBinder) :
+    (parameter.comptime = false ∧ ¬ Staging.ComptimeOnlyType parameter.scheme.body) ↔
+      (!parameter.comptime && !SourceCompilationPlan.sourceTypeIsComptimeOnly parameter.scheme.body) = true := by
+  rw [← comptimeOnly_iff]
+  cases parameter.comptime <;> cases SourceCompilationPlan.sourceTypeIsComptimeOnly parameter.scheme.body <;> decide
+
+private theorem runtimeContract_iff (contract : SourceCoreStageContracts.Contract) :
+    RuntimeContract contract ↔ runtimeContract? contract = true := by
+  unfold RuntimeContract runtimeContract?
+  rw [Bool.and_eq_true, List.all_eq_true]
+  constructor
+  · rintro ⟨unstaged, parameters⟩
+    exact ⟨by simp [unstaged],
+      fun parameter member => (runtimeParameter_iff parameter).mp (parameters parameter member)⟩
+  · rintro ⟨unstaged, parameters⟩
+    exact ⟨by simpa using unstaged,
+      fun parameter member => (runtimeParameter_iff parameter).mpr (parameters parameter member)⟩
+
+private theorem runtimeContracts_iff (plan : SourceCompilationPlan.Plan) :
+    RuntimeContracts plan ↔ runtimeContracts? plan = true := by
+  unfold RuntimeContracts runtimeContracts?
+  rw [List.all_eq_true]
+  constructor
+  · intro runtime row member
+    obtain ⟨contract, named, contractRuntime⟩ := runtime row member
+    rw [named]
+    exact (runtimeContract_iff contract).mp contractRuntime
+  · intro runtime row member
+    have checked := runtime row member
+    cases named : SourceCoreStageContracts.Contract.named plan row.key with
+    | error error =>
+      rw [named] at checked
+      cases checked
+    | ok contract =>
+      rw [named] at checked
+      exact ⟨contract, rfl, (runtimeContract_iff contract).mpr checked⟩
+
+instance (plan : SourceCompilationPlan.Plan) : Decidable (RuntimeContracts plan) :=
+  decidable_of_iff _ (runtimeContracts_iff plan).symm
+
+/-- The exact target of a planned instantiation is the key of a specialization
+the plan records. -/
+private theorem target_member {plan : SourceCompilationPlan.Plan} {instantiation : DeclarationInstantiation}
+    {key : SourceSpecialization.SpecializationKey}
+    (target : SourceCompilationPlan.exactInstantiationKey plan instantiation = .ok key) :
+    ∃ row ∈ plan.specializations, row.key = key := by
+  unfold SourceCompilationPlan.exactInstantiationKey at target
+  split at target
+  · cases target
+  · rename_i row filtered
+    cases target
+    have member : row ∈ [row] := .head _
+    rw [← filtered] at member
+    exact ⟨row, (List.mem_filter.mp member).1, rfl⟩
+  · cases target
+
+/-- Every instantiation the plan records has a runtime named contract. -/
+theorem RuntimeContracts.contract {plan : SourceCompilationPlan.Plan} (runtime : RuntimeContracts plan)
+    {instantiation : DeclarationInstantiation} {key : SourceSpecialization.SpecializationKey}
+    (target : SourceCompilationPlan.exactInstantiationKey plan instantiation = .ok key) :
+    ∃ contract, SourceCoreStageContracts.Contract.named plan key = .ok contract ∧ RuntimeContract contract := by
+  obtain ⟨row, member, rfl⟩ := target_member target
+  exact runtime row member
+
+private theorem arguments_accept {frame : Staging.CallGuard.Frame} {force : Bool} (unforced : force = false) :
+    ∀ {index : Nat} {parameters : List TypedBinder} {arguments : List ExpressionId},
+      (∀ parameter ∈ parameters, parameter.comptime = false ∧ ¬ Staging.ComptimeOnlyType parameter.scheme.body) →
+      parameters.length = arguments.length →
+      Staging.CallGuard.ArgumentsAccept frame force index parameters arguments
+  | index, [], [], _, _ => .nil index
+  | _, [], _ :: _, _, lengths => by simp at lengths
+  | _, _ :: _, [], _, lengths => by simp at lengths
+  | _, parameter :: _, _ :: _, runtime, lengths =>
+    .cons (.ordinary (by
+        obtain ⟨plain, notOnly⟩ := runtime parameter List.mem_cons_self
+        intro required
+        rcases required with forced | marked | only
+        · rw [unforced] at forced
+          cases forced
+        · rw [plain] at marked
+          cases marked
+        · exact notOnly only))
+      (arguments_accept unforced (fun other member => runtime other (List.mem_cons_of_mem _ member))
+        (by simpa using lengths))
+
+/-- The call guard accepts every call of a planned instantiation at the arity
+of its runtime named contract, in every frame: an effectful caller bypasses the
+guard, and otherwise every argument and the result are ordinary. -/
+theorem RuntimeContracts.accepts {plan : SourceCompilationPlan.Plan} (runtime : RuntimeContracts plan)
+    {instantiation : DeclarationInstantiation} {key : SourceSpecialization.SpecializationKey}
+    (target : SourceCompilationPlan.exactInstantiationKey plan instantiation = .ok key)
+    {contract : SourceCoreStageContracts.Contract}
+    (named : SourceCoreStageContracts.Contract.named plan key = .ok contract)
+    {call : ExpressionId} {arguments : List ExpressionId}
+    (arity : contract.parameters.length = arguments.length) :
+    ∀ frame, Staging.CallGuard.Accepts frame (CallContractCertificates.semanticContract contract) call arguments := by
+  intro frame
+  obtain ⟨actual, actualNamed, unstaged, parameters⟩ := runtime.contract target
+  cases Except.ok.inj (named.symm.trans actualNamed)
+  classical
+  by_cases effectful : Staging.CallGuard.Effectful frame
+  · exact .effectful effectful
+  · exact .ordinary effectful (arguments_accept unstaged parameters arity) (.ordinary unstaged)
 
 /-- Sites of the nested closure: the first subset's forms with nested
 children, direct calls with nested arguments whose instantiation the caller's
 family admits, builtin conversions with a nested argument, mapping indices
 with a nested base and key, references to builtin closures, calls of
 builtin closures with nested arguments, tuples of more than two nested
-elements, constructor applications with nested arguments, and array forms of
-the heads' shapes with nested children, in the order the Source evaluates
-them. -/
+elements, constructor applications with nested arguments, array forms of
+the heads' shapes with nested children, named function values whose
+instantiation the plan records, and uncoerced indirect calls with a nested
+callee and nested arguments, in a family that admits every planned
+instantiation, in a program whose callable table records no lambda and whose
+planned instantiations have runtime contracts, in the order the Source
+evaluates them. -/
 inductive Nested {checked : SourceCoreCompatibleCatalog.Checked}
     (prepared : Prepared checked) (named : SourceCoreGeneralFunctions.Function)
     (source : TypedSource) (called : DeclarationInstantiation → Prop) : ExpressionId → Prop where
@@ -630,6 +794,16 @@ inductive Nested {checked : SourceCoreCompatibleCatalog.Checked}
       (first : Nested prepared named source called site.base)
       (second : Nested prepared named source called site.subscript)
       (third : Nested prepared named source called value) : Nested prepared named source called id
+  | namedValue {id} (site : ValueSite prepared named source id)
+      (planned : ∃ key, SourceCompilationPlan.exactInstantiationKey prepared.base.plan site.instantiation = .ok key) :
+      Nested prepared named source called id
+  | indirect {id callee ids metadata} (site : IndirectSite prepared named source id callee ids metadata)
+      (covers : CoversPlan prepared.base.plan called)
+      (noLambdas : NoLambdas prepared.ancestry.graph.inputs.callable.table)
+      (runtime : RuntimeContracts prepared.base.plan)
+      (calleeChild : Nested prepared named source called callee)
+      (arguments : ∀ argument ∈ ids, Nested prepared named source called argument) :
+      Nested prepared named source called id
 
 /-- Static receipts at nested sites. The forms of the first subset keep the
 receipts of `CellAwareInvocationAcceptedExpressionTrees.Tree` with nested
@@ -644,7 +818,11 @@ its arguments and the receipt of every argument at its lowered code; a tuple
 of more than two elements keeps its node's metadata at the type of its packed
 codes and the receipt of every element at its lowered code; and a constructor
 application keeps the compiler's constructor header, its closed substitution and
-the receipt of every argument at its lowered code. -/
+the receipt of every argument at its lowered code; a named function value keeps
+the compiler's value receipt and the authority of its selected header; and an
+indirect call keeps the compiler's indirect-call receipt, its prepared call
+site, its original metadata, the row's sidecar, the two whole-program premises
+and the receipts of its callee and of every argument at its lowered code. -/
 inductive NestedTree (whole : SourceCoreUnifiedCompilation.Compiled)
     (headers : List (CallableIndexedOwnedFunctionValues.Header whole (Program.ofChecked whole.sourceProgram)))
     (called : DeclarationInstantiation → Prop) (compilation : SourceCoreFunctions.Context)
@@ -945,6 +1123,32 @@ inductive NestedTree (whole : SourceCoreUnifiedCompilation.Compiled)
       NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id
         ⟨.unit, SourceCoreDataExpressions.memrefStore layout comparison.expression
           (SourceCoreDataExpressions.elementRef layout first.expression second.expression) third.expression⟩
+  | namedValue {policy body fuel id lowered}
+      (receipt : CellAwareNamedValueCertificates.Receipt policy body fuel compilation
+        (.initial whole.compatible.checked) whole.indexed.ancestry.graph.inputs.callable.table source scope id
+        reasonAt lowered)
+      (port : CellAwareNamedValueAuthority.Port receipt headers) :
+      NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id lowered
+  | indirect {policy body fuel id callee ids metadata lowered sidecar}
+      (compiler : CallableIndirectCallCertificates.Receipt policy body fuel compilation source scope id callee ids
+        metadata reasonAt lowered)
+      (prepared : CallableIndexedOwnedIndirectSourceAdapters.Prepared compiler
+        whole.indexed.ancestry.graph.inputs.callable)
+      (sourceParent : CallableIndexedOwnedIndirectSourceAdapters.SourceParent compiler)
+      (original : CompatibleExpressionReads.Metadata whole.compatible.checked source id compiler.original
+        compiler.type)
+      (functionType : policy.callables.functionType = CallableContract.functionType)
+      (caller : SourceCoreStageContracts.prepareSidecar whole.indexed.base.plan prepared.site.caller = .ok sidecar)
+      (covers : CoversPlan whole.indexed.base.plan called)
+      (noLambdas : NoLambdas whole.indexed.ancestry.graph.inputs.callable.table)
+      (calleeTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope
+        callee compiler.calleeCode)
+      (lengths : ids.length = compiler.codes.length)
+      (found : ∀ argument ∈ ids, ∃ node, source.lookupExpression? argument = some node)
+      (arguments : ∀ argument ∈ ids.zip compiler.codes,
+        NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope argument.1
+          argument.2) :
+      NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id lowered
 
 section Embedding
 variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
@@ -985,6 +1189,8 @@ theorem nested_found {id : ExpressionId} (nested : Nested prepared named source 
   | constructor site _ => exact ⟨_, site.found⟩
   | array site _ => exact ⟨_, site.found⟩
   | memrefLoad site _ _ _ | memrefStore site _ _ _ _ => exact ⟨_, site.found⟩
+  | namedValue site _ => exact ⟨_, site.found⟩
+  | indirect site _ _ _ _ _ => exact ⟨_, site.found⟩
 
 end Embedding
 
@@ -1048,6 +1254,14 @@ theorem projected
   | memrefLoad metadata _ _ _ _ _ _ _ _ _ | memrefStore metadata _ _ _ _ _ _ _ _ _ _ _ _ =>
     cases Option.some.inj (found.symm.trans metadata.found)
     exact metadata.projected
+  | namedValue receipt _ =>
+    cases Option.some.inj (found.symm.trans receipt.metadata.found)
+    exact receipt.metadata.projected
+  | indirect compiler _ _ original _ _ _ _ _ _ _ _ =>
+    cases Option.some.inj (found.symm.trans original.found)
+    have loweredType : lowered.type = compiler.type := congrArg SourceCoreBasic.LoweredExpr.type compiler.output
+    rw [loweredType]
+    exact original.projected
 
 /-- The receipts of typed sites have the projections of the sites' types as
 their native types. -/
@@ -1079,6 +1293,73 @@ theorem projected_codes {ids : List ExpressionId} {types : List TypeSystem.Ty}
 
 end Projection
 
+section Reads
+variable {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer} {fuel : Nat}
+  {compilation : SourceCoreFunctions.Context} {checked : SourceCoreCompatibleCatalog.Checked}
+  {source : TypedSource} {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {node : ExpressionNode}
+  {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
+  (found : source.lookupExpression? id = some node)
+  (special : ∀ child budget, (match policy.lowerSpecial? with
+    | none => (Except.ok none : Except SourceCoreBasic.Error (Option SourceCoreBasic.LoweredExpr))
+    | some lower => lower compilation child budget source scope id reasonAt) = .ok none)
+  (readPolicy : policy.readExpression source id = SourceCoreCompatibleDataExpressions.readExpression checked source id)
+  (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body (fuel + 1) compilation
+    source scope id reasonAt = .ok lowered)
+
+include found special readPolicy accepted in
+/-- The accepted lowering of a declaration reference reads its node through
+the policy's reader. -/
+private theorem value_read {name : String} {instantiation : DeclarationInstantiation}
+    (form : node.form = .reference name (.declaration instantiation)) :
+    id.occurrence.owner = source.owner ∧ ∃ type, policy.readExpression source id = .ok (node, type) := by
+  rw [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+  by_cases owner : id.occurrence.owner = source.owner
+  · refine ⟨owner, ?_⟩
+    simp only [owner, ne_eq, not_true_eq_false, ↓reduceIte, found, bind, Except.bind, pure, Except.pure] at accepted
+    have bypass := special (fun budget childSource childScope childId childReasonAt =>
+      SourceCoreFunctions.lowerExpressionWithPolicy policy body (min budget fuel) compilation
+        childSource childScope childId childReasonAt) (fuel + 1)
+    cases hook : policy.lowerSpecial? <;> simp only [hook] at accepted bypass
+    all_goals try rw [bypass] at accepted
+    all_goals
+      simp only [form, readPolicy] at accepted
+      cases read : SourceCoreCompatibleDataExpressions.readExpression checked source id with
+      | error => simp [read] at accepted
+      | ok pair =>
+        obtain ⟨other, type⟩ := pair
+        have metadata := CompatibleExpressionReads.metadata_of_read read
+        have same := Option.some.inj (metadata.found.symm.trans found)
+        subst other
+        exact ⟨type, readPolicy.trans read⟩
+  · simp [owner, bind, Except.bind] at accepted
+
+include found special readPolicy accepted in
+/-- The accepted lowering of an indirect call reads its node through the
+policy's reader. -/
+private theorem indirect_read {callee : ExpressionId} {ids : List ExpressionId}
+    {metadata : IndirectCallResolution} (form : node.form = .call callee ids (.indirect metadata)) :
+    ∃ type, policy.readExpression source id = .ok (node, type) := by
+  rw [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+  by_cases owner : id.occurrence.owner = source.owner
+  · simp only [owner, ne_eq, not_true_eq_false, ↓reduceIte, found, bind, Except.bind, pure, Except.pure] at accepted
+    have bypass := special (fun budget childSource childScope childId childReasonAt =>
+      SourceCoreFunctions.lowerExpressionWithPolicy policy body (min budget fuel) compilation
+        childSource childScope childId childReasonAt) (fuel + 1)
+    cases hook : policy.lowerSpecial? <;> simp only [hook] at accepted bypass
+    all_goals try rw [bypass] at accepted
+    all_goals
+      simp only [form, readPolicy] at accepted
+      cases read : SourceCoreCompatibleDataExpressions.readExpression checked source id with
+      | error => simp [read] at accepted
+      | ok pair =>
+        obtain ⟨other, type⟩ := pair
+        have metadata := CompatibleExpressionReads.metadata_of_read read
+        have same := Option.some.inj (metadata.found.symm.trans found)
+        subst other
+        exact ⟨type, readPolicy.trans read⟩
+  · simp [owner, bind, Except.bind] at accepted
+end Reads
+
 variable {whole : SourceCoreUnifiedCompilation.Compiled}
   {headers : List (CallableIndexedOwnedFunctionValues.Header whole (Program.ofChecked whole.sourceProgram))}
   {called : DeclarationInstantiation → Prop}
@@ -1099,6 +1380,44 @@ private theorem direct_special {id callee : ExpressionId} {ids : List Expression
       | none => (Except.ok none : Except SourceCoreBasic.Error (Option SourceCoreBasic.LoweredExpr))
       | some lower => lower (context whole.indexed named) child budget source scope id reasonAt) = .ok none :=
   fun child budget => CellAwareInvocationAcceptedDirectSites.special generation site rootFuel child budget scope reasonAt
+
+private theorem value_special {id : ExpressionId} (site : ValueSite whole.indexed named source id) :
+    ∀ child budget, (match (namedPolicy generation rootFuel).lowerSpecial? with
+      | none => (Except.ok none : Except SourceCoreBasic.Error (Option SourceCoreBasic.LoweredExpr))
+      | some lower => lower (context whole.indexed named) child budget source scope id reasonAt) = .ok none :=
+  fun child budget => CellAwareInvocationAcceptedValueSites.special generation site rootFuel child budget scope reasonAt
+
+private theorem indirect_special {id callee : ExpressionId} {ids : List ExpressionId}
+    {metadata : IndirectCallResolution} (site : IndirectSite whole.indexed named source id callee ids metadata) :
+    ∀ child budget, (match (namedPolicy generation rootFuel).lowerSpecial? with
+      | none => (Except.ok none : Except SourceCoreBasic.Error (Option SourceCoreBasic.LoweredExpr))
+      | some lower => lower (context whole.indexed named) child budget source scope id reasonAt) = .ok none :=
+  fun child budget =>
+    CellAwareInvocationAcceptedIndirectSites.special generation site rootFuel child budget scope reasonAt
+
+/-- An accepted named function value of the row selects a reference edge of
+the plan from the row's key (`SourceCoreFunctions.selectedSignature`). -/
+private theorem values_of_accepted {id : ExpressionId} (site : ValueSite whole.indexed named source id)
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy (namedPolicy generation rootFuel)
+      (namedLowerBody generation) (fuel + 1) (context whole.indexed named) source scope id reasonAt = .ok lowered) :
+    NamedValuesOf whole.indexed.base.plan named.signature.key := by
+  obtain ⟨owner, type, read⟩ := value_read site.found (value_special generation rootFuel site)
+    (CellAwareInvocationAcceptedValueSites.read generation site rootFuel) accepted site.form
+  obtain ⟨_index, signature, _identity, selection, _⟩ := CellAwareNamedValueCertificates.value_of_accepted owner
+    site.found read site.form (value_special generation rootFuel site _ _) accepted
+  obtain ⟨_caller, _target, _specialized, _, _, _, _, referenceKey, _⟩ := NamedCalls.selected_signature_facts selection
+  simp only [↓reduceIte] at referenceKey
+  unfold SourceCompilationPlan.exactReferenceKey at referenceKey
+  split at referenceKey
+  · cases referenceKey
+  · rename_i edge filtered
+    have member : edge ∈ [edge] := .head _
+    rw [← filtered] at member
+    have facts := List.mem_filter.mp member
+    simp only [Bool.and_eq_true, decide_eq_true_eq] at facts
+    exact ⟨edge, facts.1, facts.2.1.1⟩
+  · cases referenceKey
 
 private theorem conversion_special {id callee argument : ExpressionId} {function : BuiltinFunctionId}
     {target : TypeSystem.Ty} (site : ConversionSite whole.indexed named source id callee argument function target) :
@@ -1265,7 +1584,9 @@ private theorem bound_none {lower : ExpressionId → Except SourceCoreBasic.Erro
   rfl
 
 /-- The accepted named compiler yields the nested receipt tree at every nested
-site. A call's authority is the input `ports`, as for extended roots. -/
+site. A call's authority is the input `ports`, as for extended roots; a named
+function value's is the input `valuePorts`, needed only when the plan records
+a reference edge from the row, as an accepted value's selection shows. -/
 theorem of_nested {id : ExpressionId}
     (nested : Nested whole.indexed named source called id)
     (unique : NodeOccurrencesUnique source)
@@ -1276,6 +1597,8 @@ theorem of_nested {id : ExpressionId}
         (context whole.indexed named) (.initial whole.compatible.checked) source callScope callId callee ids
         instantiation reasonAt callCode),
       Nonempty (Port receipt headers))
+    (valuePorts : NamedValuesOf whole.indexed.base.plan named.signature.key →
+      CellAwareNamedValuePorts.ValuePorts generation headers)
     {node : ExpressionNode} (found : source.lookupExpression? id = some node)
     (typed : ExpressionHasType source sourceContext id node.type)
     {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
@@ -1826,6 +2149,64 @@ theorem of_nested {id : ExpressionId}
         exact .memrefStore metadata form referenceMetadata site.referenceForm baseFound subscriptFound valueFound shaped
           valueType prepared (firstIH baseFound baseTyped firstGenerated)
           (secondIH subscriptFound subscriptTyped secondGenerated) valueTree
+  | @namedValue id site planned =>
+    have same := Option.some.inj (site.found.symm.trans found)
+    subst node
+    cases fuel with
+    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+    | succ fuel =>
+      obtain ⟨receipt⟩ := CellAwareNamedValueCertificates.Receipt.of_site generation rootFuel site accepted
+      obtain ⟨port⟩ := valuePorts (values_of_accepted generation rootFuel site accepted) receipt
+      exact .namedValue receipt port
+  | @indirect id callee ids metadata site plan noLambdas _runtime calleeChild arguments calleeIH ih =>
+    have same := Option.some.inj (site.found.symm.trans found)
+    subst node
+    cases fuel with
+    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+    | succ fuel =>
+      have bypass := indirect_special generation rootFuel (scope := scope) (reasonAt := reasonAt) site
+      have readPolicy := CellAwareInvocationAcceptedIndirectSites.read generation site rootFuel
+      obtain ⟨type, read⟩ := indirect_read site.found bypass readPolicy accepted site.form
+      obtain ⟨compiler⟩ := CallableIndirectCallCertificates.of_functions
+        (policy := namedPolicy generation rootFuel) (body := namedLowerBody generation)
+        (compilation := context whole.indexed named) (scope := scope) (reasonAt := reasonAt)
+        site.found site.form bypass read site.form accepted
+      have sourceParent := CallableIndexedOwnedPreparedStagedRecursiveCallerSourceReceipts.source_parent compiler
+        readPolicy
+      obtain ⟨_, original⟩ := CallableIndexedOwnedPreparedStagedRecursiveCallerSourceReceipts.original_read_metadata
+        compiler readPolicy
+      obtain ⟨prepared⟩ := CallableIndexedOwnedPreparedStagedRecursiveCallerSourceReceipts.prepared compiler
+        readPolicy [] (CellAwareNamedCallPorts.callable_policy generation)
+      obtain ⟨sidecar, issued⟩ := CallableIndexedActualNamedSourceReceipts.hook_sidecar whole generation.hook
+      have caller : SourceCoreStageContracts.prepareSidecar whole.indexed.base.plan prepared.site.caller =
+          .ok sidecar := by
+        rw [prepared.caller]
+        exact issued
+      have originalSame := Option.some.inj (compiler.found.symm.trans site.found)
+      have parentTyped : ExpressionHasType source sourceContext id compiler.original.type := by
+        rw [originalSame]
+        exact typed
+      obtain ⟨_parameter, _result, _types, calleeTyped, argumentsTyped, _bundle, _resultType⟩ :=
+        CallableIndexedOwnedPreparedStagedRecursiveCallerSourceReceipts.original_child_types
+          compiler sourceParent unique parentTyped
+      obtain ⟨calleeNode, calleeContains, calleeNodeType⟩ := calleeTyped.stored_type
+      have calleeFound := lookupExpression?_complete unique calleeContains
+      rw [← calleeNodeType] at calleeTyped
+      have calleeTree := calleeIH calleeFound calleeTyped compiler.calleeAccepted
+      have relation := argument_rel
+        (relation := fun argument lowered => NestedTree whole headers called (context whole.indexed named)
+          whole.indexed.fuel (context whole.indexed named).solvedRequirements source sourceContext reasonAt scope
+          argument lowered)
+        (fun argument member {lowered} generated => by
+          obtain ⟨argumentNode, argumentFound⟩ := nested_found (arguments argument member)
+          exact ih argument member argumentFound
+            (CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique argumentsTyped member
+              argumentFound) generated)
+        compiler.argumentsAccepted
+      obtain ⟨lengths, each⟩ := zip_of_rel relation
+      exact .indirect compiler prepared sourceParent original (CellAwareNamedCallPorts.function_type generation)
+        caller plan noLambdas calleeTree lengths (fun argument member => nested_found (arguments argument member))
+        each
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedNestedTrees
 end
@@ -1841,9 +2222,16 @@ missing-default fault of its header (`MissingDefaults`); a reference to a
 builtin closure uses the builtin value bounds, with the function model's
 inclusion of the builtin values; a call of a builtin closure uses the
 contracted builtin head, with the meaning of its argument receipts; and a tuple
-uses the tuple head, with the meaning of its element receipts. The application of
-each admitted callee header below the grade is the input that the row lemma
-supplies. -/
+uses the tuple head, with the meaning of its element receipts; a named function
+value uses the named value bounds, with the function model's inclusion of the
+positive named handles; and an indirect call uses the indirect head, with the
+meaning of its callee and argument receipts, the row's sidecar at the
+invocation scope, the callable and named origins of the function model, and
+the fault words of both gates (`IndirectFaults`). The application of each
+admitted callee header below the grade is the input that the row lemma
+supplies; the application of an indirect callee's value follows from it, for
+a family that admits every planned instantiation in a program without
+lambdas, as the root model gives it. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -1855,6 +2243,9 @@ open CellAwareInvocationAcceptedNestedTrees (NestedTree)
 open CallableIndexedOwnedFunctionValues (Header Key OwnedKey)
 open CallableIndexedOwnedPreparedStagedPhysicalDirectHeadBounds (Point)
 open DataPatternValues (ListRel)
+open CellAwareInvocationAcceptedIndirectPremises (CoversPlan NoLambdas)
+open CallableIndexedOwnedContextualDiagnosticSources (SourceView)
+open CallableIndexedOwnedPreparedStagedIndirectSecondGateBounds (NamedOrigin)
 universe u
 
 private theorem tree_types {source : TypedSource} {certificate : GenericExpressionMeaning.Certificate}
@@ -1915,6 +2306,23 @@ private theorem arguments_rel {source : TypedSource} {scope : SourceCoreLocalCel
     obtain ⟨node, nodeFound⟩ := found pair.1 (List.of_mem_zip member).1
     exact ⟨node, nodeFound, rfl, member⟩
 
+/-- The callee and the arguments of one indirect call, each at its lowered
+code. -/
+private def Applied (scope : SourceCoreLocalCell.Scope) (callee : ExpressionId)
+    (calleeCode : SourceCoreBasic.LoweredExpr) (ids : List ExpressionId) (codes : List SourceCoreBasic.LoweredExpr) :
+    GenericExpressionMeaning.Certificate :=
+  fun current child code => current = scope ∧ ((child = callee ∧ code = calleeCode) ∨ (child, code) ∈ ids.zip codes)
+
+private theorem applied_rel {source : TypedSource} {scope : SourceCoreLocalCell.Scope} {callee : ExpressionId}
+    {calleeCode : SourceCoreBasic.LoweredExpr} {ids : List ExpressionId} {codes : List SourceCoreBasic.LoweredExpr}
+    (lengths : ids.length = codes.length)
+    (found : ∀ argument ∈ ids, ∃ node, source.lookupExpression? argument = some node) :
+    ListRel (fun id code => ∃ node, source.lookupExpression? id = some node ∧
+      Applied scope callee calleeCode ids codes scope id code) ids codes :=
+  rel_of_zip lengths fun pair member => by
+    obtain ⟨node, nodeFound⟩ := found pair.1 (List.of_mem_zip member).1
+    exact ⟨node, nodeFound, rfl, .inr member⟩
+
 /-- The missing-default fault of every index header of a Source, at its
 reason, as a fault relation decodes it. -/
 def MissingDefaults (compiled : SourceCoreUnifiedCompilation.Compiled) (registry : SourceCoreRawMetadata.Registry)
@@ -1951,6 +2359,58 @@ theorem missingDefaults {compiled : SourceCoreUnifiedCompilation.Compiled}
     baseSource keySource baseValue
   obtain ⟨port⟩ := CellAwareNamedIndexDiagnostics.ready issuer record sourceEq unique header
   exact port.missing receiver functions keyFound form mapping world baseSource keySource baseValue
+
+/-- The fault words of both gates of every indirect site of an invocation
+scope, as a fault relation decodes them: a staged guard rejection at its
+original selected row, and a different physical count as the Source arity
+fault (the inputs `stageFaults` and `arityFaults` of the indirect heads). -/
+def IndirectFaults (compiled : SourceCoreUnifiedCompilation.Compiled) (invocation : Staging.Recursive.Scope)
+    (faults : RecursiveStageMeaning.FaultRep) : Prop :=
+  ∀ {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer} {fuel : Nat}
+    {compilation : SourceCoreFunctions.Context} {scope : SourceCoreLocalCell.Scope} {id callee : ExpressionId}
+    {ids : List ExpressionId} {metadata : IndirectCallResolution} {reasonAt : ExpressionId → Word}
+    {lowered : SourceCoreBasic.LoweredExpr}
+    (compiler : CallableIndirectCallCertificates.Receipt policy body fuel compilation invocation.source scope id
+      callee ids metadata reasonAt lowered)
+    (prepared : CallableIndexedOwnedIndirectSourceAdapters.Prepared compiler
+      compiled.indexed.ancestry.graph.inputs.callable)
+    {sidecar : SourceCoreStageContracts.Sidecar},
+    SourceView sidecar.source invocation.source → invocation.guards = CallableLedger.frame sidecar →
+    (∀ {sourceValue : Dynamic.Value} {carrier : Value} {originalNode : ExpressionNode}
+      {originalMetadata : IndirectCallResolution} {reason : Staging.CallGuard.Fault}
+      (dispatch : CallStageBoundary.Dispatch (CallableLedger.frame sidecar) prepared.site prepared.site.call ids
+        sourceValue carrier),
+      CallableIndexedOwnedPreparedScopedCallBoundaryReceipts.CallView originalNode compiler.original
+        originalMetadata metadata →
+      CallableIndexedOwnedSelectedCallCodebookReceipts.Selected sidecar prepared.site callee ids originalMetadata
+        originalNode dispatch.row →
+      Staging.CallBoundary.GuardRejects invocation.guards id ids sourceValue reason →
+      faults (.stage invocation id reason) (dispatch.reason reason)) ∧
+    (∀ {originalNode : ExpressionNode} {originalMetadata : IndirectCallResolution}
+      {row : SourceCoreStageCodebook.Decision},
+      CallableIndexedOwnedSelectedCallCodebookReceipts.Selected sidecar prepared.site callee ids originalMetadata
+        originalNode row →
+      row.entry.parameterCount ≠ ids.length →
+      faults (.semantic (.argumentArityMismatch row.entry.parameterCount ids.length))
+        (prepared.site.reasonAt row.caller row.call row.entry.id .beforeApplication
+          (.argumentArityMismatch row.entry.parameterCount ids.length)))
+
+/-- The public receiver decodes the fault words of both gates of every
+indirect site of every invocation scope. -/
+theorem indirectFaults {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+    (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed completion.entry
+      completion.result.context.registry completion.result.extension completion.result.diagnostics)
+    (invocation : Staging.Recursive.Scope) :
+    IndirectFaults compiled invocation
+      (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics) := by
+  intro policy body fuel compilation scope id callee ids metadata reasonAt lowered compiler prepared sidecar view
+    guardFrame
+  exact ⟨fun dispatch callView selected rejected => CellAwareInvocationAcceptedIndirectReceipts.stage_faults
+      receiver (SelectedCompilationPhysicalProgramSupport.stagePrepared compiled) compiler prepared view guardFrame
+      dispatch callView selected rejected,
+    fun selected different => CellAwareInvocationAcceptedIndirectReceipts.arity_faults receiver
+      (SelectedCompilationPhysicalProgramSupport.stagePrepared compiled) compiler prepared selected different⟩
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {headers : List (Header compiled (Program.ofChecked compiled.sourceProgram))}
@@ -1998,6 +2458,39 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 
 local notation "valueModel" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked rawRegistry functions
 
+variable (namedIncluded : CellAwareInvocationNamedValueBounds.NamedValuesIncluded headers keys functions)
+  (origins : ∀ {mapping world sourceType sourceValue carrier type},
+    (CompatibleAmbientHeap.payloadModel compiled.compatible.checked rawRegistry functions).Represents mapping world
+      sourceType sourceValue carrier type → IsFunction sourceValue →
+    CallableLedger.OriginRep compiled.indexed.base.plan compiled.indexed.ancestry.graph.inputs.callable.table
+      sourceValue carrier)
+  (namedOrigins : ∀ {mapping world sourceType sourceValue carrier type},
+    (CompatibleAmbientHeap.payloadModel compiled.compatible.checked rawRegistry functions).Represents mapping world
+      sourceType sourceValue carrier type → NamedOrigin compiled sourceValue)
+  (gateFaults : IndirectFaults compiled invocation faults)
+  (sidecars : ∀ {sidecar : SourceCoreStageContracts.Sidecar},
+    SourceCoreStageContracts.prepareSidecar compiled.indexed.base.plan compilation.owner = .ok sidecar →
+    SourceView sidecar.source invocation.source ∧ NodeOccurrencesUnique sidecar.source ∧
+      invocation.guards = CallableLedger.frame sidecar)
+  (preservedApplications : CoversPlan compiled.indexed.base.plan called →
+    NoLambdas compiled.indexed.ancestry.graph.inputs.callable.table → ∀ grade,
+    (∀ header, header ∈ headers → called header.instantiation →
+      CellAwareInvocationAcceptedDirectCalls.PreservesBelow (attachment := attachment) (headers := headers)
+        (keys := keys) (CompatibleAmbientHeap.payloadModel compiled.compatible.checked rawRegistry functions)
+        registry faults header grade) →
+    CellAwareInvocationAcceptedIndirectApplication.PreservesBelow (attachment := attachment) (headers := headers)
+      (keys := keys) (CompatibleAmbientHeap.payloadModel compiled.compatible.checked rawRegistry functions)
+      registry faults grade)
+  (reflectedApplications : CoversPlan compiled.indexed.base.plan called →
+    NoLambdas compiled.indexed.ancestry.graph.inputs.callable.table → ∀ grade,
+    (∀ header, header ∈ headers → called header.instantiation →
+      CellAwareInvocationAcceptedDirectCalls.ReflectsBelow (attachment := attachment) (headers := headers)
+        (keys := keys) (CompatibleAmbientHeap.payloadModel compiled.compatible.checked rawRegistry functions)
+        registry faults header grade) →
+    CellAwareInvocationAcceptedIndirectApplication.ReflectsBelow (attachment := attachment) (headers := headers)
+      (keys := keys) (CompatibleAmbientHeap.payloadModel compiled.compatible.checked rawRegistry functions)
+      registry faults grade)
+
 private theorem product_values :
     CallableIndexedOwnedPreparedStagedPairBounds.ProductValues (model := valueModel) := by
   intro mapping world leftType rightType left right first second firstType secondType firstValue secondValue
@@ -2005,7 +2498,8 @@ private theorem product_values :
 
 include callerBridge keyPhysical cache faithful functionLeaves functionTypes included extension sameLedger uninitialized
   missing
-  selectedBodies wellFormed runtime covers in
+  selectedBodies wellFormed runtime covers namedIncluded origins namedOrigins gateFaults sidecars
+  preservedApplications in
 /-- Every nested receipt tree preserves its staged Source execution at every
 grade, given the application of every admitted callee header below the
 grade. -/
@@ -2452,10 +2946,43 @@ theorem preserves_nested_tree [RecursiveStageMeaning.FaultTokens faults]
       runtime covers metadata form referenceMetadata referenceForm baseFound subscriptFound valueFound
       ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr (.inl ⟨rfl, rfl⟩)⟩ ⟨rfl, .inr (.inr ⟨rfl, rfl⟩)⟩ shaped valueType prepared
       rfl size children ⟨rfl, rfl, rfl⟩
+  | namedValue receipt port =>
+    intro size _
+    exact CellAwareInvocationNamedValueBounds.preserves owner keyPhysical receipt port callerBridge cache functions
+      namedIncluded faults unique size
+  | @indirect policy body fuel id callee ids metadata lowered sidecar compiler prepared sourceParent original
+      functionType caller plan noLambdas calleeTree lengths found arguments calleeIH ih =>
+    intro size applications
+    have ownerCaller : SourceCoreStageContracts.prepareSidecar compiled.indexed.base.plan compilation.owner =
+        .ok sidecar := prepared.caller ▸ caller
+    obtain ⟨view, originalUnique, guardFrame⟩ := sidecars ownerCaller
+    obtain ⟨stageFaults, arityFaults⟩ := gateFaults compiler prepared view guardFrame
+    obtain ⟨_storedTypes, sequence⟩ := DataExpressionSequence.Tree.of_children
+      (applied_rel (source := invocation.source) (scope := scope) (callee := callee)
+        (calleeCode := compiler.calleeCode) lengths found)
+    have childMeaning : PreservesBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Applied scope callee compiler.calleeCode ids compiler.codes) faults size := by
+      intro smaller less current child childCode member _
+      have below : ∀ header, header ∈ headers → called header.instantiation →
+          CellAwareInvocationAcceptedDirectCalls.PreservesBelow (attachment := attachment) (headers := headers)
+            (keys := keys) valueModel registry faults header smaller :=
+        fun header headerMember headerAdmitted belowSize belowLess =>
+          applications header headerMember headerAdmitted belowSize (Nat.lt_trans belowLess less)
+      obtain ⟨currentEq, member⟩ := member
+      subst current
+      rcases member with ⟨rfl, rfl⟩ | member
+      · exact calleeIH smaller below ⟨rfl, rfl, rfl⟩
+      · exact ih (child, childCode) member smaller below ⟨rfl, rfl, rfl⟩
+    intro current child code point
+    exact CellAwareInvocationAcceptedIndirectCalls.preserves callerBridge.forgetSlots cache valueModel index registry
+      faults compiler prepared sourceParent functionType caller view originalUnique guardFrame origins namedOrigins
+      stageFaults arityFaults unique wellFormed runtime covers size ⟨rfl, .inl ⟨rfl, rfl⟩⟩ sequence childMeaning
+      (preservedApplications plan noLambdas size applications) point
 
 include callerBridge keyPhysical cache faithful functionLeaves functionTypes included extension sameLedger uninitialized
   missing
-  selectedBodies wellFormed runtime covers in
+  selectedBodies wellFormed runtime covers namedIncluded origins namedOrigins gateFaults sidecars
+  reflectedApplications in
 /-- Native completion of every nested receipt tree reconstructs its staged
 Source execution, given the native application of every admitted callee
 header below the grade. -/
@@ -2899,6 +3426,38 @@ theorem reflects_nested_tree [RecursiveStageMeaning.FaultTokens faults]
       runtime covers metadata form referenceMetadata referenceForm baseFound subscriptFound valueFound
       ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr (.inl ⟨rfl, rfl⟩)⟩ ⟨rfl, .inr (.inr ⟨rfl, rfl⟩)⟩ shaped valueType prepared
       rfl size children ⟨rfl, rfl, rfl⟩
+  | namedValue receipt port =>
+    intro size _
+    exact CellAwareInvocationNamedValueBounds.reflects owner keyPhysical receipt port callerBridge cache functions
+      namedIncluded faults unique runtime size
+  | @indirect policy body fuel id callee ids metadata lowered sidecar compiler prepared sourceParent original
+      functionType caller plan noLambdas calleeTree lengths found arguments calleeIH ih =>
+    intro size applications
+    have ownerCaller : SourceCoreStageContracts.prepareSidecar compiled.indexed.base.plan compilation.owner =
+        .ok sidecar := prepared.caller ▸ caller
+    obtain ⟨view, originalUnique, guardFrame⟩ := sidecars ownerCaller
+    obtain ⟨stageFaults, arityFaults⟩ := gateFaults compiler prepared view guardFrame
+    obtain ⟨_storedTypes, sequence⟩ := DataExpressionSequence.Tree.of_children
+      (applied_rel (source := invocation.source) (scope := scope) (callee := callee)
+        (calleeCode := compiler.calleeCode) lengths found)
+    have childMeaning : ReflectsBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Applied scope callee compiler.calleeCode ids compiler.codes) faults size := by
+      intro smaller less current child childCode member _
+      have below : ∀ header, header ∈ headers → called header.instantiation →
+          CellAwareInvocationAcceptedDirectCalls.ReflectsBelow (attachment := attachment) (headers := headers)
+            (keys := keys) valueModel registry faults header smaller :=
+        fun header headerMember headerAdmitted belowSize belowLess =>
+          applications header headerMember headerAdmitted belowSize (Nat.lt_trans belowLess less)
+      obtain ⟨currentEq, member⟩ := member
+      subst current
+      rcases member with ⟨rfl, rfl⟩ | member
+      · exact calleeIH smaller below ⟨rfl, rfl, rfl⟩
+      · exact ih (child, childCode) member smaller below ⟨rfl, rfl, rfl⟩
+    intro current child code point
+    exact CellAwareInvocationAcceptedIndirectCalls.reflects callerBridge.forgetSlots cache valueModel index registry
+      faults compiler prepared sourceParent functionType caller view originalUnique guardFrame origins namedOrigins
+      stageFaults arityFaults unique wellFormed runtime covers size ⟨rfl, .inl ⟨rfl, rfl⟩⟩ sequence childMeaning
+      (reflectedApplications plan noLambdas size applications) point
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedNestedBounds
 end
@@ -2910,8 +3469,13 @@ accepts for the body is a nested site. The receipt tree of each accepted
 expression is extracted from the compiler's own acceptance and closed by the
 nested bounds; the inputs are the call authority of the body's call receipts
 and the application of every admitted callee header below the budget, as for
-`CellAwareInvocationAcceptedCallExpressions`. A row whose accepted expressions
-are extended roots is closed in this sense too (`closedNested_of_closedCalls`). -/
+`CellAwareInvocationAcceptedCallExpressions`, the authority of the body's
+named function values when the plan records a reference edge from the row,
+and for its indirect calls the function model's origins, the fault words of
+both gates, the guard frame of the row's sidecar at the invocation scope and
+the application of an indirect callee's value from the headers'. A row whose
+accepted expressions are extended roots is closed in this sense too
+(`closedNested_of_closedCalls`). -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -2921,9 +3485,11 @@ open CallableIndexedOwnedFunctionState
 open CallableIndexedOwnedFunctionValues (Header Key OwnedKey)
 open CellAwareInvocationAcceptedTerminals (children)
 open CellAwareInvocationAcceptedNamedInvocation (rowIndex)
-open CellAwareInvocationAcceptedNestedTrees (Nested)
+open CellAwareInvocationAcceptedNestedTrees (Nested NamedValuesOf)
 open CellAwareInvocationAcceptedCallExpressions (ClosedCalls Ports)
 open GeneralizedLocalInitializerCompilation (namedPolicy namedLowerBody)
+open CellAwareInvocationAcceptedIndirectPremises (CoversPlan NoLambdas)
+open CallableIndexedOwnedPreparedStagedIndirectSecondGateBounds (NamedOrigin)
 
 variable {whole : SourceCoreUnifiedCompilation.Compiled}
   {headers : List (Header whole (Program.ofChecked whole.sourceProgram))}
@@ -3002,7 +3568,27 @@ theorem preserves [RecursiveStageMeaning.FaultTokens faults]
     (ports : Ports (headers := headers) generation record) (size : Nat)
     (applications : ∀ header, header ∈ headers → called header.instantiation →
       CellAwareInvocationAcceptedDirectCalls.PreservesBelow (attachment := fun _ _ _ => True) (headers := headers)
-        (keys := keys) model registry faults header size) :
+        (keys := keys) model registry faults header size)
+    (valuePorts : NamedValuesOf whole.indexed.base.plan named.signature.key →
+      CellAwareNamedValuePorts.ValuePorts generation headers)
+    (namedIncluded : CellAwareInvocationNamedValueBounds.NamedValuesIncluded headers keys functions)
+    (origins : ∀ {mapping world sourceType sourceValue carrier type},
+      (model).Represents mapping world sourceType sourceValue carrier type → IsFunction sourceValue →
+      CallableLedger.OriginRep whole.indexed.base.plan whole.indexed.ancestry.graph.inputs.callable.table
+        sourceValue carrier)
+    (namedOrigins : ∀ {mapping world sourceType sourceValue carrier type},
+      (model).Represents mapping world sourceType sourceValue carrier type → NamedOrigin whole sourceValue)
+    (gateFaults : CellAwareInvocationAcceptedNestedBounds.IndirectFaults whole invocation faults)
+    (guardFrames : ∀ {sidecar : SourceCoreStageContracts.Sidecar},
+      SourceCoreStageContracts.prepareSidecar whole.indexed.base.plan named.signature.key = .ok sidecar →
+      invocation.guards = CallableLedger.frame sidecar)
+    (preservedApplications : CoversPlan whole.indexed.base.plan called →
+      NoLambdas whole.indexed.ancestry.graph.inputs.callable.table → ∀ grade,
+      (∀ header, header ∈ headers → called header.instantiation →
+        CellAwareInvocationAcceptedDirectCalls.PreservesBelow (attachment := fun _ _ _ => True) (headers := headers)
+          (keys := keys) model registry faults header grade) →
+      CellAwareInvocationAcceptedIndirectApplication.PreservesBelow (attachment := fun _ _ _ => True)
+        (headers := headers) (keys := keys) model registry faults grade) :
     CellAwareInvocationExpressionBounds.PreservesAt (attachment := fun _ _ _ => True)
       (CallableIndexedOwnedPhysicalCanonicalState.ordinaryCaller owner 1 keyPhysical.locations).forgetSlots context
       model (rowIndex generation record) registry invocation (Accepted generation record called fuel) faults size := by
@@ -3015,6 +3601,19 @@ theorem preserves [RecursiveStageMeaning.FaultTokens faults]
     initial admitted authority physical
   obtain ⟨generated, nested⟩ := accepted
   have sourceNamed : invocation.source = CallableIndexedNamedGeneration.source named := sourceEq
+  have sidecars : ∀ {sidecar : SourceCoreStageContracts.Sidecar},
+      SourceCoreStageContracts.prepareSidecar whole.indexed.base.plan
+        (CallableIndexedNamedGeneration.context whole.indexed named).owner = .ok sidecar →
+      CallableIndexedOwnedContextualDiagnosticSources.SourceView sidecar.source invocation.source ∧
+        NodeOccurrencesUnique sidecar.source ∧ invocation.guards = CallableLedger.frame sidecar := by
+    intro sidecar issued
+    have rowSource : sidecar.source = invocation.source := by
+      rw [sourceNamed]
+      exact congrArg (fun row : SourceSpecialization.SpecializedFunction => row.function.typedBody)
+        (RecursiveNamedPreparedStageScopes.sidecar_caller issued record)
+    refine ⟨.inl rowSource.symm, ?_, guardFrames issued⟩
+    rw [rowSource]
+    exact sourceRuntime.graph.nodeOccurrencesUnique
   change SourceCoreGeneralFunctions.lowerContextualExpression _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ = _ at generated
   cases fuel with
   | zero => simp [SourceCoreGeneralFunctions.lowerContextualExpression.eq_def] at generated
@@ -3023,14 +3622,15 @@ theorem preserves [RecursiveStageMeaning.FaultTokens faults]
     have unique := sourceRuntime.graph.nodeOccurrencesUnique
     rw [sourceNamed] at unique found typed
     have tree := CellAwareInvocationAcceptedNestedTrees.of_nested (headers := headers) generation rootFuel nested
-      unique physical.declarations ports found typed generated
+      unique physical.declarations ports valuePorts found typed generated
     rw [← sourceNamed] at tree found typed
     exact CellAwareInvocationAcceptedNestedBounds.preserves_nested_tree (attachment := fun _ _ _ => True)
       (compilation := CallableIndexedNamedGeneration.context whole.indexed named) owner
       (CallableIndexedOwnedPhysicalCanonicalState.ordinaryCaller owner 1 keyPhysical.locations) keyPhysical
       (fun state => state.physical) functions faithful functionLeaves functionTypes profile included extension
       sameLedger faults
-      uninitialized missing selectedBodies wellFormed sourceRuntime covers tree size applications ⟨rfl, rfl, rfl⟩
+      uninitialized missing selectedBodies wellFormed sourceRuntime covers namedIncluded origins namedOrigins
+      gateFaults sidecars preservedApplications tree size applications ⟨rfl, rfl, rfl⟩
       found typed environments heaps locals agrees actualTyped initial admitted authority physical
 
 /-- Every completed native run of an accepted nested site reconstructs an
@@ -3058,7 +3658,27 @@ theorem reflects [RecursiveStageMeaning.FaultTokens faults]
     (ports : Ports (headers := headers) generation record) (size : Nat)
     (applications : ∀ header, header ∈ headers → called header.instantiation →
       CellAwareInvocationAcceptedDirectCalls.ReflectsBelow (attachment := fun _ _ _ => True) (headers := headers)
-        (keys := keys) model registry faults header size) :
+        (keys := keys) model registry faults header size)
+    (valuePorts : NamedValuesOf whole.indexed.base.plan named.signature.key →
+      CellAwareNamedValuePorts.ValuePorts generation headers)
+    (namedIncluded : CellAwareInvocationNamedValueBounds.NamedValuesIncluded headers keys functions)
+    (origins : ∀ {mapping world sourceType sourceValue carrier type},
+      (model).Represents mapping world sourceType sourceValue carrier type → IsFunction sourceValue →
+      CallableLedger.OriginRep whole.indexed.base.plan whole.indexed.ancestry.graph.inputs.callable.table
+        sourceValue carrier)
+    (namedOrigins : ∀ {mapping world sourceType sourceValue carrier type},
+      (model).Represents mapping world sourceType sourceValue carrier type → NamedOrigin whole sourceValue)
+    (gateFaults : CellAwareInvocationAcceptedNestedBounds.IndirectFaults whole invocation faults)
+    (guardFrames : ∀ {sidecar : SourceCoreStageContracts.Sidecar},
+      SourceCoreStageContracts.prepareSidecar whole.indexed.base.plan named.signature.key = .ok sidecar →
+      invocation.guards = CallableLedger.frame sidecar)
+    (reflectedApplications : CoversPlan whole.indexed.base.plan called →
+      NoLambdas whole.indexed.ancestry.graph.inputs.callable.table → ∀ grade,
+      (∀ header, header ∈ headers → called header.instantiation →
+        CellAwareInvocationAcceptedDirectCalls.ReflectsBelow (attachment := fun _ _ _ => True) (headers := headers)
+          (keys := keys) model registry faults header grade) →
+      CellAwareInvocationAcceptedIndirectApplication.ReflectsBelow (attachment := fun _ _ _ => True)
+        (headers := headers) (keys := keys) model registry faults grade) :
     CellAwareInvocationExpressionBounds.ReflectsAt (attachment := fun _ _ _ => True)
       (CallableIndexedOwnedPhysicalCanonicalState.ordinaryCaller owner 1 keyPhysical.locations).forgetSlots context
       model (rowIndex generation record) registry invocation (Accepted generation record called fuel) faults size := by
@@ -3071,6 +3691,19 @@ theorem reflects [RecursiveStageMeaning.FaultTokens faults]
     initial admitted authority physical
   obtain ⟨generated, nested⟩ := accepted
   have sourceNamed : invocation.source = CallableIndexedNamedGeneration.source named := sourceEq
+  have sidecars : ∀ {sidecar : SourceCoreStageContracts.Sidecar},
+      SourceCoreStageContracts.prepareSidecar whole.indexed.base.plan
+        (CallableIndexedNamedGeneration.context whole.indexed named).owner = .ok sidecar →
+      CallableIndexedOwnedContextualDiagnosticSources.SourceView sidecar.source invocation.source ∧
+        NodeOccurrencesUnique sidecar.source ∧ invocation.guards = CallableLedger.frame sidecar := by
+    intro sidecar issued
+    have rowSource : sidecar.source = invocation.source := by
+      rw [sourceNamed]
+      exact congrArg (fun row : SourceSpecialization.SpecializedFunction => row.function.typedBody)
+        (RecursiveNamedPreparedStageScopes.sidecar_caller issued record)
+    refine ⟨.inl rowSource.symm, ?_, guardFrames issued⟩
+    rw [rowSource]
+    exact sourceRuntime.graph.nodeOccurrencesUnique
   change SourceCoreGeneralFunctions.lowerContextualExpression _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ = _ at generated
   cases fuel with
   | zero => simp [SourceCoreGeneralFunctions.lowerContextualExpression.eq_def] at generated
@@ -3079,14 +3712,15 @@ theorem reflects [RecursiveStageMeaning.FaultTokens faults]
     have unique := sourceRuntime.graph.nodeOccurrencesUnique
     rw [sourceNamed] at unique found typed
     have tree := CellAwareInvocationAcceptedNestedTrees.of_nested (headers := headers) generation rootFuel nested
-      unique physical.declarations ports found typed generated
+      unique physical.declarations ports valuePorts found typed generated
     rw [← sourceNamed] at tree found typed
     exact CellAwareInvocationAcceptedNestedBounds.reflects_nested_tree (attachment := fun _ _ _ => True)
       (compilation := CallableIndexedNamedGeneration.context whole.indexed named) owner
       (CallableIndexedOwnedPhysicalCanonicalState.ordinaryCaller owner 1 keyPhysical.locations) keyPhysical
       (fun state => state.physical) functions faithful functionLeaves functionTypes profile included extension
       sameLedger faults
-      uninitialized missing selectedBodies wellFormed sourceRuntime covers tree size applications ⟨rfl, rfl, rfl⟩
+      uninitialized missing selectedBodies wellFormed sourceRuntime covers namedIncluded origins namedOrigins
+      gateFaults sidecars reflectedApplications tree size applications ⟨rfl, rfl, rfl⟩
       found typed environments heaps locals agrees actualTyped initial admitted authority physical
 
 /-- A named row whose accepted expressions are all nested sites discharges the
@@ -3115,7 +3749,34 @@ theorem expressions [RecursiveStageMeaning.FaultTokens faults]
       CellAwareInvocationAcceptedDirectCalls.PreservesBelow (attachment := fun _ _ _ => True) (headers := headers)
         (keys := keys) model registry faults header budget ∧
       CellAwareInvocationAcceptedDirectCalls.ReflectsBelow (attachment := fun _ _ _ => True) (headers := headers)
-        (keys := keys) model registry faults header budget) :
+        (keys := keys) model registry faults header budget)
+    (valuePorts : NamedValuesOf whole.indexed.base.plan named.signature.key →
+      CellAwareNamedValuePorts.ValuePorts generation headers)
+    (namedIncluded : CellAwareInvocationNamedValueBounds.NamedValuesIncluded headers keys functions)
+    (origins : ∀ {mapping world sourceType sourceValue carrier type},
+      (model).Represents mapping world sourceType sourceValue carrier type → IsFunction sourceValue →
+      CallableLedger.OriginRep whole.indexed.base.plan whole.indexed.ancestry.graph.inputs.callable.table
+        sourceValue carrier)
+    (namedOrigins : ∀ {mapping world sourceType sourceValue carrier type},
+      (model).Represents mapping world sourceType sourceValue carrier type → NamedOrigin whole sourceValue)
+    (gateFaults : CellAwareInvocationAcceptedNestedBounds.IndirectFaults whole invocation faults)
+    (guardFrames : ∀ {sidecar : SourceCoreStageContracts.Sidecar},
+      SourceCoreStageContracts.prepareSidecar whole.indexed.base.plan named.signature.key = .ok sidecar →
+      invocation.guards = CallableLedger.frame sidecar)
+    (preservedApplications : CoversPlan whole.indexed.base.plan called →
+      NoLambdas whole.indexed.ancestry.graph.inputs.callable.table → ∀ grade,
+      (∀ header, header ∈ headers → called header.instantiation →
+        CellAwareInvocationAcceptedDirectCalls.PreservesBelow (attachment := fun _ _ _ => True) (headers := headers)
+          (keys := keys) model registry faults header grade) →
+      CellAwareInvocationAcceptedIndirectApplication.PreservesBelow (attachment := fun _ _ _ => True)
+        (headers := headers) (keys := keys) model registry faults grade)
+    (reflectedApplications : CoversPlan whole.indexed.base.plan called →
+      NoLambdas whole.indexed.ancestry.graph.inputs.callable.table → ∀ grade,
+      (∀ header, header ∈ headers → called header.instantiation →
+        CellAwareInvocationAcceptedDirectCalls.ReflectsBelow (attachment := fun _ _ _ => True) (headers := headers)
+          (keys := keys) model registry faults header grade) →
+      CellAwareInvocationAcceptedIndirectApplication.ReflectsBelow (attachment := fun _ _ _ => True)
+        (headers := headers) (keys := keys) model registry faults grade) :
     CellAwareInvocationAcceptedInputs.Expressions (attachment := fun _ _ _ => True) (receiving := receiving)
       (functions := functions)
       (CallableIndexedOwnedPhysicalCanonicalState.ordinaryCaller owner 1 keyPhysical.locations).forgetSlots
@@ -3129,6 +3790,7 @@ theorem expressions [RecursiveStageMeaning.FaultTokens faults]
       size
       (fun header member admitted below less => (applications header member admitted).1 below
         (Nat.lt_trans less smaller))
+      valuePorts namedIncluded origins namedOrigins gateFaults guardFrames preservedApplications
       ⟨generated, closed fuel scope id lowered generated⟩
   · intro size smaller scope id lowered generated
     exact reflects generation record called owner keyPhysical registry invocation faults fuel sourceEq extension
@@ -3137,6 +3799,7 @@ theorem expressions [RecursiveStageMeaning.FaultTokens faults]
       size
       (fun header member admitted below less => (applications header member admitted).2 below
         (Nat.lt_trans less smaller))
+      valuePorts namedIncluded origins namedOrigins gateFaults guardFrames reflectedApplications
       ⟨generated, closed fuel scope id lowered generated⟩
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedNestedExpressions
@@ -3151,7 +3814,10 @@ expressions are nested sites calling only admitted instantiations (`Row`).
 One strong induction on the grade gives the accepted-expression meaning of
 every family body on the slot-retaining protocol: at a call of a given grade
 the direct-call head needs the callee's application below that grade, and the
-row lemma gives it from the callee body's expressions below it. -/
+row lemma gives it from the callee body's expressions below it. An indirect
+callee's application follows from the same applications at the root model
+(`CellAwareInvocationAcceptedIndirectLeaves`), and every registry scope of a
+family body has the guard frame of its row's sidecar (`guard_frame`). -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -3166,8 +3832,8 @@ variable {whole : SourceCoreUnifiedCompilation.Compiled}
   {keys : List (Key whole (Program.ofChecked whole.sourceProgram))}
 
 /-- The receipts of one family row, as the public named root takes them, with
-the nested closure and call authority of its body and its own registry
-scope. -/
+the nested closure, the call authority and the named-value authority of its
+body and its own registry scope. -/
 structure Row (called : DeclarationInstantiation → Prop)
     (header : Header whole (Program.ofChecked whole.sourceProgram)) where
   named : SourceCoreGeneralFunctions.Function
@@ -3200,6 +3866,8 @@ structure Row (called : DeclarationInstantiation → Prop)
   issuer : CellAwareNamedDiagnosticIssuer.Named whole.indexed named (diagnostics.reasonAt named.signature.key)
   closed : CellAwareInvocationAcceptedNestedExpressions.ClosedNested generation record called
   ports : CellAwareInvocationAcceptedCallExpressions.Ports (headers := headers) generation record
+  valuePorts : CellAwareInvocationAcceptedNestedTrees.NamedValuesOf whole.indexed.base.plan named.signature.key →
+    CellAwareNamedValuePorts.ValuePorts generation headers
   bodyScope : Staging.Recursive.Scope
   bodySelected : (SelectedCompilationPhysicalProgramSupport.stages whole).Closure header.function bodyScope
 
@@ -3242,6 +3910,35 @@ private theorem row_unique {header : Header whole (Program.ofChecked whole.sourc
   rw [← row.sameNamed]
   simpa only [CallableIndexedNamedGeneration.source, header.agreement.source] using functionUnique
 
+include artifact checked wellFormed in
+/-- Every registry scope of an issued header's function has the guard frame of
+the header's sidecar, which the indirect heads need at the scope. -/
+theorem guard_frame (header : Header whole (Program.ofChecked whole.sourceProgram))
+    {child : Staging.Recursive.Scope} (selected : (stages).Closure header.function child)
+    {sidecar : SourceCoreStageContracts.Sidecar}
+    (issued : SourceCoreStageContracts.prepareSidecar whole.indexed.base.plan header.named.signature.key =
+      .ok sidecar) :
+    child.guards = CallableLedger.frame sidecar := by
+  have program : checkProgram workspace checkFuel = .ok whole.sourceProgram := by
+    rw [(sourceCompiled.artifact_fields artifact).1]
+    exact checked
+  have sourceReceipt := (CallableIndexedActualNamedSourceReceipts.header_source whole header).1
+  obtain ⟨signature, signatureMember, sourceOwner⟩ : ∃ signature ∈ whole.sourceProgram.signatures.functions,
+      header.function.source.owner = signature.id := by
+    have sourceEq := header.frame.source
+    cases header.frame.instantiated with
+    | @intro signature definition _ signatureMember definitionMember _ ownerEq _ instanceSource _ _ =>
+      obtain ⟨generic, genericMember, rfl⟩ := List.mem_map.mp definitionMember
+      obtain ⟨_, _, headerWellFormed⟩ := checkedFunctionHeaderWellFormed_ofCheckProgram program genericMember
+      refine ⟨signature, signatureMember, ?_⟩
+      rw [sourceEq, instanceSource]
+      simpa [StructuralSubstitution.applyTypedSource, FunctionDefinition.ofChecked, BodyDefinition.ofChecked]
+        using headerWellFormed.source_owner.trans ownerEq
+  exact RecursiveNamedPreparedScopeCoherence.selected_frame
+    (SelectedCompilationPhysicalProgramSupport.stagePrepared whole)
+    (SourceCoreUnifiedPreparationCertificates.compiled_planPrepared whole) wellFormed signatureMember sourceOwner
+    issued sourceReceipt selected
+
 include profile receiver support artifact checked wellFormed rows in
 /-- Every family body has its accepted-expression meaning on the
 slot-retaining protocol at every grade, for every owner key with physical
@@ -3281,6 +3978,9 @@ theorem expressions (size : Nat) :
           (fun calleeOwner calleeKey _ calleeSelected =>
             ih smaller less callee calleeMember calleeAdmitted calleeOwner calleeKey calleeSelected)
     let row := rows header member admitted
+    have sizes : ∀ callee, callee ∈ headers → called callee.instantiation →
+        callee.globals = whole.indexed.base.globals.length :=
+      fun callee calleeMember calleeAdmitted => (rows callee calleeMember calleeAdmitted).sameGlobals
     exact CellAwareInvocationAcceptedNestedExpressions.expressions row.generation row.record called owner keyPhysical
       stages child faults row.closed size (row_source row selected) completion.result.extension
       (CellAwareInvocationAcceptedNamedInvocation.reads row.generation row.record row.issuer receiver
@@ -3289,7 +3989,16 @@ theorem expressions (size : Nat) :
       (CellAwarePhysicalFunctionOrigins.runtime_views profile) profile (CellAwareBuiltinValueOrigins.included profile)
       (CellAwareInvocationAcceptedNestedBounds.missingDefaults row.issuer row.record (row_source row selected)
         ((row_source row selected) ▸ row_unique support row) receiver rootFunctions)
-      support.registryBodies wellFormed row.ports applications
+      support.registryBodies wellFormed row.ports applications row.valuePorts
+      (CellAwareInvocationNamedValueBounds.included_root profile)
+      (fun represented shape => CellAwareInvocationAcceptedIndirectReceipts.origins profile represented shape)
+      (fun represented => CellAwareInvocationAcceptedIndirectReceipts.named_origins profile represented)
+      (CellAwareInvocationAcceptedNestedBounds.indirectFaults receiver child)
+      (fun issued => guard_frame artifact checked wellFormed header selected (row.sameNamed ▸ issued))
+      (fun plan noLambdas _grade below => CellAwareInvocationAcceptedIndirectLeaves.preserves_application profile
+        stages faults owner keyPhysical wellFormed noLambdas plan sizes below)
+      (fun plan noLambdas _grade below => CellAwareInvocationAcceptedIndirectLeaves.reflects_application profile
+        stages faults owner keyPhysical wellFormed noLambdas plan sizes below)
 
 include profile receiver support artifact checked wellFormed rows in
 /-- The direct-call head's application input holds for every admitted header
@@ -3334,7 +4043,11 @@ is a nested site, a declaration reference that the plan records no reference
 edge for, or the callee of a conversion; the compiler lowers neither reference
 on its own, so `closedNested` turns the check into `ClosedNested`. A reference
 to a builtin closure is a nested site of its own, since the compiler lowers it
-to the closure's value. -/
+to the closure's value, and so is a named function value whose instantiation
+the plan records. An indirect call is a nested site only when the check is
+given that the family admits every planned instantiation (`covers`), the
+callable table records no lambda and the planned instantiations have runtime
+contracts. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxRecDepth 4096
@@ -3342,11 +4055,14 @@ namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedNested
 open Core Frontend SourceInference
 open CallableIndexedNamedGeneration (Prepared)
 open CellAwareNamedExpressionSyntax (Site site?)
-open CellAwareInvocationAcceptedNestedTrees (Nested)
+open CellAwareInvocationAcceptedNestedTrees (Nested RuntimeContracts)
 open CellAwareInvocationAcceptedDirectSites (DirectSite)
 open CellAwareInvocationAcceptedCallSubsetCheck (ReferenceSite directSite? referenceSite?)
 open CellAwareInvocationAcceptedConversionSites (ConversionReference conversionSite? conversionReference?)
 open CellAwareInvocationAcceptedBuiltinSites (builtinSite?)
+open CellAwareInvocationAcceptedValueSites (ValueSite)
+open CellAwareInvocationAcceptedIndirectSites (IndirectSite)
+open CellAwareInvocationAcceptedIndirectPremises (CoversPlan NoLambdas)
 
 private def all? {P : ExpressionId → Prop} (check : (id : ExpressionId) → Option (PLift (P id))) :
     (ids : List ExpressionId) → Option (PLift (∀ argument ∈ ids, P argument))
@@ -3361,13 +4077,46 @@ private def all? {P : ExpressionId → Prop} (check : (id : ExpressionId) → Op
         exact head
       · exact tail argument member⟩
 
-/-- Proof-producing recognition of one nested site and its children. -/
+/-- Proof-producing recognition of a named function value of the row whose
+instantiation the plan records. -/
+def valueSite? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked)
+    (named : SourceCoreGeneralFunctions.Function) (source : TypedSource) (id : ExpressionId) :
+    Option (Σ' (site : ValueSite prepared named source id),
+      ∃ key, SourceCompilationPlan.exactInstantiationKey prepared.base.plan site.instantiation = .ok key) :=
+  match found : source.lookupExpression? id with
+  | none => none
+  | some node =>
+    match form : node.form with
+    | .reference name (.declaration instantiation) =>
+      match coercions : node.coercions, requirements : node.requirements with
+      | [], [] =>
+        match initializer : prepared.base.locals.bindings.find? (fun binding =>
+            decide (binding.caller = named.signature.key ∧ binding.initializer = id)) with
+        | some _ => none
+        | none =>
+          match substitution : instantiation.parameterSubstitution, predicates : instantiation.predicates with
+          | [], [] =>
+            match assumptions : named.specialized.assumptions with
+            | [] =>
+              match target : SourceCompilationPlan.exactInstantiationKey prepared.base.plan instantiation with
+              | .ok key => some ⟨⟨node, name, instantiation, found, form, coercions, requirements, initializer,
+                  ⟨substitution, predicates⟩, assumptions⟩, key, target⟩
+              | .error _ => none
+            | _ :: _ => none
+          | _, _ => none
+      | _, _ => none
+    | _ => none
+
+/-- Proof-producing recognition of one nested site and its children. An
+indirect call is recognized only with a proof that the family admits every
+planned instantiation, which the check cannot decide. -/
 def nested? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked)
     (named : SourceCoreGeneralFunctions.Function) (source : TypedSource)
     (called : DeclarationInstantiation → Prop) [DecidablePred called] :
-    (fuel : Nat) → (id : ExpressionId) → Option (PLift (Nested prepared named source called id))
-  | 0, _ => none
-  | fuel + 1, id =>
+    (fuel : Nat) → (id : ExpressionId) → (covers : Option (PLift (CoversPlan prepared.base.plan called)) := none) →
+      Option (PLift (Nested prepared named source called id))
+  | 0, _, _ => none
+  | fuel + 1, id, covers =>
     match site? prepared named source id with
     | some site =>
       match form : site.node.form with
@@ -3377,65 +4126,76 @@ def nested? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared
       | .tuple [] => some ⟨.literal site (form ▸ .unit)⟩
       | .reference _name (.local _binder) => some ⟨.read site form⟩
       | .unary _operator operand => do
-        let ⟨child⟩ ← nested? prepared named source called fuel operand
+        let ⟨child⟩ ← nested? prepared named source called fuel operand covers
         pure ⟨.unary site form child⟩
       | .binary left _operator right => do
-        let ⟨first⟩ ← nested? prepared named source called fuel left
-        let ⟨second⟩ ← nested? prepared named source called fuel right
+        let ⟨first⟩ ← nested? prepared named source called fuel left covers
+        let ⟨second⟩ ← nested? prepared named source called fuel right covers
         pure ⟨.binary site form first second⟩
       | .conditional condition thenId elseId => do
-        let ⟨test⟩ ← nested? prepared named source called fuel condition
-        let ⟨yes⟩ ← nested? prepared named source called fuel thenId
-        let ⟨no⟩ ← nested? prepared named source called fuel elseId
+        let ⟨test⟩ ← nested? prepared named source called fuel condition covers
+        let ⟨yes⟩ ← nested? prepared named source called fuel thenId covers
+        let ⟨no⟩ ← nested? prepared named source called fuel elseId covers
         pure ⟨.conditional site form test yes no⟩
       | .group inner => do
-        let ⟨child⟩ ← nested? prepared named source called fuel inner
+        let ⟨child⟩ ← nested? prepared named source called fuel inner covers
         pure ⟨.group site form child⟩
       | .tuple [left, right] => do
-        let ⟨first⟩ ← nested? prepared named source called fuel left
-        let ⟨second⟩ ← nested? prepared named source called fuel right
+        let ⟨first⟩ ← nested? prepared named source called fuel left covers
+        let ⟨second⟩ ← nested? prepared named source called fuel right covers
         pure ⟨.pair site form first second⟩
       | .index base key => do
-        let ⟨first⟩ ← nested? prepared named source called fuel base
-        let ⟨second⟩ ← nested? prepared named source called fuel key
+        let ⟨first⟩ ← nested? prepared named source called fuel base covers
+        let ⟨second⟩ ← nested? prepared named source called fuel key covers
         pure ⟨.index site form first second⟩
       | .reference _name (.builtinFunction function) =>
         match function.conversion? with
         | none => some ⟨.builtinValue site form⟩
         | some _ => none
+      | .call _callee _ids (.indirect _metadata) =>
+        match CellAwareInvocationAcceptedIndirectSites.indirectSite? prepared named source id, covers with
+        | some ⟨callee, ids, _metadata, ⟨indirect⟩⟩, some ⟨plan⟩ =>
+          if noLambdas : NoLambdas prepared.ancestry.graph.inputs.callable.table then
+            if runtime : RuntimeContracts prepared.base.plan then do
+              let ⟨calleeChild⟩ ← nested? prepared named source called fuel callee covers
+              let ⟨arguments⟩ ← all? (nested? prepared named source called fuel · covers) ids
+              pure ⟨indirect.elim fun indirect => .indirect indirect plan noLambdas runtime calleeChild arguments⟩
+            else none
+          else none
+        | _, _ => none
       | _ => none
     | none =>
       match directSite? prepared named source id with
       | some ⟨_callee, ids, instantiation, site⟩ =>
         if selected : called instantiation then
-          match all? (nested? prepared named source called fuel) ids with
+          match all? (nested? prepared named source called fuel · covers) ids with
           | some ⟨arguments⟩ => some ⟨.call site selected arguments⟩
           | none => none
         else none
       | none =>
         match conversionSite? prepared named source id with
         | some ⟨_callee, argument, _function, _target, site⟩ => do
-          let ⟨child⟩ ← nested? prepared named source called fuel argument
+          let ⟨child⟩ ← nested? prepared named source called fuel argument covers
           pure ⟨.conversion site child⟩
         | none =>
           match builtinSite? prepared named source id with
           | some ⟨_callee, ids, _function, site⟩ => do
-            let ⟨arguments⟩ ← all? (nested? prepared named source called fuel) ids
+            let ⟨arguments⟩ ← all? (nested? prepared named source called fuel · covers) ids
             pure ⟨.builtin site arguments⟩
           | none =>
             match CellAwareInvocationAcceptedTupleSites.tupleSite? prepared named source id with
             | some ⟨ids, site⟩ => do
-              let ⟨elements⟩ ← all? (nested? prepared named source called fuel) ids
+              let ⟨elements⟩ ← all? (nested? prepared named source called fuel · covers) ids
               pure ⟨.tuple site elements⟩
             | none =>
               match CellAwareInvocationAcceptedConstructorSites.constructorSite? prepared named source id with
               | some ⟨_instantiation, ids, site⟩ => do
-                let ⟨arguments⟩ ← all? (nested? prepared named source called fuel) ids
+                let ⟨arguments⟩ ← all? (nested? prepared named source called fuel · covers) ids
                 pure ⟨.constructor site arguments⟩
               | none =>
                 match CellAwareInvocationAcceptedArraySites.arraySite? prepared named source id with
                 | some ⟨form, site⟩ => do
-                  let ⟨children⟩ ← all? (nested? prepared named source called fuel)
+                  let ⟨children⟩ ← all? (nested? prepared named source called fuel · covers)
                     ((Staging.Recursive.arrayChildren form).getD [])
                   pure ⟨.array site children⟩
                 | none =>
@@ -3447,8 +4207,8 @@ def nested? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared
                       match CellAwareInvocationAcceptedMemrefSites.memrefSite? prepared named source id reference with
                       | none => none
                       | some site => do
-                        let ⟨first⟩ ← nested? prepared named source called fuel site.base
-                        let ⟨second⟩ ← nested? prepared named source called fuel site.subscript
+                        let ⟨first⟩ ← nested? prepared named source called fuel site.base covers
+                        let ⟨second⟩ ← nested? prepared named source called fuel site.subscript covers
                         pure ⟨.memrefLoad site
                           ((congrArg ExpressionNode.form (Option.some.inj (site.found.symm.trans found))).trans form)
                           first second⟩
@@ -3456,12 +4216,16 @@ def nested? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared
                       match CellAwareInvocationAcceptedMemrefSites.memrefSite? prepared named source id reference with
                       | none => none
                       | some site => do
-                        let ⟨first⟩ ← nested? prepared named source called fuel site.base
-                        let ⟨second⟩ ← nested? prepared named source called fuel site.subscript
-                        let ⟨third⟩ ← nested? prepared named source called fuel value
+                        let ⟨first⟩ ← nested? prepared named source called fuel site.base covers
+                        let ⟨second⟩ ← nested? prepared named source called fuel site.subscript covers
+                        let ⟨third⟩ ← nested? prepared named source called fuel value covers
                         pure ⟨.memrefStore site
                           ((congrArg ExpressionNode.form (Option.some.inj (site.found.symm.trans found))).trans form)
                           first second third⟩
+                    | .reference _name (.declaration _instantiation) =>
+                      match valueSite? prepared named source id with
+                      | some ⟨site, planned⟩ => some ⟨.namedValue site planned⟩
+                      | none => none
                     | _ => none
 
 /-- An expression node of the check: a nested site, a reference site, or the
@@ -3474,9 +4238,10 @@ def Checked {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared
 
 private def checkedNode? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked)
     (named : SourceCoreGeneralFunctions.Function) (source : TypedSource)
-    (called : DeclarationInstantiation → Prop) [DecidablePred called] (fuel : Nat) (id : ExpressionId) :
+    (called : DeclarationInstantiation → Prop) [DecidablePred called] (fuel : Nat) (id : ExpressionId)
+    (covers : Option (PLift (CoversPlan prepared.base.plan called)) := none) :
     Option (PLift (Checked prepared named source called id)) :=
-  match nested? prepared named source called fuel id with
+  match nested? prepared named source called fuel id covers with
   | some ⟨nested⟩ => some ⟨.inl nested⟩
   | none =>
     match referenceSite? prepared named source id with
@@ -3489,20 +4254,20 @@ private def checkedNode? {checked : SourceCoreCompatibleCatalog.Checked} (prepar
 private def sweep? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked)
     (named : SourceCoreGeneralFunctions.Function) (source : TypedSource)
     (called : DeclarationInstantiation → Prop) [DecidablePred called] (fuel : Nat) :
-    (nodes : List Node) →
+    (nodes : List Node) → (covers : Option (PLift (CoversPlan prepared.base.plan called)) := none) →
       Option (PLift (∀ node, Node.expression node ∈ nodes → Checked prepared named source called node.id))
-  | [] => some ⟨by intro node member; cases member⟩
-  | .expression node :: rest => do
-    let ⟨head⟩ ← checkedNode? prepared named source called fuel node.id
-    let ⟨tail⟩ ← sweep? prepared named source called fuel rest
+  | [], _ => some ⟨by intro node member; cases member⟩
+  | .expression node :: rest, covers => do
+    let ⟨head⟩ ← checkedNode? prepared named source called fuel node.id covers
+    let ⟨tail⟩ ← sweep? prepared named source called fuel rest covers
     pure ⟨by
       intro other member
       rcases List.mem_cons.mp member with same | member
       · cases same
         exact head
       · exact tail other member⟩
-  | .statement _ :: rest => do
-    let ⟨tail⟩ ← sweep? prepared named source called fuel rest
+  | .statement _ :: rest, covers => do
+    let ⟨tail⟩ ← sweep? prepared named source called fuel rest covers
     pure ⟨by
       intro other member
       rcases List.mem_cons.mp member with same | member
@@ -3512,17 +4277,54 @@ private def sweep? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : P
 /-- Every expression node of the Source is a nested site, a reference site or
 a conversion's callee.
 The fuel bounds the depth of the expression graph, which the node count
-bounds. -/
+bounds. Indirect calls are nested sites only under `covers`. -/
 def nodes? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked)
     (named : SourceCoreGeneralFunctions.Function) (source : TypedSource)
-    (called : DeclarationInstantiation → Prop) [DecidablePred called] :
+    (called : DeclarationInstantiation → Prop) [DecidablePred called]
+    (covers : Option (PLift (CoversPlan prepared.base.plan called)) := none) :
     Option (PLift (∀ id node, source.lookupExpression? id = some node →
       Checked prepared named source called id)) := do
-  let ⟨all⟩ ← sweep? prepared named source called (source.nodes.length + 1) source.nodes
+  let ⟨all⟩ ← sweep? prepared named source called (source.nodes.length + 1) source.nodes covers
   pure ⟨by
     intro id node found
     obtain ⟨member, same⟩ := lookupExpression?_sound found
     exact same ▸ all node member⟩
+
+section Transport
+variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked} {source : TypedSource}
+  {first second : SourceCoreGeneralFunctions.Function}
+
+/-- A value site retains its node and changes only the key of its
+local-inventory lookup and the row's assumptions. -/
+def transportValue (keyEq : first.signature.key = second.signature.key)
+    (assumptions : second.specialized.assumptions = []) {id : ExpressionId}
+    (site : ValueSite prepared first source id) : ValueSite prepared second source id where
+  node := site.node
+  name := site.name
+  instantiation := site.instantiation
+  found := site.found
+  form := site.form
+  coercions := site.coercions
+  requirements := site.requirements
+  notInitializer := keyEq ▸ site.notInitializer
+  monomorphic := site.monomorphic
+  assumptions := assumptions
+
+/-- An indirect site retains its node and changes only the key of its
+local-inventory lookup and the row's assumptions. -/
+def transportIndirect (keyEq : first.signature.key = second.signature.key)
+    (assumptions : second.specialized.assumptions = []) {id callee : ExpressionId} {ids : List ExpressionId}
+    {metadata : IndirectCallResolution} (site : IndirectSite prepared first source id callee ids metadata) :
+    IndirectSite prepared second source id callee ids metadata where
+  node := site.node
+  found := site.found
+  form := site.form
+  coercions := site.coercions
+  requirements := site.requirements
+  uncoerced := site.uncoerced
+  notInitializer := keyEq ▸ site.notInitializer
+  assumptions := assumptions
+end Transport
 
 /-- `Nested` depends on its row only through the row's key and its empty
 assumptions. -/
@@ -3566,6 +4368,9 @@ theorem transport {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Pr
   | memrefStore site form _ _ _ first second third =>
     exact .memrefStore (CellAwareInvocationAcceptedMemrefSites.transport keyEq assumptions site) form first second
       third
+  | namedValue site planned => exact .namedValue (transportValue keyEq assumptions site) planned
+  | indirect site plan noLambdas runtime _ _ calleeChild arguments =>
+    exact .indirect (transportIndirect keyEq assumptions site) plan noLambdas runtime calleeChild arguments
 
 /-- A named row whose every expression node is a nested site, a reference site
 or a conversion's callee has every accepted expression a nested site. -/

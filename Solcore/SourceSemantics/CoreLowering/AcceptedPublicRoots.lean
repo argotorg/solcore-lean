@@ -698,6 +698,8 @@ theorem expressions_of_family {called : DeclarationInstantiation → Prop}
       (CellAwareInvocationAcceptedNamedHeaders.record prepared aligned) called)
     (ports : CellAwareInvocationAcceptedCallExpressions.Ports (headers := headers) prepared.compilation
       (CellAwareInvocationAcceptedNamedHeaders.record prepared aligned))
+    (valuePorts : CellAwareInvocationAcceptedNestedTrees.NamedValuesOf whole.indexed.base.plan
+      prepared.named.signature.key → CellAwareNamedValuePorts.ValuePorts prepared.compilation headers)
     (wellFormed : ProgramWellFormed (Program.ofChecked whole.sourceProgram))
     (rows : ∀ callee, callee ∈ headers → called callee.instantiation →
       CellAwareInvocationAcceptedCallFamily.Row (headers := headers) called callee) :
@@ -722,6 +724,9 @@ theorem expressions_of_family {called : DeclarationInstantiation → Prop}
   have unique : NodeOccurrencesUnique (CallableIndexedNamedGeneration.source prepared.named) := by
     rw [← aligned.named]
     simpa only [CallableIndexedNamedGeneration.source, header.agreement.source] using functionUnique
+  have sizes : ∀ callee, callee ∈ headers → called callee.instantiation →
+      callee.globals = whole.indexed.base.globals.length :=
+    fun callee member admitted => (rows callee member admitted).sameGlobals
   have sourceEq : child.source = (index prepared aligned).source := by
     show child.source = CallableIndexedNamedGeneration.source prepared.named
     rw [← aligned.named]
@@ -744,6 +749,16 @@ theorem expressions_of_family {called : DeclarationInstantiation → Prop}
           checked wellFormed rows callee member admitted smaller,
         fun smaller _ => CellAwareInvocationAcceptedCallFamily.reflects callableProfile receiver support artifact
           checked wellFormed rows callee member admitted smaller⟩)
+    valuePorts (CellAwareInvocationNamedValueBounds.included_root callableProfile)
+    (fun represented shape => CellAwareInvocationAcceptedIndirectReceipts.origins callableProfile represented shape)
+    (fun represented => CellAwareInvocationAcceptedIndirectReceipts.named_origins callableProfile represented)
+    (CellAwareInvocationAcceptedNestedBounds.indirectFaults receiver child)
+    (fun issued => CellAwareInvocationAcceptedCallFamily.guard_frame artifact checked wellFormed header selectedChild
+      (aligned.named ▸ issued))
+    (fun plan noLambdas _grade below => CellAwareInvocationAcceptedIndirectLeaves.preserves_application
+      callableProfile stages faults owner keyPhysical wellFormed noLambdas plan sizes below)
+    (fun plan noLambdas _grade below => CellAwareInvocationAcceptedIndirectLeaves.reflects_application
+      callableProfile stages faults owner keyPhysical wellFormed noLambdas plan sizes below)
 
 variable {nativeArtifact : SourceCoreIndexedSession.Artifact}
   {nativeSession : SourceCoreIndexedSession.Session nativeArtifact}
