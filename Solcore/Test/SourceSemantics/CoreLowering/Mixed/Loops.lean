@@ -31,7 +31,7 @@ open Tests.SourceCompilerFeatureSupport (get require boot word)
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function mixedFor(flag: Bool) returns (Word, Bool) {",
+    "function mixedFor(flag: bool) returns (word, bool) {",
     "  let f = lam(value) { return value; };",
     "  let first = true;",
     "  let counter = 0;",
@@ -1524,7 +1524,7 @@ open Tests.SourceCompilerFeatureSupport (get require boot word)
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function mixedWhile(flag: Bool) returns (Word, Bool) {",
+    "function mixedWhile(flag: bool) returns (word, bool) {",
     "  let f = lam(value) { return value; };",
     "  let active = flag;",
     "  let first = true;",

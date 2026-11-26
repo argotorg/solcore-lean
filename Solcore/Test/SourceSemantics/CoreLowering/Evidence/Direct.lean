@@ -474,11 +474,11 @@ def observeRoot (function : CheckedFunction) (signature generic : ProgramFunctio
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
+    "trait Mark<T> {}", "impl Mark<word> {}", "impl Mark<bool> {}",
     "function choose<A, B>(a: A, b: B) returns (A) where A: Mark { return a; }",
     "function relay<A, B>(a: A, b: B) returns (A) where A: Mark { return choose(a, b); }",
-    "function wordRoot(value: Word, flag: Bool) returns (Word) { return relay(value, flag); }",
-    "function boolRoot(flag: Bool, value: Word) returns (Bool) { return relay(flag, value); }"]}] }
+    "function wordRoot(value: word, flag: bool) returns (word) { return relay(value, flag); }",
+    "function boolRoot(flag: bool, value: word) returns (bool) { return relay(flag, value); }"]}] }
 
 structure CheckedFixture where
   program : CheckedProgram

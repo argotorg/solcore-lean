@@ -26,11 +26,11 @@ private def assertTrue (test : Bool) (message : String) : IO Unit :=
 private def w (n : Nat) : Core.Word := Core.Word.ofNatModulo n
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Mark<T> {}", "impl Mark<Word> {}",
+    "trait Mark<T> {}", "impl Mark<word> {}",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
-    "function unusedViews(seed: Word) returns (Word) {",
+    "function unusedViews(seed: word) returns (word) {",
     " let outer = lam(value) { keep(value); let unused = lam(item) { return item; }; return seed; };",
-    " let one: Word = 1; let two: Word = 2; return outer(one) + outer(two); }"
+    " let one: word = 1; let two: word = 2; return outer(one) + outer(two); }"
   ]}] }
 
 def run : IO Unit := do
@@ -116,16 +116,16 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Mark<T> {}", "impl Mark<Word> {}",
-    "type F = function(Word) returns (Word);",
+    "trait Mark<T> {}", "impl Mark<word> {}",
+    "type F = function(word) returns (word);",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
-    "function escaped(seed: Word) returns (F, F) {",
-    " let outer = lam(value) { keep(value); let inner: F = lam(delta: Word) -> Word { seed = seed + delta; return seed; }; return inner; };",
-    " let one: Word = 1; let two: Word = 2; return (outer(one), outer(two)); }",
-    "function factory(seed: Word) returns (F) { return lam(delta: Word) -> Word { seed = seed + delta; return seed; }; }",
-    "function namedBoundary(seed: Word) returns (F) { return factory(seed); }",
-    "function failure(seed: Word) returns (Word) { let absent: Word; let f = lam(value) { keep(value); return absent; }; return f(seed); }",
-    "function empty() returns (function() returns (Word)) { return lam() -> Word { return 7; }; }"
+    "function escaped(seed: word) returns (F, F) {",
+    " let outer = lam(value) { keep(value); let inner: F = lam(delta: word) -> word { seed = seed + delta; return seed; }; return inner; };",
+    " let one: word = 1; let two: word = 2; return (outer(one), outer(two)); }",
+    "function factory(seed: word) returns (F) { return lam(delta: word) -> word { seed = seed + delta; return seed; }; }",
+    "function namedBoundary(seed: word) returns (F) { return factory(seed); }",
+    "function failure(seed: word) returns (word) { let absent: word; let f = lam(value) { keep(value); return absent; }; return f(seed); }",
+    "function empty() returns (function() returns (word)) { return lam() -> word { return 7; }; }"
   ]}] }
 private def key (program : CheckedProgram) (name : String) : IO Key := do
   match program.signatures.functions.filter (·.name == name) with
@@ -421,16 +421,16 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Mark<T> {}", "impl Mark<Word> {}",
-    "type F = function(Word) returns (Word);",
+    "trait Mark<T> {}", "impl Mark<word> {}",
+    "type F = function(word) returns (word);",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
-    "function escaped(seed: Word) returns (F, F) {",
-    " let outer = lam(value) { keep(value); let inner: F = lam(delta: Word) -> Word { seed = seed + delta; return seed; }; return inner; };",
-    " let one: Word = 1; let two: Word = 2; return (outer(one), outer(two)); }",
-    "function recursive(n: Word, value: Word) returns (F) { if (n == 0) { return lam(delta: Word) -> Word { value += delta; return value; }; } return recursive(n - 1, value + 1); }",
+    "function escaped(seed: word) returns (F, F) {",
+    " let outer = lam(value) { keep(value); let inner: F = lam(delta: word) -> word { seed = seed + delta; return seed; }; return inner; };",
+    " let one: word = 1; let two: word = 2; return (outer(one), outer(two)); }",
+    "function recursive(n: word, value: word) returns (F) { if (n == 0) { return lam(delta: word) -> word { value += delta; return value; }; } return recursive(n - 1, value + 1); }",
     "function repeated() returns (F, F) { return (recursive(2, 1), recursive(2, 10)); }",
-    "function failure(seed: Word) returns (Word) { let captured: F = lam(delta: Word) -> Word { seed += delta; return seed; }; let absent: Word; return absent; }",
-    "function suspended(seed: Word) returns (Word) { let captured: F = lam(delta: Word) -> Word { seed += delta; return seed; }; while (true) {} return 0; }"
+    "function failure(seed: word) returns (word) { let captured: F = lam(delta: word) -> word { seed += delta; return seed; }; let absent: word; return absent; }",
+    "function suspended(seed: word) returns (word) { let captured: F = lam(delta: word) -> word { seed += delta; return seed; }; while (true) {} return 0; }"
   ]}] }
 private def key (program : CheckedProgram) (name : String) : IO Key :=
   match program.signatures.functions.filter (·.name == name) with
@@ -650,13 +650,13 @@ private def w (value : Nat) : Core.Word := Core.Word.ofNatModulo value
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Mark<T> {}", "impl Mark<Word> {}",
-    "type WordFunction = function(Word) returns (Word);",
+    "trait Mark<T> {}", "impl Mark<word> {}",
+    "type WordFunction = function(word) returns (word);",
     "function keep<T>(item: T) returns (T) where T: Mark { return item; }",
     "function pair() returns (WordFunction, WordFunction) {",
     " let outer = lam(value) { keep(value);",
-    "   let inner: WordFunction = lam(item: Word) -> Word { return item; }; return inner; };",
-    " let one: Word = 1; let two: Word = 2; return (outer(one), outer(two)); }"
+    "   let inner: WordFunction = lam(item: word) -> word { return item; }; return inner; };",
+    " let one: word = 1; let two: word = 2; return (outer(one), outer(two)); }"
   ]}] }
 
 private def artifact (program : CheckedProgram) : IO SourceCoreCompatibleFunctions.Automatic := do
@@ -794,19 +794,19 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Holder { Hold(function(Word) returns (Word)) }",
-    "trait Marker<T> {}", "impl Marker<Word> {}",
+    "enum Holder { Hold(function(word) returns (word)) }",
+    "trait Marker<T> {}", "impl Marker<word> {}",
     "function keep<T>(value: T) returns (T) where T: Marker { return value; }",
-    "function inc(value: Word) returns (Word) { return value + 1; }",
-    "function dec(value: Word) returns (Word) { return value - 1; }",
-    "function getNamed() returns (function(Word) returns (Word)) { return inc; }",
-    "function getBuiltin() returns (function(Word) returns (integer)) { return wordToInteger; }",
-    "function getQualified() returns (function(Word) returns (Word)) { return keep; }",
+    "function inc(value: word) returns (word) { return value + 1; }",
+    "function dec(value: word) returns (word) { return value - 1; }",
+    "function getNamed() returns (function(word) returns (word)) { return inc; }",
+    "function getBuiltin() returns (function(word) returns (integer)) { return wordToInteger; }",
+    "function getQualified() returns (function(word) returns (word)) { return keep; }",
     "function getNominal() returns (Holder) { return .Hold(inc); }",
-    "function getTuple() returns (function(Word) returns (Word), function(Word) returns (integer)) { return (inc, wordToInteger); }",
-    "function mappingReturn(value: mapping(function(Word) returns (Word) => function(Word) returns (Word))) returns (mapping(function(Word) returns (Word) => function(Word) returns (Word))) { return value; }",
-    "function alias(value: mapping(@Word => function(Word) returns (Word))) returns (mapping(@Word => function(Word) returns (Word))) { return value; }",
-    "function make(value: Word) returns (function(Word) returns (Word)) { return lam(delta: Word) -> Word { value = value + delta; return value; }; }"
+    "function getTuple() returns (function(word) returns (word), function(word) returns (integer)) { return (inc, wordToInteger); }",
+    "function mappingReturn(value: mapping(function(word) returns (word) => function(word) returns (word))) returns (mapping(function(word) returns (word) => function(word) returns (word))) { return value; }",
+    "function alias(value: mapping(@word => function(word) returns (word))) returns (mapping(@word => function(word) returns (word))) { return value; }",
+    "function make(value: word) returns (function(word) returns (word)) { return lam(delta: word) -> word { value = value + delta; return value; }; }"
   ]}] }
 
 private def key (program : CheckedProgram) (name : String) : IO Key := do
@@ -979,10 +979,10 @@ private def get {ε α : Type} [Repr ε] (label : String) : Except ε α → IO 
   | .error error => throw (IO.userError s!"{label}: {reprStr error}")
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Mark<T> {}", "impl Mark<Word> {}",
+    "trait Mark<T> {}", "impl Mark<word> {}",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
-    "function sharedHistory(seed: Word) returns (Word) {",
-    " let shared = lam(item) { let probe: Word = 0; return item; };",
+    "function sharedHistory(seed: word) returns (word) {",
+    " let shared = lam(item) { let probe: word = 0; return item; };",
     " let outer = lam(value) { keep(value); return shared(value); };",
     " return outer(seed) + outer(seed); }"
   ]}] }
@@ -1315,13 +1315,13 @@ private def get {ε α : Type} [Repr ε] (label : String) : Except ε α → IO 
   | .error error => throw (IO.userError s!"{label}: {reprStr error}")
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Mark<T> {}", "impl Mark<Word> {}",
-    "type WordFunction = function(Word) returns (Word);",
+    "trait Mark<T> {}", "impl Mark<word> {}",
+    "type WordFunction = function(word) returns (word);",
     "function keep<T>(item: T) returns (T) where T: Mark { return item; }",
     "function pair() returns (WordFunction, WordFunction) {",
     " let outer = lam(value) { keep(value);",
-    "   let inner: WordFunction = lam(item: Word) -> Word { return item; }; return inner; };",
-    " let one: Word = 1; let two: Word = 2; return (outer(one), outer(two)); }"
+    "   let inner: WordFunction = lam(item: word) -> word { return item; }; return inner; };",
+    " let one: word = 1; let two: word = 2; return (outer(one), outer(two)); }"
   ]}] }
 
 def run : IO Unit := do
@@ -1388,11 +1388,11 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit :=
 private def w (value : Nat) : Core.Word := Core.Word.ofNatModulo value
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Mark<T> {}", "impl Mark<Word> {}",
+    "trait Mark<T> {}", "impl Mark<word> {}",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
-    "function unusedViews(seed: Word) returns (Word) {",
+    "function unusedViews(seed: word) returns (word) {",
     " let outer = lam(value) { keep(value); let unused = lam(item) { return item; }; return seed; };",
-    " let one: Word = 1; let two: Word = 2; return outer(one) + outer(two); }"
+    " let one: word = 1; let two: word = 2; return outer(one) + outer(two); }"
   ]}] }
 
 def run : IO Unit := do
@@ -1490,9 +1490,9 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit :=
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Mark<T> {}", "impl Mark<Word> {}",
+    "trait Mark<T> {}", "impl Mark<word> {}",
     "function keep<T>(item: T) returns (T) where T: Mark { return item; }",
-    "function main() returns (Word) {",
+    "function main() returns (word) {",
     " let f = lam(value) { keep(value); return value; }; return f(1); }"
   ]}] }
 
@@ -1545,19 +1545,19 @@ private def w (n : Nat) : Core.Word := Core.Word.ofNatModulo n
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
-    "trait Marker<T> {}", "impl Marker<mapping(Word => Word)> {}",
+    "trait Marker<T> {}", "impl Marker<mapping(word => word)> {}",
     "function keep<T>(value: T) returns (T) where T: Marker { return value; }",
-    "function local(table: mapping(Word => Word)) returns (mapping(Word => Word)) { let f = lam(item) { return keep(item); }; return f(table); }",
-    "function lazy() returns (mapping(Word => Word)) { let table: mapping(Word => Word); table[1] = 7; return table; }",
-    "function choose(value: Box<Word>) returns (Word) { match (value) { case .Box(bound) { return bound; } default { return 99; } } }",
-    "function capture(start: Word) returns (Word) { let value = start; let f = lam(step: Word) { value += step; return value; }; f(3); return f(4); }",
-    "function recursive(n: Word) returns (Word) { let f: function(Word) returns (Word); f = lam(left: Word) { return left == 0 ? 0 : f(left - 1) + 1; }; return f(n); }",
-    "function unused() returns (Word) { let unused = lam(item) { return item; }; return 7; }",
-    "function tuple(value: (Word, Bool)) returns (Word) { match (value) { case ((left, flag)) { return flag ? left : 99; } default { return 77; } } }",
-    "function looping(limit: Word) returns (Word) { let total = 0; for (let i = 0; i < limit; i += 1) { total += i; } return total; }",
-    "function absent() returns (Word) { let absent: Word; return absent; }"
-    , "function getLocal(start: Word) returns (function(Word) returns (Word)) { let value = start; let f = lam(item) { value += 1; return item; }; return f; }"
-    , "function useReturned(start: Word) returns (Word) { let f = getLocal(start); return f(9); }"
+    "function local(table: mapping(word => word)) returns (mapping(word => word)) { let f = lam(item) { return keep(item); }; return f(table); }",
+    "function lazy() returns (mapping(word => word)) { let table: mapping(word => word); table[1] = 7; return table; }",
+    "function choose(value: Box<word>) returns (word) { match (value) { case .Box(bound) { return bound; } default { return 99; } } }",
+    "function capture(start: word) returns (word) { let value = start; let f = lam(step: word) { value += step; return value; }; f(3); return f(4); }",
+    "function recursive(n: word) returns (word) { let f: function(word) returns (word); f = lam(left: word) { return left == 0 ? 0 : f(left - 1) + 1; }; return f(n); }",
+    "function unused() returns (word) { let unused = lam(item) { return item; }; return 7; }",
+    "function tuple(value: (word, bool)) returns (word) { match (value) { case ((left, flag)) { return flag ? left : 99; } default { return 77; } } }",
+    "function looping(limit: word) returns (word) { let total = 0; for (let i = 0; i < limit; i += 1) { total += i; } return total; }",
+    "function absent() returns (word) { let absent: word; return absent; }"
+    , "function getLocal(start: word) returns (function(word) returns (word)) { let value = start; let f = lam(item) { value += 1; return item; }; return f; }"
+    , "function useReturned(start: word) returns (word) { let f = getLocal(start); return f(9); }"
   ]}] }
 
 private def key (program : CheckedProgram) (name : String) : IO Key :=
@@ -1643,7 +1643,7 @@ private def manyRoots : IO Unit := do
     mainSources := [{
       path := "main.solc"
       content := "pragma solcore;\n" ++ String.intercalate "\n" ((List.range 40).map fun index =>
-        "function root" ++ toString index ++ "() returns (Word) { return 7; }")}] }
+        "function root" ++ toString index ++ "() returns (word) { return 7; }")}] }
   let program ← match checkProgram workspace with
     | .ok program => pure program | .error error => throw (IO.userError s!"many roots rejected: {reprStr error}")
   let plan ← match SourceSpecializationWorklist.run program
@@ -1816,10 +1816,10 @@ private def get {ε α : Type} [Repr ε] (label : String) : Except ε α → IO 
   | .error error => throw (IO.userError s!"{label}: {reprStr error}")
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Mark<T> {}", "impl Mark<Word> {}",
-    "type F = function(Word) returns (Word);",
+    "trait Mark<T> {}", "impl Mark<word> {}",
+    "type F = function(word) returns (word);",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
-    "function nested(seed: Word) returns (F, F) { let outer = lam(value) { keep(value); let inner = lam(item) { keep(item); return seed; }; return (inner, inner); }; let one: Word = 1; return outer(one); }"
+    "function nested(seed: word) returns (F, F) { let outer = lam(value) { keep(value); let inner = lam(item) { keep(item); return seed; }; return (inner, inner); }; let one: word = 1; return outer(one); }"
   ]}] }
 
 def run : IO Unit := do
@@ -1891,14 +1891,14 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Mark<T> {}", "impl Mark<Word> {}",
-    "type F = function(Word) returns (Word);",
+    "trait Mark<T> {}", "impl Mark<word> {}",
+    "type F = function(word) returns (word);",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
-    "function views(seed: Word) returns (F, F) { let f = lam(item) { keep(item); seed += 1; return seed; }; return (f, f); }",
-    "function nested(seed: Word) returns (F, F) { let outer = lam(value) { keep(value); let inner = lam(item) { keep(item); seed += 1; return seed; }; return (inner, inner); }; let one: Word = 1; return outer(one); }",
-    "function mono(seed: Word) returns (F) { let f: F = lam(item: Word) -> Word { seed += item; return seed; }; return f; }",
-    "function failure(seed: Word) returns (Word) { let f = lam(item) { keep(item); seed += 1; return seed; }; let captured: F = f; let absent: Word; return absent; }",
-    "function suspended(seed: Word) returns (Word) { let f = lam(item) { keep(item); seed += 1; return seed; }; let captured: F = f; while (true) {} return 0; }"
+    "function views(seed: word) returns (F, F) { let f = lam(item) { keep(item); seed += 1; return seed; }; return (f, f); }",
+    "function nested(seed: word) returns (F, F) { let outer = lam(value) { keep(value); let inner = lam(item) { keep(item); seed += 1; return seed; }; return (inner, inner); }; let one: word = 1; return outer(one); }",
+    "function mono(seed: word) returns (F) { let f: F = lam(item: word) -> word { seed += item; return seed; }; return f; }",
+    "function failure(seed: word) returns (word) { let f = lam(item) { keep(item); seed += 1; return seed; }; let captured: F = f; let absent: word; return absent; }",
+    "function suspended(seed: word) returns (word) { let f = lam(item) { keep(item); seed += 1; return seed; }; let captured: F = f; while (true) {} return 0; }"
   ]}] }
 private def key (program : CheckedProgram) (name : String) : IO Key :=
   match program.signatures.functions.filter (·.name == name) with
@@ -2236,18 +2236,18 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Mark<T> {}", "impl Mark<Word> {}",
-    "type F = function(Word) returns (Word);",
+    "trait Mark<T> {}", "impl Mark<word> {}",
+    "type F = function(word) returns (word);",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
-    "function escaped(seed: Word) returns (F, F) {",
-    " let outer = lam(value) { keep(value); let inner: F = lam(delta: Word) -> Word { seed = seed + delta; return seed; }; return inner; };",
-    " let one: Word = 1; let two: Word = 2; return (outer(one), outer(two)); }",
-    "function maker(value: Word) returns (F) { return lam(delta: Word) -> Word { value = value + delta; return value; }; }",
-    "function zero() returns (function() returns (Word)) { return lam() -> Word { return 7; }; }",
-    "function loop(value: Word) returns (F) { let f: F; while (true) { f = lam(delta: Word) -> Word { value = value + delta; return value; }; break; } return f; }",
-    "function unused(value: Word) returns (Word) { let ignored = lam(item) { return item; }; return value; }",
-    "function poly(flag: Bool) returns (Word, Bool) { let f = lam(item) { return item; }; return (f(1), f(flag)); }",
-    "function nestedPoly(flag: Bool) returns (Word, Word) { let outer = lam(value) { let inner = lam(item) { return item; }; return inner(1); }; let one: Word = 1; return (outer(one), outer(flag)); }"
+    "function escaped(seed: word) returns (F, F) {",
+    " let outer = lam(value) { keep(value); let inner: F = lam(delta: word) -> word { seed = seed + delta; return seed; }; return inner; };",
+    " let one: word = 1; let two: word = 2; return (outer(one), outer(two)); }",
+    "function maker(value: word) returns (F) { return lam(delta: word) -> word { value = value + delta; return value; }; }",
+    "function zero() returns (function() returns (word)) { return lam() -> word { return 7; }; }",
+    "function loop(value: word) returns (F) { let f: F; while (true) { f = lam(delta: word) -> word { value = value + delta; return value; }; break; } return f; }",
+    "function unused(value: word) returns (word) { let ignored = lam(item) { return item; }; return value; }",
+    "function poly(flag: bool) returns (word, bool) { let f = lam(item) { return item; }; return (f(1), f(flag)); }",
+    "function nestedPoly(flag: bool) returns (word, word) { let outer = lam(value) { let inner = lam(item) { return item; }; return inner(1); }; let one: word = 1; return (outer(one), outer(flag)); }"
   ]}] }
 private def key (program : CheckedProgram) (name : String) : IO Key :=
   match program.signatures.functions.filter (·.name == name) with

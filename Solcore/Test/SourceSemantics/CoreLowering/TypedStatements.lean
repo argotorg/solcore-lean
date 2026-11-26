@@ -154,11 +154,11 @@ theorem accepted_reflects (native : SourceCoreGeneralFunctions.CallableContext)
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function choose(m: mapping((Bool, Bool) => Word)) returns (integer) { return wordToInteger(m[(true, false)]); }",
-    "function lazy() returns (integer) { let m: mapping((Bool, Bool) => Word); return wordToInteger(m[(true, false)]); }",
+    "function choose(m: mapping((bool, bool) => word)) returns (integer) { return wordToInteger(m[(true, false)]); }",
+    "function lazy() returns (integer) { let m: mapping((bool, bool) => word); return wordToInteger(m[(true, false)]); }",
     "function paired(a: integer, b: integer) returns (integer) { return integerSub(true ? a : b, false ? a : b); }",
-    "function skipped(a: integer) returns (integer) { let missing: Bool; let m: mapping((Bool, Bool) => Word); return wordToInteger((false && missing) ? m[(true, false)] : 7); }",
-    "function failed() returns (integer) { let missing: Bool; let m: mapping((Bool, Bool) => Word); return wordToInteger(m[(true, missing)]); }"]}]}
+    "function skipped(a: integer) returns (integer) { let missing: bool; let m: mapping((bool, bool) => word); return wordToInteger((false && missing) ? m[(true, false)] : 7); }",
+    "function failed() returns (integer) { let missing: bool; let m: mapping((bool, bool) => word); return wordToInteger(m[(true, missing)]); }"]}]}
 
 def run : IO Unit := do
   let checked ← SourceCompilerFeatureSupport.get "typed builtin source checker" (checkProgram workspace)
@@ -313,10 +313,10 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function twice() returns ((Bool, Bool)) { let m: mapping(Bool => Bool); return (m[true], m[false]); }",
-    "function fault() returns ((Bool, Bool, Bool)) { let m: mapping(Bool => Bool); let missing: Bool; let other: mapping(Bool => Bool); return (m[true], missing, other[false]); }",
-    "function payload() returns ((mapping(Bool => Bool), Bool)) { let m: mapping(Bool => mapping(Bool => Bool)); let n: mapping(Bool => Bool); return (m[true], n[false]); }",
-    "function key_fault() returns ((Bool, Bool)) { let m: mapping(Bool => Bool); let missing: Bool; return (m[true], m[missing]); }"
+    "function twice() returns ((bool, bool)) { let m: mapping(bool => bool); return (m[true], m[false]); }",
+    "function fault() returns ((bool, bool, bool)) { let m: mapping(bool => bool); let missing: bool; let other: mapping(bool => bool); return (m[true], missing, other[false]); }",
+    "function payload() returns ((mapping(bool => bool), bool)) { let m: mapping(bool => mapping(bool => bool)); let n: mapping(bool => bool); return (m[true], n[false]); }",
+    "function key_fault() returns ((bool, bool)) { let m: mapping(bool => bool); let missing: bool; return (m[true], m[missing]); }"
   ]}] }
 private def reached : Nat → TypedSource → ExpressionId → List ExpressionNode
   | 0, _, _ => []
@@ -523,14 +523,14 @@ abbrev original_native_return := @Tests.SourceCoreReachableStatementContinuation
 abbrev original_native_fault := @Tests.SourceCoreReachableStatementContinuations.concrete_fault_stops
 
 private def content : String := String.intercalate "\n" [
-  "enum Choice { Left(Word), Right(Word) }",
-  "function nestedDefault(seed: Word) returns (Word) { { match (seed) { case 0 { return 19; } default { return 23; } } } let gap: Word; gap; }",
-  "function nestedIf(seed: Word) returns (Word) { if (seed == 0) { match (seed) { case 0 { return 29; } default { return 31; } } } else { return 37; } let gap: Word; gap; }",
-  "function deep(seed: Word) returns (Word) { { match (seed) { case 0 { return 47; } default { { match (seed + 1) { case 2 { return 41; } default { return 43; } } } } } } return 99; }",
-  "function prefix(seed: Word) returns (Word) { let stamp: Word = 53; { match (seed) { case 0 { let gap: Word; return gap; } default { return 59; } } } let dead = 99; return dead; }",
-  "function unit(seed: Word) returns (Unit) { { match (seed) { case 0 { return; } default { return; } } } let gap: Word; gap; }",
-  "function ordinary(seed: Word) returns (Word) { match (seed) { case 0 {} default { return 71; } } return 67; }",
-  "function noDefault(value: Choice) returns (Word) { match (value) { case .Left(x) { return x; } case .Right(y) { return y; } } }"
+  "enum Choice { Left(word), Right(word) }",
+  "function nestedDefault(seed: word) returns (word) { { match (seed) { case 0 { return 19; } default { return 23; } } } let gap: word; gap; }",
+  "function nestedIf(seed: word) returns (word) { if (seed == 0) { match (seed) { case 0 { return 29; } default { return 31; } } } else { return 37; } let gap: word; gap; }",
+  "function deep(seed: word) returns (word) { { match (seed) { case 0 { return 47; } default { { match (seed + 1) { case 2 { return 41; } default { return 43; } } } } } } return 99; }",
+  "function prefix(seed: word) returns (word) { let stamp: word = 53; { match (seed) { case 0 { let gap: word; return gap; } default { return 59; } } } let dead = 99; return dead; }",
+  "function unit(seed: word) returns (()) { { match (seed) { case 0 { return; } default { return; } } } let gap: word; gap; }",
+  "function ordinary(seed: word) returns (word) { match (seed) { case 0 {} default { return 71; } } return 67; }",
+  "function noDefault(value: Choice) returns (word) { match (value) { case .Left(x) { return x; } case .Right(y) { return y; } } }"
 ]
 private def w (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
@@ -884,18 +884,18 @@ end CompilerBridge
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function mixed() returns (Word) { let sum = 0; for (let i: Word, i = 0, let flag: Bool = true; i < 3; let copy = i, i = copy + 1) { if (flag) { sum += i; } } return sum; }",
-    "function shadow() returns (Word) { let i = 17; for (let i: Word = 0; i < 2; let copy = i, i = copy + 1) { continue; } return i; }",
-    "function falseFirst() returns (Word) { for (let i: Word = 5; false; let never: Word = 99) { return 0; } return 5; }",
-    "function breaks() returns (Word) { for (let i: Word = 0; true; let never: Word = 99) { break; } return 1; }",
-    "function returns() returns (Word) { for (let i = 0; true; let never: Word = 99) { return i; } return 1; }",
-    "function initializerFault() returns (Word) { let missing: Word; let seen: mapping(Bool => Word); for (let ready: Word = 1, let dead = seen[false] + missing; true; ) { return 0; } return 1; }",
-    "function postFault() returns (Word) { let missing: Word; let seen: mapping(Bool => Word); for (let i = 0; true; let copy = i, i = seen[false] + missing, let never: Word = 99) { continue; } return 1; }",
-    "function postAbsent() returns (Word) { for (let i = 0; true; let absent: Word, i = absent) { continue; } return 1; }"
+    "function mixed() returns (word) { let sum = 0; for (let i: word, i = 0, let flag: bool = true; i < 3; let copy = i, i = copy + 1) { if (flag) { sum += i; } } return sum; }",
+    "function shadow() returns (word) { let i = 17; for (let i: word = 0; i < 2; let copy = i, i = copy + 1) { continue; } return i; }",
+    "function falseFirst() returns (word) { for (let i: word = 5; false; let never: word = 99) { return 0; } return 5; }",
+    "function breaks() returns (word) { for (let i: word = 0; true; let never: word = 99) { break; } return 1; }",
+    "function returns() returns (word) { for (let i = 0; true; let never: word = 99) { return i; } return 1; }",
+    "function initializerFault() returns (word) { let missing: word; let seen: mapping(bool => word); for (let ready: word = 1, let dead = seen[false] + missing; true; ) { return 0; } return 1; }",
+    "function postFault() returns (word) { let missing: word; let seen: mapping(bool => word); for (let i = 0; true; let copy = i, i = seen[false] + missing, let never: word = 99) { continue; } return 1; }",
+    "function postAbsent() returns (word) { for (let i = 0; true; let absent: word, i = absent) { continue; } return 1; }"
   ]}] }
 private def escape : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function main() returns (Word) { for (let i = 0; false; let copy = i) { } return copy; }"}] }
+    "function main() returns (word) { for (let i = 0; false; let copy = i) { } return copy; }"}] }
 private def failureResume (entry : SourceCompilerFeatureSupport.Entry) : IO Unit := do
   let complete ← entry.invoke []
   let token ← match complete.outcome with
@@ -1141,12 +1141,12 @@ end CompilerBridge
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Box { Box(Word) }",
-    "function repeated() returns (Word) { let i = 0; let sum: Word; sum = 0; while (i < 5) { i += 1; if (i == 2) { continue; } { let shadow = i; sum += shadow; } if (i == 4) { break; } } return sum; }",
-    "function nested() returns (Word) { let i = 0; let m: mapping(Bool => Word); while (i < 3) { let j = 0; while (j < 2) { j += 1; m[true] = i * 10 + j; } i += 1; } return m[true]; }",
-    "function early() returns (Word) { let i = 0; while (true) { i += 1; if (i == 3) { return i; } } return 99; }",
-    "function rhsFault() returns (Word) { let i: Word = 0; let m: mapping(Bool => Word); let keys: mapping(Bool => Bool); let lazy: mapping(Bool => Word); let missing: Word; while (i < 2) { i += 1; m[keys[true]] = lazy[false] + missing; let never = true; } return 0; }",
-    "function targetFault() returns (Word) { let i: Word = 0; let m: mapping(Bool => Box); let keys: mapping(Bool => Bool); let rhs: mapping(Bool => Word); while (i < 2) { i += 1; m[keys[true]] = .Box(rhs[false]); } return 0; }"
+    "enum Box { Box(word) }",
+    "function repeated() returns (word) { let i = 0; let sum: word; sum = 0; while (i < 5) { i += 1; if (i == 2) { continue; } { let shadow = i; sum += shadow; } if (i == 4) { break; } } return sum; }",
+    "function nested() returns (word) { let i = 0; let m: mapping(bool => word); while (i < 3) { let j = 0; while (j < 2) { j += 1; m[true] = i * 10 + j; } i += 1; } return m[true]; }",
+    "function early() returns (word) { let i = 0; while (true) { i += 1; if (i == 3) { return i; } } return 99; }",
+    "function rhsFault() returns (word) { let i: word = 0; let m: mapping(bool => word); let keys: mapping(bool => bool); let lazy: mapping(bool => word); let missing: word; while (i < 2) { i += 1; m[keys[true]] = lazy[false] + missing; let never = true; } return 0; }",
+    "function targetFault() returns (word) { let i: word = 0; let m: mapping(bool => Box); let keys: mapping(bool => bool); let rhs: mapping(bool => word); while (i < 2) { i += 1; m[keys[true]] = .Box(rhs[false]); } return 0; }"
   ]}] }
 private def failureResume (entry : SourceCompilerFeatureSupport.Entry) : IO Unit := do
   let complete ← entry.invoke []
@@ -1400,19 +1400,19 @@ end CompilerBridge
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Box { Box(Word) }",
-    "function nested() returns (Word) { let sum = 0; let m: mapping(Bool => Word); for (let i: Word, i = 0; i < 3; let copy = i, i = copy + 1) { let j = 0; while (j < 2) { j += 1; if (j == 1) { continue; } for (let k = 0; k < 2; k += 1) { m[true] = i * 10 + j + k; sum += k; } } } return m[true] + sum; }",
-    "function transfers() returns (Word) { let sum = 0; for (let i = 0; i < 5; let copy = i, i = copy + 1) { if (i == 1) { continue; } { let copy = i; sum += copy; } if (i == 3) { break; } } return sum; }",
-    "function early() returns (Word) { for (let i = 0; true; let copy = i, i = copy + 1) { for (let j = 0; j < 2; j += 1) { if (i == 2) { return i + j; } } } return 99; }",
-    "function falseFirst() returns (Word) { let i = 17; for (let i: Word = 3; false; let never: Word = 99) { return 0; } return i; }",
-    "function bodyFault() returns (Word) { let m: mapping(Bool => Word); let keys: mapping(Bool => Bool); let lazy: mapping(Bool => Word); let missing: Word; for (let i: Word = 0; i < 2; let never: Word = 99) { i += 1; m[keys[true]] = lazy[false] + missing; } return 0; }",
-    "function postFault() returns (Word) { let missing: Word; let seen: mapping(Bool => Word); for (let i = 0; true; let copy = i, i = seen[false] + missing, let never: Word = 99) { continue; } return 1; }",
-    "function initializerFault() returns (Word) { let missing: Word; let seen: mapping(Bool => Word); for (let ready: Word = 1, let dead = seen[false] + missing; true; ) { return 0; } return 1; }",
-    "function conditionFault() returns (Word) { let missing: Bool; let seen: mapping(Bool => Bool); for (let ready: Word = 1; seen[false] || missing; let never: Word = 99) { return 0; } return 1; }"
+    "enum Box { Box(word) }",
+    "function nested() returns (word) { let sum = 0; let m: mapping(bool => word); for (let i: word, i = 0; i < 3; let copy = i, i = copy + 1) { let j = 0; while (j < 2) { j += 1; if (j == 1) { continue; } for (let k = 0; k < 2; k += 1) { m[true] = i * 10 + j + k; sum += k; } } } return m[true] + sum; }",
+    "function transfers() returns (word) { let sum = 0; for (let i = 0; i < 5; let copy = i, i = copy + 1) { if (i == 1) { continue; } { let copy = i; sum += copy; } if (i == 3) { break; } } return sum; }",
+    "function early() returns (word) { for (let i = 0; true; let copy = i, i = copy + 1) { for (let j = 0; j < 2; j += 1) { if (i == 2) { return i + j; } } } return 99; }",
+    "function falseFirst() returns (word) { let i = 17; for (let i: word = 3; false; let never: word = 99) { return 0; } return i; }",
+    "function bodyFault() returns (word) { let m: mapping(bool => word); let keys: mapping(bool => bool); let lazy: mapping(bool => word); let missing: word; for (let i: word = 0; i < 2; let never: word = 99) { i += 1; m[keys[true]] = lazy[false] + missing; } return 0; }",
+    "function postFault() returns (word) { let missing: word; let seen: mapping(bool => word); for (let i = 0; true; let copy = i, i = seen[false] + missing, let never: word = 99) { continue; } return 1; }",
+    "function initializerFault() returns (word) { let missing: word; let seen: mapping(bool => word); for (let ready: word = 1, let dead = seen[false] + missing; true; ) { return 0; } return 1; }",
+    "function conditionFault() returns (word) { let missing: bool; let seen: mapping(bool => bool); for (let ready: word = 1; seen[false] || missing; let never: word = 99) { return 0; } return 1; }"
   ]}] }
 private def escape : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function main() returns (Word) { for (let i = 0; false; let copy = i) { } return copy; }"}] }
+    "function main() returns (word) { for (let i = 0; false; let copy = i) { } return copy; }"}] }
 private def failureResume (entry : SourceCompilerFeatureSupport.Entry) : IO Unit := do
   let complete ← entry.invoke []
   let token ← match complete.outcome with
@@ -1655,13 +1655,13 @@ end CompilerBridge
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function nested() returns (Word) { let x = 7; for (x ~=, let i = 0; i < 2; x ~=, i += 1) { { x ~=; } let j = 0; while (j < 2) { x ~=; j += 1; } } return x; }",
-    "function transfer() returns (Word) { let x = 5; for (x ~=, let i = 0; true; x ~=, i += 1) { if (i == 0) { continue; } { x ~=; break; } } return x; }",
-    "function early() returns (Word) { let x = 9; for (x ~=; true; x ~=) { x ~=; return x; } return 0; }",
-    "function falseFirst() returns (Word) { let x = 2; for (x ~=; false; x ~=) { x ~=; } return x; }",
-    "function postFault() returns (Word) { let missing: Word; let seen: Word = 0; for (let i: Word = 0; true; let copy = i, seen = 8, missing ~=, let never: Word = 99) { seen = 3; continue; } return 1; }",
-    "function initializerFault() returns (Word) { let missing: Word; let seen: Word = 0; for (seen = 6, missing ~=, let never: Word = 99; true; ) { seen = 3; } return 1; }",
-    "function bodyFault() returns (Word) { let missing: Word; let seen: Word = 0; for (seen = 6; true; seen = 7) { { missing ~=; } seen = 8; } return 1; }"
+    "function nested() returns (word) { let x = 7; for (x ~=, let i = 0; i < 2; x ~=, i += 1) { { x ~=; } let j = 0; while (j < 2) { x ~=; j += 1; } } return x; }",
+    "function transfer() returns (word) { let x = 5; for (x ~=, let i = 0; true; x ~=, i += 1) { if (i == 0) { continue; } { x ~=; break; } } return x; }",
+    "function early() returns (word) { let x = 9; for (x ~=; true; x ~=) { x ~=; return x; } return 0; }",
+    "function falseFirst() returns (word) { let x = 2; for (x ~=; false; x ~=) { x ~=; } return x; }",
+    "function postFault() returns (word) { let missing: word; let seen: word = 0; for (let i: word = 0; true; let copy = i, seen = 8, missing ~=, let never: word = 99) { seen = 3; continue; } return 1; }",
+    "function initializerFault() returns (word) { let missing: word; let seen: word = 0; for (seen = 6, missing ~=, let never: word = 99; true; ) { seen = 3; } return 1; }",
+    "function bodyFault() returns (word) { let missing: word; let seen: word = 0; for (seen = 6; true; seen = 7) { { missing ~=; } seen = 8; } return 1; }"
   ]}] }
 private def rejected : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
@@ -2045,13 +2045,13 @@ theorem compiled_failure_preserves {layouts : SourceCoreAllocationLayouts.Prepar
 
 private def rawWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Box { Box(Bool) }",
-    "function nested(take: Bool) returns (Bool) { let x = true; let m: mapping(Bool => Bool); if (take) { let x = m[true]; { let y = !x; y; } } else { let x = !m[false]; { let y: Bool; x; } } let out = x; return out; }",
-    "function shadow() returns (Bool) { let x = true; { let x = false; { let x = true; x; } x; } return x; }",
-    "function fail() returns (Bool) { let m: mapping(Bool => Bool); { let a = m[true]; let missing: Bool; if (true) { let b = !m[false]; let failed = (m[true], missing); let never = false; } } return true; }",
-    "function missingDefault() returns (Bool) { let m: mapping(Bool => Box); if (false) { let skip = false; } else { let a = true; { let gap: Word; let failed = m[true]; } } return true; }",
-    "function early() returns (Bool) { let m: mapping(Bool => Bool); { let x = m[true]; if (!x) { let hidden: Word; return !x; } } let unreachable = false; return false; }",
-    "function boxed() returns (Box) { { let unused: Word; } if (true) { let flag = true; return Box(flag); } return Box(false); }"]}] }
+    "enum Box { Box(bool) }",
+    "function nested(take: bool) returns (bool) { let x = true; let m: mapping(bool => bool); if (take) { let x = m[true]; { let y = !x; y; } } else { let x = !m[false]; { let y: bool; x; } } let out = x; return out; }",
+    "function shadow() returns (bool) { let x = true; { let x = false; { let x = true; x; } x; } return x; }",
+    "function fail() returns (bool) { let m: mapping(bool => bool); { let a = m[true]; let missing: bool; if (true) { let b = !m[false]; let failed = (m[true], missing); let never = false; } } return true; }",
+    "function missingDefault() returns (bool) { let m: mapping(bool => Box); if (false) { let skip = false; } else { let a = true; { let gap: word; let failed = m[true]; } } return true; }",
+    "function early() returns (bool) { let m: mapping(bool => bool); { let x = m[true]; if (!x) { let hidden: word; return !x; } } let unreachable = false; return false; }",
+    "function boxed() returns (Box) { { let unused: word; } if (true) { let flag = true; return Box(flag); } return Box(false); }"]}] }
 
 private def requireFailureResume (entry : SourceCompilerFeatureSupport.Entry) : IO Unit := do
   let invocation ← entry.invoke []
@@ -2293,16 +2293,16 @@ theorem unit_source_exit :
   exact ⟨executed, true_fallthrough_unit unitSyntax unitUnique (.control executed)⟩
 
 private def content : String := String.intercalate "\n" [
-  "enum Item { Item(Bool) }",
-  "function unit() { let outer: Word; { let inner = true; } }",
-  "function nested(flag: Bool, raw: mapping(Bool => Bool)) returns (Bool) { let x = true; let m: mapping(Bool => Bool); if (flag) { let x = m[true]; { let y = !x; y; } } else { let x = !raw[false]; { let gap: Bool; x; } } let out = x; return out; }",
-  "function shadow(flag: Bool) returns (Bool) { let x = flag; { let x = !flag; { let x = flag; x; } x; } return x; }",
-  "function early(flag: Bool) returns (Bool) { let m: mapping(Bool => Bool); { let x = m[flag]; if (!x) { let hidden: Word; return !x; } } let unreachable = false; return false; }",
-  "function conditionFault(flag: Bool) returns (Bool) { let gap: Bool; if (gap) { let skipped = flag; } return flag; }",
-  "function branchFault(flag: Bool) returns (Bool) { let outer = flag; { let gap: Bool; if (flag) { let before = !outer; let failed = gap; } else { let skipped = outer; } } return outer; }",
-  "function missing(flag: Bool) returns (Bool) { let m: mapping(Bool => Item); if (flag) { let gap: Word; let failed = m[flag]; } return false; }",
-  "function identity(flag: Bool) returns (Bool) { return flag; }",
-  "function callable(f: function(Bool) returns (Bool), flag: Bool) returns (function(Bool) returns (Bool)) { { let alias = f; alias; } if (flag) { let same = f; return same; } return f; }"
+  "enum Item { Item(bool) }",
+  "function unit() { let outer: word; { let inner = true; } }",
+  "function nested(flag: bool, raw: mapping(bool => bool)) returns (bool) { let x = true; let m: mapping(bool => bool); if (flag) { let x = m[true]; { let y = !x; y; } } else { let x = !raw[false]; { let gap: bool; x; } } let out = x; return out; }",
+  "function shadow(flag: bool) returns (bool) { let x = flag; { let x = !flag; { let x = flag; x; } x; } return x; }",
+  "function early(flag: bool) returns (bool) { let m: mapping(bool => bool); { let x = m[flag]; if (!x) { let hidden: word; return !x; } } let unreachable = false; return false; }",
+  "function conditionFault(flag: bool) returns (bool) { let gap: bool; if (gap) { let skipped = flag; } return flag; }",
+  "function branchFault(flag: bool) returns (bool) { let outer = flag; { let gap: bool; if (flag) { let before = !outer; let failed = gap; } else { let skipped = outer; } } return outer; }",
+  "function missing(flag: bool) returns (bool) { let m: mapping(bool => Item); if (flag) { let gap: word; let failed = m[flag]; } return false; }",
+  "function identity(flag: bool) returns (bool) { return flag; }",
+  "function callable(f: function(bool) returns (bool), flag: bool) returns (function(bool) returns (bool)) { { let alias = f; alias; } if (flag) { let same = f; return same; } return f; }"
 ]
 
 private def finished (compiled : SourceCoreUnifiedCompilation.Compiled) (name : String)
@@ -2559,13 +2559,13 @@ theorem compiled_reflects {layouts : SourceCoreAllocationLayouts.Prepared} {fram
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function falseLoop() returns (Word) { let x: Word = 7; while (false) { let skip: Word = 8; } return x; }",
-    "function nestedBreak(flag: Bool) returns (Word) { let x: Word = 7; while (true) { let x: Word = 8; { let z: Word; if (flag) { break; } else { break; } } let skipped: Word = 9; } return x; }",
-    "function earlyReturn() returns (Word) { while (true) { let x: Word = 11; return x; } let skipped: Word = 13; return skipped; }",
-    "function conditionFault() returns (Word) { let absent: Bool; while (absent) { return 3; } return 7; }",
-    "function bodyFault() returns (Word) { while (true) { let absent: Word; let failed: Word = absent; break; } return 7; }",
-    "function lazyCondition() returns (Word) { let m: mapping(Bool => Bool); while (m[true]) { return 3; } return 7; }",
-    "function spin() { while (true) { let retained: Word = 5; continue; } }"
+    "function falseLoop() returns (word) { let x: word = 7; while (false) { let skip: word = 8; } return x; }",
+    "function nestedBreak(flag: bool) returns (word) { let x: word = 7; while (true) { let x: word = 8; { let z: word; if (flag) { break; } else { break; } } let skipped: word = 9; } return x; }",
+    "function earlyReturn() returns (word) { while (true) { let x: word = 11; return x; } let skipped: word = 13; return skipped; }",
+    "function conditionFault() returns (word) { let absent: bool; while (absent) { return 3; } return 7; }",
+    "function bodyFault() returns (word) { while (true) { let absent: word; let failed: word = absent; break; } return 7; }",
+    "function lazyCondition() returns (word) { let m: mapping(bool => bool); while (m[true]) { return 3; } return 7; }",
+    "function spin() { while (true) { let retained: word = 5; continue; } }"
   ]}] }
 
 def run : IO Unit := do
@@ -2785,8 +2785,8 @@ theorem concrete_finished (layouts : SourceCoreAllocationLayouts.Prepared) (fram
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function nested(flag: Bool) returns (Word) { let outer: Word = 17; { let unused: Bool; if (flag) { let inner: Word = 19; while (true) { let shadow: Word = 23; { while (true) { let stopped: Word; break; } } break; } } else { while (false) { let skipped: Word; } } } return outer; }",
-    "function early() returns (Word) { let root: Word; { while (true) { let answer: Word = 31; if (true) { return answer; } continue; } } return 1; }"
+    "function nested(flag: bool) returns (word) { let outer: word = 17; { let unused: bool; if (flag) { let inner: word = 19; while (true) { let shadow: word = 23; { while (true) { let stopped: word; break; } } break; } } else { while (false) { let skipped: word; } } } return outer; }",
+    "function early() returns (word) { let root: word; { while (true) { let answer: word = 31; if (true) { return answer; } continue; } } return 1; }"
   ]}] }
 def run : IO Unit := do
   let checked ← SourceCompilerFeatureSupport.get "native while source" (checkProgram workspace)
@@ -2947,15 +2947,15 @@ theorem initializer_fault :
   omega
 
 private def content : String := String.intercalate "\n" [
-  "enum Item { Item(Bool) }",
-  "function mixed(flag: Bool, value: Word) returns (Bool) { let unused: Word; let first = flag; let absent: Bool; let last = !first; return last; }",
-  "function lazy(flag: Bool) returns (Bool) { let before: Word; let m: mapping(Bool => Bool); let first = m[flag]; let gap: Bool; let last = m[!flag]; return first || last; }",
-  "function nested(m: mapping(Bool => mapping(Bool => Bool)), flag: Bool) returns (Bool) { let before: Word; let first = m[flag][false]; let gap: Bool; let last = !m[!flag][true]; return first ? first : last; }",
-  "function early(flag: Bool) returns (Bool) { let first = flag; let gap: Word; { return first; } let unreachable: Word; }",
-  "function absent(flag: Bool) returns (Bool) { let first = flag; let gap: Bool; let failed = gap; let unreachable = true; return unreachable; }",
-  "function missing(flag: Bool) returns (Bool) { let first = flag; let gap: Word; let m: mapping(Bool => Item); let failed = m[flag]; return true; }",
-  "function identity(flag: Bool) returns (Bool) { return flag; }",
-  "function callable(f: function(Bool) returns (Bool), flag: Bool) returns (function(Bool) returns (Bool)) { let gap: Word; let saved = f; let same = saved; return same; }"
+  "enum Item { Item(bool) }",
+  "function mixed(flag: bool, value: word) returns (bool) { let unused: word; let first = flag; let absent: bool; let last = !first; return last; }",
+  "function lazy(flag: bool) returns (bool) { let before: word; let m: mapping(bool => bool); let first = m[flag]; let gap: bool; let last = m[!flag]; return first || last; }",
+  "function nested(m: mapping(bool => mapping(bool => bool)), flag: bool) returns (bool) { let before: word; let first = m[flag][false]; let gap: bool; let last = !m[!flag][true]; return first ? first : last; }",
+  "function early(flag: bool) returns (bool) { let first = flag; let gap: word; { return first; } let unreachable: word; }",
+  "function absent(flag: bool) returns (bool) { let first = flag; let gap: bool; let failed = gap; let unreachable = true; return unreachable; }",
+  "function missing(flag: bool) returns (bool) { let first = flag; let gap: word; let m: mapping(bool => Item); let failed = m[flag]; return true; }",
+  "function identity(flag: bool) returns (bool) { return flag; }",
+  "function callable(f: function(bool) returns (bool), flag: bool) returns (function(bool) returns (bool)) { let gap: word; let saved = f; let same = saved; return same; }"
 ]
 
 private def finished (compiled : SourceCoreUnifiedCompilation.Compiled) (name : String)
@@ -3109,14 +3109,14 @@ example (environment : Environment) (store : Store) (fellThrough escaped : Word)
         (.inRight .word .unit) store from .inRight .unit))
 
 private def content : String := String.intercalate "\n" [
-  "enum Item { Item(Word) }",
-  "function empty(flag: Bool, value: Word) { }",
-  "function repeated(m: mapping(Bool => Bool)) returns (Bool) { m[true]; return m[false]; }",
-  "function nested(m: mapping(Bool => mapping(Bool => Bool))) returns (Bool) { (m[true][false], !m[false][true]); return m[false][false] ? m[true][true] : !m[true][false]; }",
-  "function early(m: mapping(Bool => Item)) returns (Bool) { { return true; } m[true]; }",
-  "function firstFault(m: mapping(Bool => Item)) returns (Bool) { m[true]; return false; }",
-  "function identity(flag: Bool) returns (Bool) { return flag; }",
-  "function keep(f: function(Bool) returns (Bool), flag: Bool) returns (function(Bool) returns (Bool)) { flag; return f; }"
+  "enum Item { Item(word) }",
+  "function empty(flag: bool, value: word) { }",
+  "function repeated(m: mapping(bool => bool)) returns (bool) { m[true]; return m[false]; }",
+  "function nested(m: mapping(bool => mapping(bool => bool))) returns (bool) { (m[true][false], !m[false][true]); return m[false][false] ? m[true][true] : !m[true][false]; }",
+  "function early(m: mapping(bool => Item)) returns (bool) { { return true; } m[true]; }",
+  "function firstFault(m: mapping(bool => Item)) returns (bool) { m[true]; return false; }",
+  "function identity(flag: bool) returns (bool) { return flag; }",
+  "function keep(f: function(bool) returns (bool), flag: bool) returns (function(bool) returns (bool)) { flag; return f; }"
 ]
 
 private def check (compiled : SourceCoreUnifiedCompilation.Compiled) (name : String)
@@ -3411,13 +3411,13 @@ theorem accepted_reflects {mode : Bool} {code : Expr}
 
 private def rawWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Item { Item(Word) }",
-    "function blocks() returns (Bool) { let m: mapping(Bool => Bool); { m[true]; } return !m[false]; }",
-    "function absent() returns (Bool) { let m: mapping(Bool => Bool); if (m[true]) { return m[false]; } return !m[false]; }",
+    "enum Item { Item(word) }",
+    "function blocks() returns (bool) { let m: mapping(bool => bool); { m[true]; } return !m[false]; }",
+    "function absent() returns (bool) { let m: mapping(bool => bool); if (m[true]) { return m[false]; } return !m[false]; }",
     "function nominal() returns (Item) { { } return Item(7); }",
-    "function branch(m: mapping(Bool => Bool)) returns (Bool) { if (m[true]) { { m[false]; } if (!m[false]) { return m[true]; } else { return false; } } else { { m[true]; } return !m[false]; } }",
-    "function elseFault() returns (Bool) { let m: mapping(Bool => Item); if (false) { return true; } else { { m[true]; } } return false; }",
-    "function early() returns (Bool) { let m: mapping(Bool => Item); { return true; } m[true]; return false; }"]}] }
+    "function branch(m: mapping(bool => bool)) returns (bool) { if (m[true]) { { m[false]; } if (!m[false]) { return m[true]; } else { return false; } } else { { m[true]; } return !m[false]; } }",
+    "function elseFault() returns (bool) { let m: mapping(bool => Item); if (false) { return true; } else { { m[true]; } } return false; }",
+    "function early() returns (bool) { let m: mapping(bool => Item); { return true; } m[true]; return false; }"]}] }
 
 def run : IO Unit := do
   for mode in [false, true] do
@@ -3694,11 +3694,11 @@ private theorem scoped_bool_nil (code : Expr)
 
 private def rawWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Item { Item(Word) }",
-    "function blocks() returns (Bool) { let m: mapping(Bool => Bool); { m[true]; } return !m[false]; }",
-    "function absent() returns (Bool) { let m: mapping(Bool => Bool); if (m[true]) { return m[false]; } return !m[false]; }",
+    "enum Item { Item(word) }",
+    "function blocks() returns (bool) { let m: mapping(bool => bool); { m[true]; } return !m[false]; }",
+    "function absent() returns (bool) { let m: mapping(bool => bool); if (m[true]) { return m[false]; } return !m[false]; }",
     "function nominal() returns (Item) { { } return Item(7); }",
-    "function early() returns (Bool) { let m: mapping(Bool => Item); { return true; } m[true]; return false; }"]}] }
+    "function early() returns (bool) { let m: mapping(bool => Item); { return true; } m[true]; return false; }"]}] }
 
 def run : IO Unit := do
   for mode in [false, true] do
@@ -4066,11 +4066,11 @@ theorem compiled_failure_preserves {layouts : SourceCoreAllocationLayouts.Prepar
 
 private def rawWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Box { Box(Bool) }",
-    "function mixed() returns (Bool) { let m: mapping(Bool => Bool); let a = m[true]; let unused: Word; let b = !m[false]; let c: Bool; let d = a ? m[false] : b; m[true]; return d; }",
-    "function fail() returns (Bool) { let m: mapping(Bool => Bool); let a = m[true]; let missing: Bool; let c = m[false]; let d = (m[true], missing); let never = false; return a; }",
-    "function missingDefault() returns (Bool) { let m: mapping(Bool => Box); let a = true; let gap: Word; let failed = m[true]; let never = false; return a; }",
-    "function boxed() returns (Box) { let m: mapping(Bool => Bool); let a: Box = .Box(!m[true]); let missing: Bool; let b = a; let c = b; return c; }"]}] }
+    "enum Box { Box(bool) }",
+    "function mixed() returns (bool) { let m: mapping(bool => bool); let a = m[true]; let unused: word; let b = !m[false]; let c: bool; let d = a ? m[false] : b; m[true]; return d; }",
+    "function fail() returns (bool) { let m: mapping(bool => bool); let a = m[true]; let missing: bool; let c = m[false]; let d = (m[true], missing); let never = false; return a; }",
+    "function missingDefault() returns (bool) { let m: mapping(bool => Box); let a = true; let gap: word; let failed = m[true]; let never = false; return a; }",
+    "function boxed() returns (Box) { let m: mapping(bool => bool); let a: Box = .Box(!m[true]); let missing: bool; let b = a; let c = b; return c; }"]}] }
 
 def run : IO Unit := do
   let checked ← SourceCompilerFeatureSupport.get "typed mixed checker" (checkProgram rawWorkspace)
@@ -4343,12 +4343,12 @@ theorem accepted_reflects {code : Expr}
 
 private def rawWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Item { Item(Word) }",
-    "function repeated(m: mapping(Bool => Bool)) returns (Bool) { m[true]; return m[false]; }",
-    "function lazy() returns (Bool) { let m: mapping(Bool => Bool); m[true]; return !m[false]; }",
-    "function firstFailure() returns (Bool) { let m: mapping(Bool => Item); let n: mapping(Bool => Bool); m[true]; return n[false]; }",
-    "function early() returns (Bool) { let m: mapping(Bool => Item); { return true; } m[true]; }",
-    "function nested(m: mapping(Bool => mapping(Bool => Bool))) returns (Bool) { (m[true][false], !m[false][true]); return m[false][false] ? m[true][true] : !m[true][false]; }"]}] }
+    "enum Item { Item(word) }",
+    "function repeated(m: mapping(bool => bool)) returns (bool) { m[true]; return m[false]; }",
+    "function lazy() returns (bool) { let m: mapping(bool => bool); m[true]; return !m[false]; }",
+    "function firstFailure() returns (bool) { let m: mapping(bool => Item); let n: mapping(bool => bool); m[true]; return n[false]; }",
+    "function early() returns (bool) { let m: mapping(bool => Item); { return true; } m[true]; }",
+    "function nested(m: mapping(bool => mapping(bool => bool))) returns (bool) { (m[true][false], !m[false][true]); return m[false][false] ? m[true][true] : !m[true][false]; }"]}] }
 
 def run : IO Unit := do
   let generated ← SourceCompilerFeatureSupport.get "synthetic typed lowering" compiledResult

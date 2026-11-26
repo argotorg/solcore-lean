@@ -126,7 +126,7 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Tree<T> { Leaf(T), Branch(Tree<T>, Tree<T>) }",
-    "function main() returns (Word) { return 7; }"
+    "function main() returns (word) { return 7; }"
   ] }] }
 private def metadata (signature : ProgramDataSignature) (arguments : List TypeSystem.Ty)
     (index : Nat) : IO DataConstructorInstantiation := do
@@ -279,7 +279,7 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Tree<T> { Leaf(T), Branch(Tree<T>, Tree<T>) }",
-    "function main() returns (Word) { return 7; }"
+    "function main() returns (word) { return 7; }"
   ]}] }
 private def metadata (signature : ProgramDataSignature) (arguments : List TypeSystem.Ty) (index : Nat) : IO DataConstructorInstantiation := do
   let constructor ← match signature.constructors[index]? with
@@ -484,7 +484,7 @@ private def word (value : Nat) : Word := Word.ofNatModulo value
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Box { Item(Word) }", "function main() returns (Word) { return 0; }"
+    "enum Box { Item(word) }", "function main() returns (word) { return 0; }"
   ]}] }
 
 private def completed (expression : Expr) (environment : Environment) (store : Store) : IO (Value × Store) := do
@@ -643,10 +643,10 @@ private def noFunctions (catalog : SourceCoreCompatibleCatalog.Catalog) : Functi
   extend := fun impossible _ _ _ => False.elim impossible
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Box { Item(Word) }",
-    "function scalar() returns (Word) { let table: mapping(Word => Word); table[1] = 7; return 0; }",
-    "function nested() returns (Word) { let table: mapping(Word => mapping(Word => @Word)); let other: mapping(Word => @Word); table[1] = other; return 0; }",
-    "function missing() returns (Word) { let table: mapping(Word => Box); table[1] = .Item(7); return 0; }"
+    "enum Box { Item(word) }",
+    "function scalar() returns (word) { let table: mapping(word => word); table[1] = 7; return 0; }",
+    "function nested() returns (word) { let table: mapping(word => mapping(word => @word)); let other: mapping(word => @word); table[1] = other; return 0; }",
+    "function missing() returns (word) { let table: mapping(word => Box); table[1] = .Item(7); return 0; }"
   ]}] }
 private def sourceFor (program : CheckedProgram) (name : String) : IO TypedSource := do
   let signature ← match program.signatures.functions.find? (·.name == name) with

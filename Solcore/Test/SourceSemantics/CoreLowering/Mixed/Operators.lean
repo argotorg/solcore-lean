@@ -31,7 +31,7 @@ open Tests.SourceCompilerFeatureSupport (get require boot word)
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function builtinPair(flag: Bool) returns (Bool, function(Word) returns (integer)) {",
+    "function builtinPair(flag: bool) returns (bool, function(word) returns (integer)) {",
     "  let f = lam(value) { return value; };",
     "  return (f(flag), wordToInteger);",
     "}" ]}] }
@@ -1578,7 +1578,7 @@ open Tests.SourceCompilerFeatureSupport (get require boot word)
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function operatorPair(flag: Bool) returns (Bool, function(Word) returns (integer)) {",
+    "function operatorPair(flag: bool) returns (bool, function(word) returns (integer)) {",
     "  let f = lam(value) { return value; };",
     "  return (f(flag) && !f(false), wordToInteger);",
     "}" ]}] }

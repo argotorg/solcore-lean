@@ -317,7 +317,7 @@ theorem FactoryShape.statementTyping
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function make(seed: Word) returns (function(Bool, Word) returns (Word)) { return lam(flag: Bool, next: Word) { if (flag) { seed = next; } else { let copy: Word = seed; seed = copy; } if (flag) { return seed; } return seed; }; }"}] }
+    "function make(seed: word) returns (function(bool, word) returns (word)) { return lam(flag: bool, next: word) { if (flag) { seed = next; } else { let copy: word = seed; seed = copy; } if (flag) { return seed; } return seed; }; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)
@@ -2578,7 +2578,7 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function make(seed: Word) returns (function(Word) returns (Word)) { return lam(next: Word) { let previous: Word = seed; match (next) { case copy { seed = copy; } } return previous; }; }"}] }
+    "function make(seed: word) returns (function(word) returns (word)) { return lam(next: word) { let previous: word = seed; match (next) { case copy { seed = copy; } } return previous; }; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)

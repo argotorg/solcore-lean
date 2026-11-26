@@ -315,7 +315,7 @@ def observeSelect (function : CheckedFunction) (signature : ProgramFunctionSigna
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function identity(value: Word) returns (Word) { return value; } function select(f: function(Word) returns (Word), flag: Bool, value: Word) returns (Word) { return !flag ? f(value) + value : f(value) - value; }"}] }
+    "function identity(value: word) returns (word) { return value; } function select(f: function(word) returns (word), flag: bool, value: word) returns (word) { return !flag ? f(value) + value : f(value) - value; }"}] }
 
 structure CheckedFixture where
   program : CheckedProgram

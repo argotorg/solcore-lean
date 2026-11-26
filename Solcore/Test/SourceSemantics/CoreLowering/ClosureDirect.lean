@@ -145,7 +145,7 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function identity(value: Word) returns (Word) { return value; } function make(seed: Word) returns (function() returns (Word)) { return lam() { return identity(seed); }; }"}] }
+    "function identity(value: word) returns (word) { return value; } function make(seed: word) returns (function() returns (word)) { return lam() { return identity(seed); }; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)

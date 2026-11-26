@@ -1764,11 +1764,11 @@ private def hasExactDefaultedWordEvidence
 
 private def testLambdaLetTupleConditional : IO Unit := do
   let checked ← check (String.intercalate "\n" [
-    "function polymorphic(flag: Bool) returns (Word, Bool) {",
+    "function polymorphic(flag: bool) returns (word, bool) {",
     "  let id = lam(value) { return value; };",
     "  return (id(((1))), id(flag ? flag : !flag));",
     "}",
-    "function expected(flag: Bool) returns (function(Word) returns (Word)) {",
+    "function expected(flag: bool) returns (function(word) returns (word)) {",
     "  return lam(value) { return flag ? value + 1 : value; };",
     "}",
     "function empty() { return (); }"
@@ -1852,9 +1852,9 @@ private def testDiscardedPolymorphicReferenceResidual : IO Unit := do
 /-- Two functions of one name are refused at the load (`SC0108`), so no call sees both. -/
 private def testDuplicateFunctionRefused : IO Unit := do
   let source := String.intercalate "\n" [
-    "function choose(value: Word) returns (Word) { return value; }",
-    "function choose(other: Word) returns (Word) { return other + 1; }",
-    "function run() returns (Word) { return choose(1); }"
+    "function choose(value: word) returns (word) { return value; }",
+    "function choose(other: word) returns (word) { return other + 1; }",
+    "function run() returns (word) { return choose(1); }"
   ]
   match SourceInference.loadAndCheckProgram (workspace source) with
   | .error errors =>
@@ -1866,7 +1866,7 @@ private def testDuplicateFunctionRefused : IO Unit := do
   | .ok _ => throw (IO.userError "two functions named choose were both accepted")
 
 private def testIntegerLiteralExpectedType : IO Unit := do
-  let source := "function bad() returns (Bool) { return 1; }"
+  let source := "function bad() returns (bool) { return 1; }"
   match SourceInference.loadAndCheckProgram (workspace source) with
   | .error errors =>
       assertTrue (errors.any fun error => match error with
@@ -2346,7 +2346,7 @@ private def testUnconstrainedIntegerLiteralIsAmbiguous : IO Unit := do
 
 private def testLetBoundIntegerLiteralClosesLater : IO Unit := do
   let checked ← check
-    "function closeLater() returns (Word) { let value = 1; return value; }"
+    "function closeLater() returns (word) { let value = 1; return value; }"
   let function ← match checked with
     | [function] => pure function
     | functions => throw (IO.userError
@@ -2358,11 +2358,11 @@ private def testLetBoundIntegerLiteralClosesLater : IO Unit := do
 
 private def testUnusedLetIntegerLiteralDefaultsIndependently : IO Unit := do
   rejectsAmbiguousLiteral "an unused let literal"
-    "function unused() returns (Word) { let value = 1; return 9; }"
+    "function unused() returns (word) { let value = 1; return 9; }"
   -- Through an operator the unused let defaults to `uint256`, independently of the returned
   -- literal, which the return makes `Word`.
   let checked ← check
-    "function unused() returns (Word) { let value = 1 + 2; return 9; }"
+    "function unused() returns (word) { let value = 1 + 2; return 9; }"
   let function ← match checked with
     | [function] => pure function
     | functions => throw (IO.userError
@@ -2385,11 +2385,11 @@ private def testUnusedLetIntegerLiteralDefaultsIndependently : IO Unit := do
       function.solvedRequirements.length == 3 &&
       (function.solvedRequirements.filter hasBuiltinIntUint256Evidence).length == 2 &&
       (function.solvedRequirements.filter hasBuiltinIntWordEvidence).length == 1)
-    "an unused let through an operator and a returned literal did not retain independent Int<uint256> and Int<Word> evidence"
+    "an unused let through an operator and a returned literal did not retain independent Int<uint256> and Int<word> evidence"
 
 private def testLiteralRequirementPreservesIndependentPolymorphism : IO Unit := do
   let checked ← check (String.intercalate "\n" [
-    "function run(flag: Bool) returns ((Word, Word), (Word, Bool)) {",
+    "function run(flag: bool) returns ((word, word), (word, bool)) {",
     "  let f = lam(value) { return (1, value); };",
     "  return (f(2), f(flag));",
     "}"
@@ -2407,8 +2407,8 @@ private def testLiteralRequirementPreservesIndependentPolymorphism : IO Unit := 
 
 private def testContextualIntegerLiteralOperators : IO Unit := do
   let checked ← check (String.intercalate "\n" [
-    "function addLiterals() returns (Word) { return 1 + 1; }",
-    "function complementLiteral() returns (Word) { return ~1; }"
+    "function addLiterals() returns (word) { return 1 + 1; }",
+    "function complementLiteral() returns (word) { return ~1; }"
   ])
   let intWordRequirements (function : SourceInference.CheckedFunction) :=
     function.solvedRequirements.filter fun solved =>
@@ -2426,14 +2426,14 @@ private def testContextualIntegerLiteralOperators : IO Unit := do
 
 private def testNestedIntegerLiteralOperatorsCloseLater : IO Unit := do
   let checked ← check (String.intercalate "\n" [
-    "function accept(value: Word) returns (Word) { return value; }",
-    "function nestedAdd() returns (Word) { return accept(1 + 1); }",
-    "function nestedNot() returns (Word) { return accept(~1); }",
-    "function letAdd() returns (Word) {",
+    "function accept(value: word) returns (word) { return value; }",
+    "function nestedAdd() returns (word) { return accept(1 + 1); }",
+    "function nestedNot() returns (word) { return accept(~1); }",
+    "function letAdd() returns (word) {",
     "  let value = 1 + 1;",
     "  return accept(value);",
     "}",
-    "function letNot() returns (Word) {",
+    "function letNot() returns (word) {",
     "  let value = ~1;",
     "  return accept(value);",
     "}"
@@ -2490,7 +2490,7 @@ private def testUnconstrainedIntegerLiteralOperatorsDefaultToUint256 : IO Unit :
   let unconstrained := String.intercalate "\n" [
     "function add() { 1 + 1; return; }",
     "function invert() { ~1; return; }",
-    "function compare() returns (Bool) { return 1 == 1; }"
+    "function compare() returns (bool) { return 1 == 1; }"
   ]
   let checked ← check unconstrained
   let validate (label : String) (expectedBody expectedOperator : TypeSystem.Ty)
@@ -2524,9 +2524,9 @@ private def testDeferredIntegerLiteralOperatorRejections : IO Unit := do
   let unsupported := String.intercalate "\n" [
     "enum Box { Only }",
     "function acceptBox(value: Box) returns (Box) { return value; }",
-    "function acceptBool(value: Bool) returns (Bool) { return value; }",
+    "function acceptBool(value: bool) returns (bool) { return value; }",
     "function box() returns (Box) { return acceptBox(1 + 1); }",
-    "function boolean() returns (Bool) { return acceptBool(~1); }"
+    "function boolean() returns (bool) { return acceptBool(~1); }"
   ]
   match SourceInference.loadAndCheckProgram (workspace unsupported) with
   | .error errors =>
@@ -2544,8 +2544,8 @@ private def testDeferredIntegerLiteralOperatorRejections : IO Unit := do
     "trait Add<T> {",
     "  function add(left: T, right: T) returns (T);",
     "}",
-    "function accept(value: Word) returns (Word) { return value; }",
-    "function rejected() returns (Word) { return accept(1 + 1); }"
+    "function accept(value: word) returns (word) { return value; }",
+    "function rejected() returns (word) { return accept(1 + 1); }"
   ]
   let loaded ← load traitOwned
   let add ← match loaded.environment.traitsNamed "Add" with
@@ -2560,22 +2560,22 @@ private def testDeferredIntegerLiteralOperatorRejections : IO Unit := do
               predicate.subject == TypeSystem.Ty.word &&
               predicate.arguments.isEmpty
         | _ => false)
-        "a defaulted Word operator bypassed its source Add<Word> obligation"
+        "a defaulted Word operator bypassed its source Add<word> obligation"
   | .ok _ => throw (IO.userError
       "an available Add catalog was bypassed by direct builtin deferral")
   let logical := String.intercalate "\n" [
-    "function accept(value: Word) returns (Word) { return value; }",
-    "function badAnd() returns (Word) {",
+    "function accept(value: word) returns (word) { return value; }",
+    "function badAnd() returns (word) {",
     "  let value = 1;",
     "  value && value;",
     "  return accept(value);",
     "}",
-    "function badOr() returns (Word) {",
+    "function badOr() returns (word) {",
     "  let value = 1;",
     "  value || value;",
     "  return accept(value);",
     "}",
-    "function badNot() returns (Word) {",
+    "function badNot() returns (word) {",
     "  let value = 1;",
     "  !value;",
     "  return accept(value);",
@@ -2610,12 +2610,12 @@ private def testDeferredIntegerLiteralOperatorRejections : IO Unit := do
 private def testDefaultedIntegerLiteralOperatorsRespectSourceTraits : IO Unit := do
   let source := String.intercalate "\n" [
     "trait Eq<T> {",
-    "  function eq(left: T, right: T) returns (Bool);",
+    "  function eq(left: T, right: T) returns (bool);",
     "}",
     "trait BitNot<T> {",
     "  function bnot(value: T) returns (T);",
     "}",
-    "function compare() returns (Bool) { return 1 == 1; }",
+    "function compare() returns (bool) { return 1 == 1; }",
     "function invert() { ~1; return; }"
   ]
   let loaded ← load source
@@ -2652,8 +2652,8 @@ private def testGroundOperatorResultKeepsCoercion : IO Unit := do
     "impl Add<Box> {",
     "  function add(left: Box, right: Box) returns (Box) { return left; }",
     "}",
-    "impl Coerce<Box, Word> {}",
-    "function convert(left: Box, right: Box) returns (Word) {",
+    "impl Coerce<Box, word> {}",
+    "function convert(left: Box, right: Box) returns (word) {",
     "  return left + right;",
     "}"
   ])
@@ -2670,7 +2670,7 @@ private def testGroundOperatorResultKeepsCoercion : IO Unit := do
 
 private def testUnsupportedStatement : IO Unit := do
   let source :=
-    "function loop(flag: Bool) { while (flag) { return; } }"
+    "function loop(flag: bool) { while (flag) { return; } }"
   let checked ← check source
   assertTrue (checked.any fun function =>
       function.typedBody.nodes.any fun
@@ -2682,9 +2682,9 @@ private def testTraitBackedCoercion : IO Unit := do
   let source := String.intercalate "\n" [
     "trait Coerce<From, To> {}",
     "enum Box { Only }",
-    "impl Coerce<Word, Box> {}",
+    "impl Coerce<word, Box> {}",
     "function accept(value: Box) returns (Box) { return value; }",
-    "function convert(value: Word) returns (Box) { return accept(value); }"
+    "function convert(value: word) returns (Box) { return accept(value); }"
   ]
   let checked ← check source
   match checked.find? fun function =>
@@ -2701,7 +2701,7 @@ private def testMissingCoercion : IO Unit := do
     "trait Coerce<From, To> {}",
     "enum Box { Only }",
     "function accept(value: Box) returns (Box) { return value; }",
-    "function reject(value: Word) returns (Box) { return accept(value); }"
+    "function reject(value: word) returns (Box) { return accept(value); }"
   ]
   match SourceInference.loadAndCheckProgram (workspace source) with
   | .error errors =>
@@ -2715,10 +2715,10 @@ private def testInconclusiveCoercion : IO Unit := do
   let source := String.intercalate "\n" [
     "trait Coerce<From, To> {}",
     "enum Box { Only }",
-    "impl Coerce<Word, Box> {}",
-    "impl Coerce<Word, Box> {}",
+    "impl Coerce<word, Box> {}",
+    "impl Coerce<word, Box> {}",
     "function accept(value: Box) returns (Box) { return value; }",
-    "function reject(value: Word) returns (Box) { return accept(value); }"
+    "function reject(value: word) returns (Box) { return accept(value); }"
   ]
   -- One `Coerce` head twice is refused where it is declared (`SC0218`).
   match SourceInference.loadAndCheckProgram (workspace source) with
@@ -2734,8 +2734,8 @@ private def testUnsolvedCoercionMethodPredicate : IO Unit := do
     "trait Coerce<From, To> {",
     "  function coerce(value: From) returns (To) where From: Eq;",
     "}",
-    "function acceptWord(value: Word) returns (Word) { return value; }",
-    "function reject<T>(value: T) returns (Word) where T: Coerce<Word> {",
+    "function acceptWord(value: word) returns (word) { return value; }",
+    "function reject<T>(value: T) returns (word) where T: Coerce<word> {",
     "  return acceptWord(value);",
     "}"
   ]
@@ -2757,9 +2757,9 @@ private def testUnsolvedCoercionMethodPredicate : IO Unit := do
 private def testConstrainedLetDoesNotGeneralizeAwayEvidence : IO Unit := do
   let source := String.intercalate "\n" [
     "trait Eq<T> {}",
-    "impl Eq<Word> {}",
+    "impl Eq<word> {}",
     "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
-    "function reject() returns (Bool) {",
+    "function reject() returns (bool) {",
     "  let f = lam(value) { return keep(value); };",
     "  return f(true);",
     "}"
@@ -2771,15 +2771,15 @@ private def testConstrainedLetDoesNotGeneralizeAwayEvidence : IO Unit := do
             predicate.subject == TypeSystem.Ty.bool
         | _ => false)
         "a constrained let detached its predicate from the instantiated type"
-  | .ok _ => throw (IO.userError "Eq<Word> evidence was reused for Bool")
+  | .ok _ => throw (IO.userError "Eq<word> evidence was reused for Bool")
 
 private def testQualifiedLocalSchemeRequirements : IO Unit := do
   let source := String.intercalate "\n" [
     "trait Eq<T> {}",
-    "impl Eq<Word> {}",
-    "impl Eq<Bool> {}",
+    "impl Eq<word> {}",
+    "impl Eq<bool> {}",
     "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
-    "function run(flag: Bool) returns (Word, Bool) {",
+    "function run(flag: bool) returns (word, bool) {",
     "  let f = lam(value) { return keep(value); };",
     "  return (f(1), f(flag));",
     "}"
@@ -2861,7 +2861,7 @@ private def testNestedQualifiedRequirementOwnership : IO Unit := do
   let source := String.intercalate "\n" [
     "trait Eq<T> {}",
     "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
-    "function run(flag: Bool) returns (Word, Bool) {",
+    "function run(flag: bool) returns (word, bool) {",
     "  let outer = lam(value) {",
     "    let inner = lam(item) { return keep(item); };",
     "    return value;",
@@ -2990,7 +2990,7 @@ private def testOperatorMethodCatalogDiagnostics : IO Unit := do
 
   let malformedSource := String.intercalate "\n" [
     "trait Add<T> {",
-    "  function add(value: T) returns (Bool);",
+    "  function add(value: T) returns (bool);",
     "}",
     "function reject<T>(left: T, right: T) returns (T) where T: Add {",
     "  return left + right;",
@@ -3061,8 +3061,8 @@ private def testAmbiguousCoercionTrait : IO Unit := do
         content := "pragma solcore;\n" ++ String.intercalate "\n" [
           "import * from left;",
           "import * from right;",
-          "function accept(value: Bool) returns (Bool) { return value; }",
-          "function reject(value: Word) returns (Bool) { return accept(value); }"
+          "function accept(value: bool) returns (bool) { return value; }",
+          "function reject(value: word) returns (bool) { return accept(value); }"
         ]
       }
     ]
@@ -3483,11 +3483,11 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function make(value: Word) returns (function() returns (Word)) {",
-    "  return lam() -> Word { return value; };",
+    "function make(value: word) returns (function() returns (word)) {",
+    "  return lam() -> word { return value; };",
     "}",
-    "function invoke(f: function() returns (Word)) returns (Word) { return f(); }",
-    "function constant() returns (Word) { return 13; }"
+    "function invoke(f: function() returns (word)) returns (word) { return f(); }",
+    "function constant() returns (word) { return 13; }"
   ] }]
 }
 

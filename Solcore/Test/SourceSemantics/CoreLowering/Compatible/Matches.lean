@@ -46,15 +46,15 @@ private def encode (context : SourceCoreCompatibleValues.Context) (type : TypeSy
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
-    "function ordered(table: mapping(@Word => Word), key: @Word) returns (mapping(@Word => Word)) { table[key] += 3; return table; }",
-    "function nested(table: mapping(Word => mapping(@Word => Word)), key: @Word) returns (mapping(Word => mapping(@Word => Word))) { table[1][key] += 5; return table; }",
-    "function lazy() returns (mapping(Word => Word)) { let table: mapping(Word => Word); table[1] = 7; return table; }",
-    "function rhsFailure() returns (Word) { let table: mapping(Word => Word); let absent: Word; table[1] += absent; return 0; }",
-    "function missing(table: mapping(Word => Box<Word>), key: Word) returns (Word) { table[key] = .Box(7); return 7; }",
-    "function choose(value: Box<Word>) returns (Word) { match (value) { case .Box(bound) { return bound; } default { return 99; } } }",
-    "function tuple(value: (Box<Word>, (Bool, Word))) returns (Word) { match (value) { case (.Box(bound), (flag, right)) { return flag ? bound + right : right; } default { return 99; } } }",
-    "function scrutineeFailure(value: Box<Word>) returns (Word) { let absent: Box<Word>; match (absent) { case .Box(bound) { return bound; } default { return 99; } } }",
-    "function member(value: Box<Word>) returns (Box<Word>) { value = value; return value; }"
+    "function ordered(table: mapping(@word => word), key: @word) returns (mapping(@word => word)) { table[key] += 3; return table; }",
+    "function nested(table: mapping(word => mapping(@word => word)), key: @word) returns (mapping(word => mapping(@word => word))) { table[1][key] += 5; return table; }",
+    "function lazy() returns (mapping(word => word)) { let table: mapping(word => word); table[1] = 7; return table; }",
+    "function rhsFailure() returns (word) { let table: mapping(word => word); let absent: word; table[1] += absent; return 0; }",
+    "function missing(table: mapping(word => Box<word>), key: word) returns (word) { table[key] = .Box(7); return 7; }",
+    "function choose(value: Box<word>) returns (word) { match (value) { case .Box(bound) { return bound; } default { return 99; } } }",
+    "function tuple(value: (Box<word>, (bool, word))) returns (word) { match (value) { case (.Box(bound), (flag, right)) { return flag ? bound + right : right; } default { return 99; } } }",
+    "function scrutineeFailure(value: Box<word>) returns (word) { let absent: Box<word>; match (absent) { case .Box(bound) { return bound; } default { return 99; } } }",
+    "function member(value: Box<word>) returns (Box<word>) { value = value; return value; }"
   ]}] }
 
 private def planFor (program : CheckedProgram) (name : String) : IO SourceSpecializationWorklist.Plan := do
@@ -398,14 +398,14 @@ private def workspace : Workspace.RawWorkspace := {
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "enum Tree<T> { Leaf(T), Branch(Tree<T>, Tree<T>) }",
-    "function boxed(value: Word) returns (Box<Word>) { return .Box(value); }",
-    "function branch(left: Tree<Word>, right: Tree<Word>, marker: Word) returns (Tree<Word>) { return .Branch(left, right); }",
-    "function proxyValue() returns (@Word) { return @Word; }",
-    "function find(marker: Word, table: mapping(@Word => Word), key: @Word) returns (Word) { return table[key]; }",
-    "function defaultValue(table: mapping(Word => @Word), key: Word) returns (@Word) { return table[key]; }",
-    "function missing(table: mapping(Word => Box<Word>), key: Word) returns (Box<Word>) { return table[key]; }",
-    "function empty(key: Word) returns (Word) { let table: mapping(Word => Word); return table[key]; }",
-    "function echo(value: Box<Word>) returns (Box<Word>) { return value; }"
+    "function boxed(value: word) returns (Box<word>) { return .Box(value); }",
+    "function branch(left: Tree<word>, right: Tree<word>, marker: word) returns (Tree<word>) { return .Branch(left, right); }",
+    "function proxyValue() returns (@word) { return @word; }",
+    "function find(marker: word, table: mapping(@word => word), key: @word) returns (word) { return table[key]; }",
+    "function defaultValue(table: mapping(word => @word), key: word) returns (@word) { return table[key]; }",
+    "function missing(table: mapping(word => Box<word>), key: word) returns (Box<word>) { return table[key]; }",
+    "function empty(key: word) returns (word) { let table: mapping(word => word); return table[key]; }",
+    "function echo(value: Box<word>) returns (Box<word>) { return value; }"
   ]}] }
 
 private def sourceFor (program : CheckedProgram) (name : String) : IO TypedSource := do
@@ -732,9 +732,9 @@ theorem accepted_closure_body {layouts : SourceCoreAllocationLayouts.Prepared}
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function selected(flag: Word, a: Word, b: Word) returns (Word) { match ((flag, (a, b))) { case (0, (x, y)) { return x + y; } default { return 99; } } }",
-    "function ordered(p: Word) returns (Word) { match ((p, (11, 13))) { case (0, (x, y)) { return x + y; } case (v, (_, y)) { return v + y; } } }",
-    "function captured(marker: Word) returns (Word) { match ((lam(x: Word) -> Word { marker = marker + x; return marker; }, 2)) { case (f, x) { let ignored: Word = f(x); return marker; } } }"]}] }
+    "function selected(flag: word, a: word, b: word) returns (word) { match ((flag, (a, b))) { case (0, (x, y)) { return x + y; } default { return 99; } } }",
+    "function ordered(p: word) returns (word) { match ((p, (11, 13))) { case (0, (x, y)) { return x + y; } case (v, (_, y)) { return v + y; } } }",
+    "function captured(marker: word) returns (word) { match ((lam(x: word) -> word { marker = marker + x; return marker; }, 2)) { case (f, x) { let ignored: word = f(x); return marker; } } }"]}] }
 
 def run : IO Unit := do
   let program ← SourceCompilerFeatureSupport.get "compatible marked arm program" (checkProgram workspace)
@@ -954,10 +954,10 @@ private theorem noBranchCertificate : CompatibleMatchCertificates.Certificate co
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function fallthrough(p: Word) returns (Word) { match (p) { case 0 { return 11; } default {} } return 17; }",
-    "function fault(p: Word) returns (Word) { let hole: Word; match (hole) { case v { return v; } default { return 99; } } return p; }",
-    "function nested(p: Word) returns (Word) { match ((p, (7, 11))) { case (0, (x, y)) { match ((x, y)) { case (a, b) { return a + b; } } } default { return 99; } } }",
-    "function flow(stop: Word) returns (Word) { let tally: Word = 0; for (let i: Word = 0; i < stop; i = i + 1) { match (i) { case 0 { continue; } case 2 { break; } default { tally = tally + i; } } } return tally; }"]}] }
+    "function fallthrough(p: word) returns (word) { match (p) { case 0 { return 11; } default {} } return 17; }",
+    "function fault(p: word) returns (word) { let hole: word; match (hole) { case v { return v; } default { return 99; } } return p; }",
+    "function nested(p: word) returns (word) { match ((p, (7, 11))) { case (0, (x, y)) { match ((x, y)) { case (a, b) { return a + b; } } } default { return 99; } } }",
+    "function flow(stop: word) returns (word) { let tally: word = 0; for (let i: word = 0; i < stop; i = i + 1) { match (i) { case 0 { continue; } case 2 { break; } default { tally = tally + i; } } } return tally; }"]}] }
 
 def run : IO Unit := do
   -- The checker requires exhaustive matches. Exercise the compiler's retained
@@ -1178,9 +1178,9 @@ private def template_head : IO Unit := do
   let program ← get "runtime head template source" (checkProgram {
     entry := "main.solc", externalLibraries := []
     mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-      "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
+      "trait Mark<T> {}", "impl Mark<word> {}", "impl Mark<bool> {}",
       "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
-      "function qualified(flag: Bool) returns (Word, Bool) {",
+      "function qualified(flag: bool) returns (word, bool) {",
       " match (61) { case 61 {} default {} }",
       " let f = lam(item) { return keep(item); }; return (f(1), f(flag)); }"
     ]}] })
@@ -1240,12 +1240,12 @@ private def template_head : IO Unit := do
   require (count == 1) "head template occurrence count"
 
 private def content : String := String.intercalate "\n" [
-  "function empty() returns (Word) { match (37) { case 37 {} default {} } return 41; }",
-  "function bound() returns (Word) { let head: Word = 9; match (head) { case binding {} } return 43; }",
-  "function integerHead(value: integer) returns (Word) { match (value) { case 73 {} default {} } return 47; }",
-  "function selected(a: Word, b: Word) returns (Word) { match ((a, b)) { case (37, chosen) { return chosen; } case (left, right) { return left + right; } } }",
-  "function faultArm() returns (Word) { match (37) { case 37 { let prior: Word = 41; let missing: Word; return missing; } default { return 19; } } }",
-  "function faultScrutinee() returns (Word) { let missing: Word; match (missing) { case 0 { return 23; } default { return 29; } } }"
+  "function empty() returns (word) { match (37) { case 37 {} default {} } return 41; }",
+  "function bound() returns (word) { let head: word = 9; match (head) { case binding {} } return 43; }",
+  "function integerHead(value: integer) returns (word) { match (value) { case 73 {} default {} } return 47; }",
+  "function selected(a: word, b: word) returns (word) { match ((a, b)) { case (37, chosen) { return chosen; } case (left, right) { return left + right; } } }",
+  "function faultArm() returns (word) { match (37) { case 37 { let prior: word = 41; let missing: word; return missing; } default { return 19; } } }",
+  "function faultScrutinee() returns (word) { let missing: word; match (missing) { case 0 { return 23; } default { return 29; } } }"
 ]
 
 private def finish (compiled : SourceCoreUnifiedCompilation.Compiled) (name : String)
@@ -1439,10 +1439,10 @@ private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get 
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
 private def word (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def content : String := String.intercalate "\n" [
-  "function ordered(a: Word, b: Word) returns (Word) { match ((a, b)) { case (37, bound) { return bound; } case (37, later) { return later + 1; } case (left, right) { return left + right; } } }",
-  "function choose(a: Word) returns (Word) { match (a) { case 0 { return 11; } case 1 { return 13; } default { return 17; } } }",
-  "function failed(a: Word) returns (Word) { match (a) { case 0 { let prior: Word = 41; let missing: Word; return missing; } default { return 19; } } }",
-  "function scrutineeFault() returns (Word) { let missing: Word; match (missing) { case 0 { return 23; } default { return 29; } } }"
+  "function ordered(a: word, b: word) returns (word) { match ((a, b)) { case (37, bound) { return bound; } case (37, later) { return later + 1; } case (left, right) { return left + right; } } }",
+  "function choose(a: word) returns (word) { match (a) { case 0 { return 11; } case 1 { return 13; } default { return 17; } } }",
+  "function failed(a: word) returns (word) { match (a) { case 0 { let prior: word = 41; let missing: word; return missing; } default { return 19; } } }",
+  "function scrutineeFault() returns (word) { let missing: word; match (missing) { case 0 { return 23; } default { return 29; } } }"
 ]
 
 /-- The actual whole match lowerer is supplied explicit constant scrutinee and
@@ -1542,10 +1542,10 @@ private def template_root : IO Unit := do
   let program ← get "ordered template source" (checkProgram {
     entry := "main.solc", externalLibraries := []
     mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-      "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
+      "trait Mark<T> {}", "impl Mark<word> {}", "impl Mark<bool> {}",
       "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
-      "function qualified(flag: Bool) returns (Word) {",
-      " let f = lam(item) { return keep(item); }; let other: Bool = f(flag); let number: Word = 61;",
+      "function qualified(flag: bool) returns (word) {",
+      " let f = lam(item) { return keep(item); }; let other: bool = f(flag); let number: word = 61;",
       " match ((number, number)) { case (61, 61) { return f(1); } default { return f(2); } } }"
     ]}] })
   let signature ← match program.signatures.functions.filter (·.name == "qualified") with
@@ -1714,9 +1714,9 @@ theorem selected_closure_body
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function captured(marker: Word) returns (integer) { match ((lam(x: Word) -> Word { marker = wordFromInteger(integerAdd(wordToInteger(marker), wordToInteger(x))); return marker; }, 2)) { case (f, x) { let changed = wordToInteger(f(x)); return changed; } } }",
-    "function selected(p: Word) returns (integer) { match ((p, 7)) { case (0, x) { let next = wordFromInteger(integerAdd(wordToInteger(x), 4)); return wordToInteger(next); } case (v, x) { let next = wordFromInteger(integerAdd(wordToInteger(v), wordToInteger(x))); return wordToInteger(next); } } }",
-    "function failed(p: Word) returns (integer) { let hole: Word; match ((p, 7)) { case (0, x) { return wordToInteger(x); } case (v, x) { let changed = wordFromInteger(integerAdd(wordToInteger(v), wordToInteger(hole))); return wordToInteger(changed); } } }"]}] }
+    "function captured(marker: word) returns (integer) { match ((lam(x: word) -> word { marker = wordFromInteger(integerAdd(wordToInteger(marker), wordToInteger(x))); return marker; }, 2)) { case (f, x) { let changed = wordToInteger(f(x)); return changed; } } }",
+    "function selected(p: word) returns (integer) { match ((p, 7)) { case (0, x) { let next = wordFromInteger(integerAdd(wordToInteger(x), 4)); return wordToInteger(next); } case (v, x) { let next = wordFromInteger(integerAdd(wordToInteger(v), wordToInteger(x))); return wordToInteger(next); } } }",
+    "function failed(p: word) returns (integer) { let hole: word; match ((p, 7)) { case (0, x) { return wordToInteger(x); } case (v, x) { let changed = wordFromInteger(integerAdd(wordToInteger(v), wordToInteger(hole))); return wordToInteger(changed); } } }"]}] }
 
 def run : IO Unit := do
   let program ← SourceCompilerFeatureSupport.get "typed compatible match prefix" (checkProgram workspace)
@@ -1763,11 +1763,11 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Box { Item(Word) }",
-    "enum Holder<T> { Wrap(mapping(Word => T), Word), Other(mapping(Word => T), Word) }",
-    "function mixed(root: mapping(Word => Holder<Word>), value: Holder<Word>, key: Word) returns (Word) { root[key] = value; return 0; }",
-    "function missing(root: mapping(Word => Holder<Box>), value: Holder<Box>, key: Word) returns (Word) { root[key] = value; return 0; }",
-    "function nested(root: mapping(Word => mapping(Word => @Word)), value: mapping(Word => @Word), key: Word) returns (Word) { root[key] = value; return 0; }"
+    "enum Box { Item(word) }",
+    "enum Holder<T> { Wrap(mapping(word => T), word), Other(mapping(word => T), word) }",
+    "function mixed(root: mapping(word => Holder<word>), value: Holder<word>, key: word) returns (word) { root[key] = value; return 0; }",
+    "function missing(root: mapping(word => Holder<Box>), value: Holder<Box>, key: word) returns (word) { root[key] = value; return 0; }",
+    "function nested(root: mapping(word => mapping(word => @word)), value: mapping(word => @word), key: word) returns (word) { root[key] = value; return 0; }"
   ]}] }
 private def noFunctions (catalog : SourceCoreCompatibleCatalog.Catalog) : FunctionModel catalog where
   Represents := fun _ _ _ _ _ _ _ => False
@@ -2293,10 +2293,10 @@ private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get 
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
 private def huge : Nat := 115792089237316195423570985008687907853269984665640564039457584007913129639937
 private def content : String := String.intercalate "\n" [
-  "function wordMatch(x: Word) returns (Word) { match (x) { case 37 { return 11; } case bound { return bound; } } }",
-  s!"function wordWrap(x: Word) returns (Word) \{ match (x) \{ case {huge} \{ return 13; } default \{ return 17; } } }",
-  s!"function integerMatch(x: integer) returns (Word) \{ match (x) \{ case {huge} \{ return 19; } default \{ return 23; } } }",
-  "function faultMatch(x: Word) returns (Word) { match (x) { case 37 { x = 41; let missing: Word; return missing; } default { return 29; } } }"
+  "function wordMatch(x: word) returns (word) { match (x) { case 37 { return 11; } case bound { return bound; } } }",
+  s!"function wordWrap(x: word) returns (word) \{ match (x) \{ case {huge} \{ return 13; } default \{ return 17; } } }",
+  s!"function integerMatch(x: integer) returns (word) \{ match (x) \{ case {huge} \{ return 19; } default \{ return 23; } } }",
+  "function faultMatch(x: word) returns (word) { match (x) { case 37 { x = 41; let missing: word; return missing; } default { return 29; } } }"
 ]
 
 private def inspectPattern (checked : SourceCoreCompatibleCatalog.Checked) (source : TypedSource)
@@ -2382,10 +2382,10 @@ private def template_root : IO Unit := do
   let program ← get "pattern checked template source" (checkProgram {
     entry := "main.solc", externalLibraries := []
     mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-      "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
+      "trait Mark<T> {}", "impl Mark<word> {}", "impl Mark<bool> {}",
       "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
-      "function qualified(flag: Bool) returns (Word, Bool) {",
-      " let f = lam(item) { return keep(item); }; let number: Word = 61;",
+      "function qualified(flag: bool) returns (word, bool) {",
+      " let f = lam(item) { return keep(item); }; let number: word = 61;",
       " match (number) { case 61 { return (f(1), f(flag)); } default { return (f(2), f(flag)); } } }"
     ]}] })
   let signature ← match program.signatures.functions.filter (·.name == "qualified") with
@@ -2592,14 +2592,14 @@ example {left right : DataConstructorInstantiation} (catalogValid : SignatureCat
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Tree { Leaf(Word), Pair(Tree, Tree) }",
+    "enum Tree { Leaf(word), Pair(Tree, Tree) }",
     "enum Box<T> { Box(T) }",
-    "function closure(marker: Word) returns (Word) { match (lam(x: Word) -> Word { marker = marker + x; return marker; }) { case f { let first: Word = f(2); return f(3); } } }",
-    "function mapping(m: mapping(Word => Word)) returns (Word) { match (m) { case bound { return bound[7] + bound[9]; } } }",
-    "function wildcard(m: mapping(Word => Word)) returns (Word) { match (m) { case _ { return 41; } } }",
-    "function nested(tree: Tree) returns (Word) { match (tree) { case .Pair(.Leaf(left), .Leaf(0)) { return left; } case .Pair(.Leaf(left), .Leaf(right)) { return left + right; } default { return 99; } } }",
-    "function numeric(value: Word) returns (Word) { match (value) { case 115792089237316195423570985008687907853269984665640564039457584007913129639936 { return 1; } case bound { return bound; } } }",
-    "function failed(marker: Word) returns (Word) { match (marker) { case bound { marker = bound + 1; let absent: Word; return absent; } } }"]}] }
+    "function closure(marker: word) returns (word) { match (lam(x: word) -> word { marker = marker + x; return marker; }) { case f { let first: word = f(2); return f(3); } } }",
+    "function mapping(m: mapping(word => word)) returns (word) { match (m) { case bound { return bound[7] + bound[9]; } } }",
+    "function wildcard(m: mapping(word => word)) returns (word) { match (m) { case _ { return 41; } } }",
+    "function nested(tree: Tree) returns (word) { match (tree) { case .Pair(.Leaf(left), .Leaf(0)) { return left; } case .Pair(.Leaf(left), .Leaf(right)) { return left + right; } default { return 99; } } }",
+    "function numeric(value: word) returns (word) { match (value) { case 115792089237316195423570985008687907853269984665640564039457584007913129639936 { return 1; } case bound { return bound; } } }",
+    "function failed(marker: word) returns (word) { match (marker) { case bound { marker = bound + 1; let absent: word; return absent; } } }"]}] }
 
 private def checkRawGuard (program : CheckedProgram) : IO Unit := do
   let box ← match program.signatures.dataTypes.find? (·.name == "Box") with
@@ -2782,9 +2782,9 @@ example {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel c
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
-    "function nested(marker: Word, m: mapping(Word => Word)) returns (Word) { match ((lam(x: Word) -> Word { marker = marker + x; return marker; }, (0, m))) { case (f, (0, bound)) { let ignored: Word = f(bound[7]); return f(bound[9]); } default { return 99; } } }",
-    "function miss(marker: Word, m: mapping(Word => Word)) returns (Word) { match ((lam(x: Word) -> Word { marker = marker + x; return marker; }, (1, m))) { case (f, (0, bound)) { return f(bound[7]); } default { return marker; } } }",
-    "function constructed(marker: Word, m: mapping(Word => Word)) returns (Word) { match (Box((lam(x: Word) -> Word { marker = marker + x; return marker; }, m))) { case .Box((f, bound)) { let ignored: Word = f(bound[7]); return f(bound[9]); } } }"]}] }
+    "function nested(marker: word, m: mapping(word => word)) returns (word) { match ((lam(x: word) -> word { marker = marker + x; return marker; }, (0, m))) { case (f, (0, bound)) { let ignored: word = f(bound[7]); return f(bound[9]); } default { return 99; } } }",
+    "function miss(marker: word, m: mapping(word => word)) returns (word) { match ((lam(x: word) -> word { marker = marker + x; return marker; }, (1, m))) { case (f, (0, bound)) { return f(bound[7]); } default { return marker; } } }",
+    "function constructed(marker: word, m: mapping(word => word)) returns (word) { match (Box((lam(x: word) -> word { marker = marker + x; return marker; }, m))) { case .Box((f, bound)) { let ignored: word = f(bound[7]); return f(bound[9]); } } }"]}] }
 
 def run : IO Unit := do
   let program ← SourceCompilerFeatureSupport.get "general composite pattern source"
@@ -2941,12 +2941,12 @@ end Boundaries
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
 private def content : String := String.intercalate "\n" [
-  "enum Tree { Leaf(Word), Pair(Tree, Tree) }",
+  "enum Tree { Leaf(word), Pair(Tree, Tree) }",
   "enum Box<T> { Box(T) }",
-  "function nested(tree: Tree) returns (Word) { match (tree) { case .Pair(.Leaf(37), .Leaf(bound)) { return bound; } case .Pair(.Leaf(left), .Leaf(right)) { return left + right; } default { return 99; } } }",
-  "function tuple(a: Word, b: Word) returns (Word) { match ((a, b)) { case (37, 37) { return 11; } case (left, right) { return left + right; } } }",
-  "function integerTuple(a: integer, b: Word) returns (Word) { match ((a, b)) { case (73, bound) { return bound; } default { return 17; } } }",
-  "function faultTuple(a: Word, b: Word) returns (Word) { match ((a, b)) { case (37, bound) { a = bound; let missing: Word; return missing; } default { return 29; } } }"
+  "function nested(tree: Tree) returns (word) { match (tree) { case .Pair(.Leaf(37), .Leaf(bound)) { return bound; } case .Pair(.Leaf(left), .Leaf(right)) { return left + right; } default { return 99; } } }",
+  "function tuple(a: word, b: word) returns (word) { match ((a, b)) { case (37, 37) { return 11; } case (left, right) { return left + right; } } }",
+  "function integerTuple(a: integer, b: word) returns (word) { match ((a, b)) { case (73, bound) { return bound; } default { return 17; } } }",
+  "function faultTuple(a: word, b: word) returns (word) { match ((a, b)) { case (37, bound) { a = bound; let missing: word; return missing; } default { return 29; } } }"
 ]
 
 private def auditPattern (compilation : SourceCoreCompatibleDataMatches.Context) (source : TypedSource)
@@ -3005,10 +3005,10 @@ private def template_root : IO Unit := do
   let program ← get "composite template source" (checkProgram {
     entry := "main.solc", externalLibraries := []
     mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-      "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
+      "trait Mark<T> {}", "impl Mark<word> {}", "impl Mark<bool> {}",
       "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
-      "function qualified(flag: Bool) returns (Word, Bool) {",
-      " let f = lam(item) { return keep(item); }; let number: Word = 61;",
+      "function qualified(flag: bool) returns (word, bool) {",
+      " let f = lam(item) { return keep(item); }; let number: word = 61;",
       " match ((number, number)) { case (61, 61) { return (f(1), f(flag)); } default { return (f(2), f(flag)); } } }"
     ]}] })
   let signature ← match program.signatures.functions.filter (·.name == "qualified") with

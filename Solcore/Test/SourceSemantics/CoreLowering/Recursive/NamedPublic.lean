@@ -75,12 +75,12 @@ theorem actual_completed_public_check {fuel : Nat} {value : Value} {finalStore :
 end Formal
 
 private def content : String := String.intercalate "\n" [
-  "function step(value: Word) returns (Word) { return value + 1; }",
-  "function left(n: Word) returns (Bool) { if (n == 0) { return true; } return right(n - 1); }",
-  "function right(n: Word) returns (Bool) { if (n == 0) { return false; } return left(n - 1); }",
-  "function make(seed: Word) returns (function(Word) returns (Word)) { let extra = step(seed); return lam(value: Word) -> Word { extra += value; return extra; }; }",
-  "function terminal(flag: Bool) returns (Word) { if (flag) { return 7; } else { return 9; } }",
-  "function failed() returns (Word) { let gap: Word; return gap; }",
+  "function step(value: word) returns (word) { return value + 1; }",
+  "function left(n: word) returns (bool) { if (n == 0) { return true; } return right(n - 1); }",
+  "function right(n: word) returns (bool) { if (n == 0) { return false; } return left(n - 1); }",
+  "function make(seed: word) returns (function(word) returns (word)) { let extra = step(seed); return lam(value: word) -> word { extra += value; return extra; }; }",
+  "function terminal(flag: bool) returns (word) { if (flag) { return 7; } else { return 9; } }",
+  "function failed() returns (word) { let gap: word; return gap; }",
   "function zero() {}"
 ]
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
@@ -211,12 +211,12 @@ private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get 
 private def word (value : Nat) : SourceCorePublicValues.Value := .word (Word.ofNatModulo value)
 private def content : String := String.intercalate "\n" [
   "enum Box<T> { Put(T) }",
-  "function box(value: Box<@Word>) returns (Box<@Word>) { return value; }",
-  "function proxy(value: @Word) returns (@Word) { return value; }",
-  "function alias(value: mapping(@Word => Word)) returns (mapping(@Word => Word)) { return value; }",
-  "function lookup(value: mapping(Word => Word), key: Word) returns (Word) { return value[key]; }",
-  "function nested(value: mapping(Word => mapping(Word => Word))) returns (mapping(Word => mapping(Word => Word))) { return value; }",
-  "function fault(value: mapping(Word => Word)) returns (Word) { let prior = value; let missing: Word; return missing; }"
+  "function box(value: Box<@word>) returns (Box<@word>) { return value; }",
+  "function proxy(value: @word) returns (@word) { return value; }",
+  "function alias(value: mapping(@word => word)) returns (mapping(@word => word)) { return value; }",
+  "function lookup(value: mapping(word => word), key: word) returns (word) { return value[key]; }",
+  "function nested(value: mapping(word => mapping(word => word))) returns (mapping(word => mapping(word => word))) { return value; }",
+  "function fault(value: mapping(word => word)) returns (word) { let prior = value; let missing: word; return missing; }"
 ]
 
 private def cells {artifact : Artifact} (session : Session artifact)
@@ -330,10 +330,10 @@ private def require := SourceCoreUnifiedCorpusSupport.assertTrue
 
 def run : IO Unit := do
   let content := String.intercalate "\n" [
-    "function zero() returns (Word) { return 0; }",
-    "function one(n: Word) returns (Word) { return n + 1; }",
-    "function ordered(a: Word, b: Word, c: Word) returns (Word) { return a - b + c; }",
-    "function truth(value: Bool) returns (Bool) { return value; }",
+    "function zero() returns (word) { return 0; }",
+    "function one(n: word) returns (word) { return n + 1; }",
+    "function ordered(a: word, b: word, c: word) returns (word) { return a - b + c; }",
+    "function truth(value: bool) returns (bool) { return value; }",
     "function unit() { }"
   ]
   let compiled ← SourceCoreUnifiedCorpusSupport.prepare "public root factory" content
@@ -1225,9 +1225,9 @@ private def require := SourceCoreUnifiedCorpusSupport.assertTrue
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
 private def word (value : Nat) : SourceCorePublicValues.Value := .word (Word.ofNatModulo value)
 private def content : String := String.intercalate "\n" [
-  "function mixed(a: Word, b: integer, gate: Bool) returns ((Word, integer)) { return (gate ? a : a + 1, b); }",
-  "function echo(value: (Word, (Bool, integer))) returns ((Word, (Bool, integer))) { return value; }",
-  "function fault(n: Word, pair: (Bool, integer)) returns (Word) { let prior = n; let missing: Word; return missing; }"
+  "function mixed(a: word, b: integer, gate: bool) returns ((word, integer)) { return (gate ? a : a + 1, b); }",
+  "function echo(value: (word, (bool, integer))) returns ((word, (bool, integer))) { return value; }",
+  "function fault(n: word, pair: (bool, integer)) returns (word) { let prior = n; let missing: word; return missing; }"
 ]
 
 private def cells {artifact : Artifact} (session : Session artifact)
@@ -1405,17 +1405,17 @@ theorem wrong_generic_declaration_rejected {signature : ProgramFunctionSignature
 end Boundaries
 
 private def content : String := String.intercalate "\n" [
-  "trait Marker<T> {}", "impl Marker<Word> {}",
+  "trait Marker<T> {}", "impl Marker<word> {}",
   "function choose<A, B>(first: A, second: B) returns (A) { return first; }",
   "function keep<T>(value: T) returns (T) where T: Marker { return value; }",
   "function relay<T>(value: T) returns (T) where T: Marker { return keep(value); }",
-  "function recur<T>(value: T, count: Word) returns (T) { if (count == 0) { return value; } else { return recur(value, count - 1); } }",
+  "function recur<T>(value: T, count: word) returns (T) { if (count == 0) { return value; } else { return recur(value, count - 1); } }",
   "function missing<T>(value: T) returns (T) { let absent: T; return absent; }",
-  "function wordRoot() returns (Word) { return choose(7, true); }",
-  "function boolRoot() returns (Bool) { let nine: Word = 9; return choose(false, nine); }",
-  "function constrained(value: Word) returns (Word) where Word: Marker { return relay(value); }",
-  "function recurRoot() returns (Word) { return recur(13, 3); }",
-  "function faultRoot() returns (Word) { return missing(7); }"
+  "function wordRoot() returns (word) { return choose(7, true); }",
+  "function boolRoot() returns (bool) { let nine: word = 9; return choose(false, nine); }",
+  "function constrained(value: word) returns (word) where word: Marker { return relay(value); }",
+  "function recurRoot() returns (word) { return recur(13, 3); }",
+  "function faultRoot() returns (word) { return missing(7); }"
 ]
 
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
@@ -1977,23 +1977,23 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
-    "impl Coerce<Word, integer> { function coerce(value: Word) returns (integer) { let seen = value; if (value == 0) { let coercionGap: integer; return coercionGap; } return wordToInteger(value); } }",
+    "impl Coerce<word, integer> { function coerce(value: word) returns (integer) { let seen = value; if (value == 0) { let coercionGap: integer; return coercionGap; } return wordToInteger(value); } }",
     "function choose<A, B>(unused: A, value: B) returns (B) { return value; }",
     "function tag<T>(value: T) returns (T) { let seen = value; return value; }",
-    "function flag(value: Word) returns (Bool) { let seen = value; return value == 1; }",
-    "function failWord(value: Word) returns (Word) { let nestedGap: Word; return nestedGap; }",
-    "function last(a: Word, b: Word, c: Word) returns (Word) { return c; }",
-    "function one() returns (Word) { return 1; }",
-    "function good(value: Word) returns (integer) { return choose(flag(value), tag(value)); }",
-    "function first(value: Word) returns (integer) { return choose(failWord(value), tag(value)); }",
-    "function later(value: Word) returns (integer) { return choose(tag(value), failWord(value)); }",
-    "function single(value: Word) returns (integer) { return tag(tag(value)); }",
-    "function repeated(value: Word) returns (integer) { return last(tag(value), tag(value), tag(value)); }",
+    "function flag(value: word) returns (bool) { let seen = value; return value == 1; }",
+    "function failWord(value: word) returns (word) { let nestedGap: word; return nestedGap; }",
+    "function last(a: word, b: word, c: word) returns (word) { return c; }",
+    "function one() returns (word) { return 1; }",
+    "function good(value: word) returns (integer) { return choose(flag(value), tag(value)); }",
+    "function first(value: word) returns (integer) { return choose(failWord(value), tag(value)); }",
+    "function later(value: word) returns (integer) { return choose(tag(value), failWord(value)); }",
+    "function single(value: word) returns (integer) { return tag(tag(value)); }",
+    "function repeated(value: word) returns (integer) { return last(tag(value), tag(value), tag(value)); }",
     "function zero() returns (integer) { return one(); }",
-    "function empty(value: Word) returns (Word) { return choose(flag(value), tag(value)); }",
-    "function boxed(value: Word) returns (integer) { return choose(Box(tag(value)), tag(value)); }",
-    "function builtin(value: Word) returns (integer) { return choose(integerEq(wordToInteger(tag(value)), wordToInteger(1)), tag(value)); }",
-    "function lazy(value: Word) returns (integer) { return choose(flag(value), value == 1 ? tag(value) : failWord(value)); }"
+    "function empty(value: word) returns (word) { return choose(flag(value), tag(value)); }",
+    "function boxed(value: word) returns (integer) { return choose(Box(tag(value)), tag(value)); }",
+    "function builtin(value: word) returns (integer) { return choose(integerEq(wordToInteger(tag(value)), wordToInteger(1)), tag(value)); }",
+    "function lazy(value: word) returns (integer) { return choose(flag(value), value == 1 ? tag(value) : failWord(value)); }"
   ]}] }
 private def require := SourceCompilerFeatureSupport.require
 private def get {α ε : Type} [Repr ε] := @SourceCompilerFeatureSupport.get α ε _
@@ -2330,12 +2330,12 @@ theorem residual_admissibility_boundary :
   cases impossible
 
 private def content : String := String.intercalate "\n" [
-  "function step(n: Word) returns (Word) { return n + 1; }",
-  "function self(n: Word) returns (Word) { if (n == 0) { return 0; } return self(n - 1); }",
-  "function loop(n: Word) returns (Word) { let total = 0; for (let i = 0; i < n; i += 1) { total += step(i); } return total; }",
-  "function down(n: Word) returns (Word) { while (n != 0) { n -= 1; } return n; }",
-  "function assign(m: mapping(Bool => Word)) returns (Word) { m[true] = step(6); return m[true]; }",
-  "function fail() returns (Word) { let saved: Word = 17; let gap: Word; return gap; }",
+  "function step(n: word) returns (word) { return n + 1; }",
+  "function self(n: word) returns (word) { if (n == 0) { return 0; } return self(n - 1); }",
+  "function loop(n: word) returns (word) { let total = 0; for (let i = 0; i < n; i += 1) { total += step(i); } return total; }",
+  "function down(n: word) returns (word) { while (n != 0) { n -= 1; } return n; }",
+  "function assign(m: mapping(bool => word)) returns (word) { m[true] = step(6); return m[true]; }",
+  "function fail() returns (word) { let saved: word = 17; let gap: word; return gap; }",
   "function zero() {}"
 ]
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
@@ -2596,18 +2596,18 @@ end Boundary
 
 private def content : String := String.intercalate "\n" [
   "enum Pair<A, B> { Pair(A, B) }",
-  "function side(x: Word) returns (Word) { return x; }",
-  "function truth(x: Bool) returns (Bool) { return x; }",
+  "function side(x: word) returns (word) { return x; }",
+  "function truth(x: bool) returns (bool) { return x; }",
   "function choose<A, B>(a: A, b: B) returns (A) { return a; }",
-  "function fail() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
-  "function rootWord() returns (Word) { return choose(side(7), truth(true)); }",
-  "function rootBool() returns (Bool) { return choose(truth(false), side(9)); }",
-  "function rootData() returns (Pair<Word, Bool>) { return Pair(side(11), truth(true)); }",
-  "function nested() returns (Word) { return choose(choose(side(3), truth(true)), side(5)); }",
-  "function paired() returns ((Word, Bool)) { return (choose(side(13), truth(true)), truth(false)); }",
-  "function indexed(m: mapping(Bool => Word)) returns (Word) { return m[choose(truth(true), side(17))]; }",
-  "function firstFault() returns (Word) { return choose(fail(), side(99)); }",
-  "function laterFault() returns (Word) { return choose(side(19), fail()); }"
+  "function fail() returns (word) { let written: word = 5; let gap: word; return gap; }",
+  "function rootWord() returns (word) { return choose(side(7), truth(true)); }",
+  "function rootBool() returns (bool) { return choose(truth(false), side(9)); }",
+  "function rootData() returns (Pair<word, bool>) { return Pair(side(11), truth(true)); }",
+  "function nested() returns (word) { return choose(choose(side(3), truth(true)), side(5)); }",
+  "function paired() returns ((word, bool)) { return (choose(side(13), truth(true)), truth(false)); }",
+  "function indexed(m: mapping(bool => word)) returns (word) { return m[choose(truth(true), side(17))]; }",
+  "function firstFault() returns (word) { return choose(fail(), side(99)); }",
+  "function laterFault() returns (word) { return choose(side(19), fail()); }"
 ]
 private def w (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
@@ -2819,10 +2819,10 @@ private def content : String := String.intercalate "\n" [
   "function choose<A, B>(first: A, second: B) returns (A) { let saved = first; return saved; }",
   "function pair<A, B>(first: A, second: B) returns ((A, B)) { return (first, second); }",
   "function wrap<T>(value: T) returns (Box<T>) { return Box(value); }",
-  "function wordRoot() returns (Word) { return choose(9, false); }",
-  "function boolRoot() returns (Bool) { let eight: Word = 8; return choose(true, eight); }",
-  "function pairRoot() returns ((Word, Bool)) { return pair(7, true); }",
-  "function boxRoot() returns (Box<Word>) { return wrap(5); }"
+  "function wordRoot() returns (word) { return choose(9, false); }",
+  "function boolRoot() returns (bool) { let eight: word = 8; return choose(true, eight); }",
+  "function pairRoot() returns ((word, bool)) { return pair(7, true); }",
+  "function boxRoot() returns (Box<word>) { return wrap(5); }"
 ]
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
@@ -3112,13 +3112,13 @@ theorem actual_selected_law {source : TypedSource} {context : SourceSemantics.Co
 private def content : String := String.intercalate "\n" [
   "enum Pair<A, B> { Pair(A, B) }",
   "function choose<A, B>(a: A, b: B) returns (A) { return a; }",
-  "function side(x: Word) returns (Word) { return x; }",
-  "function fail() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
+  "function side(x: word) returns (word) { return x; }",
+  "function fail() returns (word) { let written: word = 5; let gap: word; return gap; }",
   "function unitRoot() { return choose((), side(7)); }",
-  "function wordRoot() returns (Word) { return choose(side(7), side(7)); }",
-  "function flagRoot() returns (Bool) { return choose(false, side(13)); }",
-  "function dataRoot() returns (Pair<Word, Bool>) { return Pair(choose(17, false), true); }",
-  "function lateFault() returns (Word) { return choose(side(19), fail()); }"
+  "function wordRoot() returns (word) { return choose(side(7), side(7)); }",
+  "function flagRoot() returns (bool) { return choose(false, side(13)); }",
+  "function dataRoot() returns (Pair<word, bool>) { return Pair(choose(17, false), true); }",
+  "function lateFault() returns (word) { return choose(side(19), fail()); }"
 ]
 private def w (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
@@ -3284,9 +3284,9 @@ theorem packed_parameter_collision :
 private def content : String := String.intercalate "\n" [
   "function first<A, B>(one: A, two: B) returns (A) { return one; }",
   "function reverse<A, B>(one: A, two: B) returns ((B, A)) { return (two, one); }",
-  "function wordRoot() returns (Word) { return first(7, true); }",
-  "function boolRoot() returns (Bool) { let nine: Word = 9; return first(false, nine); }",
-  "function pairRoot() returns ((Bool, Word)) { return reverse(11, false); }"
+  "function wordRoot() returns (word) { return first(7, true); }",
+  "function boolRoot() returns (bool) { let nine: word = 9; return first(false, nine); }",
+  "function pairRoot() returns ((bool, word)) { return reverse(11, false); }"
 ]
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
 

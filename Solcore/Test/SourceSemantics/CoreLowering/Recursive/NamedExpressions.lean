@@ -151,13 +151,13 @@ theorem continuation_below {size budget : Nat} {next : Expr} {output : Ty} {valu
     exact .inr ⟨_, _, _, _, _, _, _, _, trace, heaps, retained, count, typed, Nat.lt_of_lt_of_le strict within, remaining⟩
 
 private def content : String := String.intercalate "\n" [
-  "function mark(value: Word) returns (Word) { let copied = value; return copied; }",
-  "function fail(value: Word) returns (Word) { let gap: Word; return gap; }",
-  "function mixed(raw: mapping(Word => Word), seed: Word) returns (Word) { let root: Word; root = mark(seed); raw[mark(root)] += mark(5); root += mark(raw[root]); raw[mark(root)] = mark(11); return root; }",
-  "function bareFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let root: Word; root += mark(seed); raw[mark(seed)] = mark(5); return root; }",
-  "function keyFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let root: Word; root = mark(seed); root += mark(2); raw[fail(root)] = mark(5); return root; }",
-  "function rhsFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let root: Word; root = mark(seed); root += mark(2); raw[mark(root)] = fail(5); return root; }",
-  "function unitResult(raw: mapping(Word => Word), seed: Word) { let root: Word; root = mark(seed); raw[mark(root)] = mark(5); root += mark(2); }"
+  "function mark(value: word) returns (word) { let copied = value; return copied; }",
+  "function fail(value: word) returns (word) { let gap: word; return gap; }",
+  "function mixed(raw: mapping(word => word), seed: word) returns (word) { let root: word; root = mark(seed); raw[mark(root)] += mark(5); root += mark(raw[root]); raw[mark(root)] = mark(11); return root; }",
+  "function bareFault(raw: mapping(word => word), seed: word) returns (word) { let root: word; root += mark(seed); raw[mark(seed)] = mark(5); return root; }",
+  "function keyFault(raw: mapping(word => word), seed: word) returns (word) { let root: word; root = mark(seed); root += mark(2); raw[fail(root)] = mark(5); return root; }",
+  "function rhsFault(raw: mapping(word => word), seed: word) returns (word) { let root: word; root = mark(seed); root += mark(2); raw[mark(root)] = fail(5); return root; }",
+  "function unitResult(raw: mapping(word => word), seed: word) { let root: word; root = mark(seed); raw[mark(root)] = mark(5); root += mark(2); }"
 ]
 private def wordValue (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def present (n : Nat) : TypeSystem.Ty × Option SourceTypedRuntime.Value := (.word, some (wordValue n))
@@ -397,18 +397,18 @@ theorem projection_typing_is_static {catalog : SourceCoreCompatibleCatalog.Catal
   CompatibleExpressionCertificateNativeTyping.project_wellFormed projected
 
 private def content : String := String.intercalate "\n" [
-  "function side(n: Word) returns (Word) { let saved = n; return saved; }",
-  "function truth(flag: Bool) returns (Bool) { return flag; }",
-  "function fail() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
-  "function assign(x: Word, y: Word) returns (Word) { x = side(y); return x; }",
-  "function compound(x: Word, y: Word) returns (Word) { x += side(y); return x; }",
-  "function indexed(m: mapping(Bool => Word), y: Word) returns (Word) { m[truth(true)] = side(y); return m[true]; }",
-  "function compoundIndex(m: mapping(Bool => Word), y: Word) returns (Word) { m[truth(true)] += side(y); return m[true]; }",
-  "function rhsBuiltin(m: mapping(Bool => integer), y: Word) returns (integer) { m[truth(true)] = integerAdd(wordToInteger(side(y)), wordToInteger(side(y))); return m[true]; }",
-  "function pairKey(m: mapping((Bool, Bool) => Word), y: Word) returns (Word) { m[(truth(true), truth(false))] = side(y); return m[(true, false)]; }",
-  "function rhsFault(m: mapping(Bool => Word), y: Word) returns (Word) { m[truth(true)] = fail(); return m[true]; }",
-  "function keyFault(m: mapping(Bool => Word), y: Word) returns (Word) { m[side(fail()) == y] = side(y); return m[true]; }",
-  "function lateFault(x: Word, y: Word) returns (Word) { x = side(y); return fail(); }"
+  "function side(n: word) returns (word) { let saved = n; return saved; }",
+  "function truth(flag: bool) returns (bool) { return flag; }",
+  "function fail() returns (word) { let written: word = 5; let gap: word; return gap; }",
+  "function assign(x: word, y: word) returns (word) { x = side(y); return x; }",
+  "function compound(x: word, y: word) returns (word) { x += side(y); return x; }",
+  "function indexed(m: mapping(bool => word), y: word) returns (word) { m[truth(true)] = side(y); return m[true]; }",
+  "function compoundIndex(m: mapping(bool => word), y: word) returns (word) { m[truth(true)] += side(y); return m[true]; }",
+  "function rhsBuiltin(m: mapping(bool => integer), y: word) returns (integer) { m[truth(true)] = integerAdd(wordToInteger(side(y)), wordToInteger(side(y))); return m[true]; }",
+  "function pairKey(m: mapping((bool, bool) => word), y: word) returns (word) { m[(truth(true), truth(false))] = side(y); return m[(true, false)]; }",
+  "function rhsFault(m: mapping(bool => word), y: word) returns (word) { m[truth(true)] = fail(); return m[true]; }",
+  "function keyFault(m: mapping(bool => word), y: word) returns (word) { m[side(fail()) == y] = side(y); return m[true]; }",
+  "function lateFault(x: word, y: word) returns (word) { x = side(y); return fail(); }"
 ]
 private def w (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
@@ -707,16 +707,16 @@ theorem rhs_fault_keeps_prefix {targetSize rhsSize : Nat} {target : Dynamic.Reso
 end SizedResults
 
 private def content : String := String.intercalate "\n" [
-  "function copy(value: Word) returns (Word) { let copied = value; return copied; }",
-  "function rawCopy(value: mapping(Word => Word)) returns (mapping(Word => Word)) { let copied = value; return copied; }",
-  "function fail(value: Word) returns (Word) { let gap: Word; return gap; }",
-  "function chain(seed: Word) returns (Word) { let root: Word; root = copy(seed); root += copy(2); root = copy(root); return copy(root); }",
-  "function shadow(seed: Word) returns (Word) { let root = copy(seed); { let root: Word; root = copy(2); root += copy(3); } root += copy(4); return copy(root); }",
-  "function absent(seed: Word) returns (Word) { let root: Word; root += copy(seed); return copy(99); }",
-  "function rhsFault(seed: Word) returns (Word) { let root = copy(10); root += fail(seed); return copy(99); }",
-  "function afterWrite(seed: Word) returns (Word) { let root = copy(10); root += copy(seed); return fail(root); }",
-  "function unitResult(seed: Word) { let root: Word; root = copy(seed); root += copy(2); }",
-  "function rawResult(raw: mapping(Word => Word)) returns (mapping(Word => Word)) { let root: mapping(Word => Word); root = rawCopy(raw); return root; }"
+  "function copy(value: word) returns (word) { let copied = value; return copied; }",
+  "function rawCopy(value: mapping(word => word)) returns (mapping(word => word)) { let copied = value; return copied; }",
+  "function fail(value: word) returns (word) { let gap: word; return gap; }",
+  "function chain(seed: word) returns (word) { let root: word; root = copy(seed); root += copy(2); root = copy(root); return copy(root); }",
+  "function shadow(seed: word) returns (word) { let root = copy(seed); { let root: word; root = copy(2); root += copy(3); } root += copy(4); return copy(root); }",
+  "function absent(seed: word) returns (word) { let root: word; root += copy(seed); return copy(99); }",
+  "function rhsFault(seed: word) returns (word) { let root = copy(10); root += fail(seed); return copy(99); }",
+  "function afterWrite(seed: word) returns (word) { let root = copy(10); root += copy(seed); return fail(root); }",
+  "function unitResult(seed: word) { let root: word; root = copy(seed); root += copy(2); }",
+  "function rawResult(raw: mapping(word => word)) returns (mapping(word => word)) { let root: mapping(word => word); root = rawCopy(raw); return root; }"
 ]
 private def wordValue (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def present (n : Nat) : TypeSystem.Ty × Option SourceTypedRuntime.Value := (.word, some (wordValue n))
@@ -868,9 +868,9 @@ theorem continuation_or_fault
 end Continuation
 
 private def content : String := String.intercalate "\n" [
-  "function wordMask(seed: Word) returns (Word) { let root = seed; let read: function() returns (Word) = lam() -> Word { return root; }; root ~=; return read(); }",
-  "function doubleLoop(seed: Word) returns (Word) { let root = seed; for (let i = 0; i < 3; i += 1) { root ~=; root ~=; } return root; }",
-  "function firstFault(seed: Word) returns (Word) { let root = seed; let gap: Word; root ~=; gap ~=; root = 99; return root; }"
+  "function wordMask(seed: word) returns (word) { let root = seed; let read: function() returns (word) = lam() -> word { return root; }; root ~=; return read(); }",
+  "function doubleLoop(seed: word) returns (word) { let root = seed; for (let i = 0; i < 3; i += 1) { root ~=; root ~=; } return root; }",
+  "function firstFault(seed: word) returns (word) { let root = seed; let gap: word; root ~=; gap ~=; root = 99; return root; }"
 ]
 private def wordValue (n : Nat) : SourceTypedRuntime.Value := .word (Core.Word.ofNatModulo n)
 private def finish (compiled : SourceCoreUnifiedCompilation.Compiled) (name : String)
@@ -1130,13 +1130,13 @@ theorem support_is_not_annotation_typing :
   | namedData found => simp at found
 
 private def content : String := String.intercalate "\n" [
-  "function step(n: Word) returns (Word) { return n + 1; }",
-  "function self(n: Word) returns (Word) { if (n == 0) { return 0; } return self(n - 1); }",
-  "function loop(n: Word) returns (Word) { let total = 0; for (let i = 0; i < n; i += 1) { total += step(i); } return total; }",
-  "function down(n: Word) returns (Word) { while (n != 0) { n -= 1; } return n; }",
-  "function assign(m: mapping(Bool => Word)) returns (Word) { m[true] = step(6); return m[true]; }",
-  "function make(seed: Word) returns (function(Word) returns (Word)) { return lam(value: Word) -> Word { seed += value; return seed; }; }",
-  "function fail() returns (Word) { let saved: Word = 17; let gap: Word; return gap; }",
+  "function step(n: word) returns (word) { return n + 1; }",
+  "function self(n: word) returns (word) { if (n == 0) { return 0; } return self(n - 1); }",
+  "function loop(n: word) returns (word) { let total = 0; for (let i = 0; i < n; i += 1) { total += step(i); } return total; }",
+  "function down(n: word) returns (word) { while (n != 0) { n -= 1; } return n; }",
+  "function assign(m: mapping(bool => word)) returns (word) { m[true] = step(6); return m[true]; }",
+  "function make(seed: word) returns (function(word) returns (word)) { return lam(value: word) -> word { seed += value; return seed; }; }",
+  "function fail() returns (word) { let saved: word = 17; let gap: word; return gap; }",
   "function zero() {}"
 ]
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
@@ -1392,22 +1392,22 @@ theorem call_children
 end OriginalSource
 
 private def content : String := String.intercalate "\n" [
-  "function side(n: Word) returns (Word) { let saved = n; return saved; }",
-  "function take(a: Word, b: Word) returns (Word) { return a - b; }",
-  "function fail() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
-  "function failAfter(a: Word) returns (Word) { let written = a + 10; let gap: Word; return gap; }",
-  "function ordered() returns (Word) { return take(side(7), side(3)); }",
-  "function firstFault() returns (Word) { return take(fail(), side(7)); }",
-  "function laterFault() returns (Word) { return take(side(7), fail()); }",
-  "function bodyFault() returns (Word) { return failAfter(side(7)); }",
-  "function mapLeaf(raw: mapping((Bool, Bool) => Word)) returns (mapping((Bool, Bool) => Word)) { return raw; }",
-  "function rawEcho(raw: mapping((Bool, Bool) => Word)) returns (mapping((Bool, Bool) => Word)) { return mapLeaf(raw); }",
-  "function defaulted() returns (Word) { let raw: mapping((Bool, Bool) => Word); return raw[(true, false)]; }",
-  "function alias(n: Word) returns (function(Word) returns (Word)) { let captured = n; return lam(x: Word) -> Word { captured += x; return captured; }; }",
-  "function aliases(n: Word) returns (Word) { let first = alias(n); let second = first; let a = first(2); return a + second(3); }",
-  "function self(n: Word) returns (Word) { return n == 0 ? 2 : self(n - 1) + 1; }",
-  "function left(n: Word) returns (Word) { return n == 0 ? 7 : right(n - 1); }",
-  "function right(n: Word) returns (Word) { return n == 0 ? 11 : left(n - 1); }"
+  "function side(n: word) returns (word) { let saved = n; return saved; }",
+  "function take(a: word, b: word) returns (word) { return a - b; }",
+  "function fail() returns (word) { let written: word = 5; let gap: word; return gap; }",
+  "function failAfter(a: word) returns (word) { let written = a + 10; let gap: word; return gap; }",
+  "function ordered() returns (word) { return take(side(7), side(3)); }",
+  "function firstFault() returns (word) { return take(fail(), side(7)); }",
+  "function laterFault() returns (word) { return take(side(7), fail()); }",
+  "function bodyFault() returns (word) { return failAfter(side(7)); }",
+  "function mapLeaf(raw: mapping((bool, bool) => word)) returns (mapping((bool, bool) => word)) { return raw; }",
+  "function rawEcho(raw: mapping((bool, bool) => word)) returns (mapping((bool, bool) => word)) { return mapLeaf(raw); }",
+  "function defaulted() returns (word) { let raw: mapping((bool, bool) => word); return raw[(true, false)]; }",
+  "function alias(n: word) returns (function(word) returns (word)) { let captured = n; return lam(x: word) -> word { captured += x; return captured; }; }",
+  "function aliases(n: word) returns (word) { let first = alias(n); let second = first; let a = first(2); return a + second(3); }",
+  "function self(n: word) returns (word) { return n == 0 ? 2 : self(n - 1) + 1; }",
+  "function left(n: word) returns (word) { return n == 0 ? 7 : right(n - 1); }",
+  "function right(n: word) returns (word) { return n == 0 ? 11 : left(n - 1); }"
 ]
 private def w (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 
@@ -1635,28 +1635,28 @@ theorem parent_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat
 end ConcreteBodies
 
 private def content : String := String.intercalate "\n" [
-  "enum Box { Box(Bool) }", "enum Row { Row(Word, Bool) }",
-  "enum Key { Key(Bool) }", "enum Missing { Missing(Word) }",
-  "function side(n: Word) returns (Word) { let saved = n; return saved; }",
-  "function truth(flag: Bool) returns (Bool) { let saved = flag; return saved; }",
-  "function failWord() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
-  "function badBool() returns (Bool) { let written: Word = 19; let gap: Bool; return gap; }",
-  "function filled() returns (mapping(Bool => Bool)) { let m: mapping(Bool => Bool); m[true] = true; return m; }",
-  "function empty() returns (mapping(Bool => Bool)) { let m: mapping(Bool => Bool); return m; }",
-  "function badMap() returns (mapping(Bool => Bool)) { let written: Word = 23; let gap: Word; gap; let m: mapping(Bool => Bool); return m; }",
+  "enum Box { Box(bool) }", "enum Row { Row(word, bool) }",
+  "enum Key { Key(bool) }", "enum Missing { Missing(word) }",
+  "function side(n: word) returns (word) { let saved = n; return saved; }",
+  "function truth(flag: bool) returns (bool) { let saved = flag; return saved; }",
+  "function failWord() returns (word) { let written: word = 5; let gap: word; return gap; }",
+  "function badBool() returns (bool) { let written: word = 19; let gap: bool; return gap; }",
+  "function filled() returns (mapping(bool => bool)) { let m: mapping(bool => bool); m[true] = true; return m; }",
+  "function empty() returns (mapping(bool => bool)) { let m: mapping(bool => bool); return m; }",
+  "function badMap() returns (mapping(bool => bool)) { let written: word = 23; let gap: word; gap; let m: mapping(bool => bool); return m; }",
   "function single() returns (Box) { return Box(truth(true)); }",
   "function row() returns (Row) { return Row(side(7), truth(false)); }",
-  "function nominalKey() returns (Bool) { let m: mapping(Key => Bool); return m[Key(truth(true))]; }",
-  "function productKey() returns (Bool) { let m: mapping((Bool, Bool) => Bool); return m[(truth(true), truth(false))]; }",
-  "function duplicate(m: mapping((Bool, Bool) => Bool)) returns (Bool) { return m[(truth(true), truth(false))]; }",
-  "function baseIndex() returns (Bool) { return filled()[truth(true)]; }",
-  "function lazyIndex() returns (Bool) { return empty()[truth(true)]; }",
-  "function operatorParent() returns (Bool) { return !filled()[truth(true)]; }",
+  "function nominalKey() returns (bool) { let m: mapping(Key => bool); return m[Key(truth(true))]; }",
+  "function productKey() returns (bool) { let m: mapping((bool, bool) => bool); return m[(truth(true), truth(false))]; }",
+  "function duplicate(m: mapping((bool, bool) => bool)) returns (bool) { return m[(truth(true), truth(false))]; }",
+  "function baseIndex() returns (bool) { return filled()[truth(true)]; }",
+  "function lazyIndex() returns (bool) { return empty()[truth(true)]; }",
+  "function operatorParent() returns (bool) { return !filled()[truth(true)]; }",
   "function constructorFirstFault() returns (Row) { return Row(failWord(), truth(false)); }",
   "function constructorLaterFault() returns (Row) { return Row(side(7), badBool()); }",
-  "function baseFault() returns (Bool) { return badMap()[truth(true)]; }",
-  "function keyFault() returns (Bool) { return filled()[badBool()]; }",
-  "function defaultFault() returns (Missing) { let m: mapping(Bool => Missing); return m[truth(true)]; }"
+  "function baseFault() returns (bool) { return badMap()[truth(true)]; }",
+  "function keyFault() returns (bool) { return filled()[badBool()]; }",
+  "function defaultFault() returns (Missing) { let m: mapping(bool => Missing); return m[truth(true)]; }"
 ]
 private def w (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def finish (compiled : SourceCoreUnifiedCompilation.Compiled) (name : String) (arguments : List SourceTypedRuntime.Value)
@@ -1926,23 +1926,23 @@ theorem twice_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat)
 end ConcreteBodies
 
 private def content : String := String.intercalate "\n" [
-  "function side(n: Word) returns (Word) { let saved = n; return saved; }",
-  "function truth(flag: Bool) returns (Bool) { let saved = flag; return saved; }",
-  "function fail() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
-  "function badBool() returns (Bool) { let written: Word = 19; let gap: Bool; return gap; }",
-  "function grouped() returns (Word) { return ((side(7))); }",
-  "function paired() returns ((Word, Word)) { return (side(7), side(3)); }",
-  "function unary() returns (Bool) { return !truth(false); }",
-  "function strict() returns (Word) { return side(7) - side(3); }",
-  "function choose() returns (Word) { return truth(false) ? fail() : side(11); }",
-  "function chooseTrue() returns (Word) { return truth(true) ? side(13) : fail(); }",
-  "function andSkip() returns (Bool) { return truth(false) && badBool(); }",
-  "function andNext() returns (Bool) { return truth(true) && truth(false); }",
-  "function orSkip() returns (Bool) { return truth(true) || badBool(); }",
-  "function orNext() returns (Bool) { return truth(false) || truth(true); }",
-  "function firstFault() returns (Word) { return fail() + side(7); }",
-  "function laterFault() returns (Word) { return side(7) + fail(); }",
-  "function conditionFault() returns (Word) { return badBool() ? side(13) : side(11); }"
+  "function side(n: word) returns (word) { let saved = n; return saved; }",
+  "function truth(flag: bool) returns (bool) { let saved = flag; return saved; }",
+  "function fail() returns (word) { let written: word = 5; let gap: word; return gap; }",
+  "function badBool() returns (bool) { let written: word = 19; let gap: bool; return gap; }",
+  "function grouped() returns (word) { return ((side(7))); }",
+  "function paired() returns ((word, word)) { return (side(7), side(3)); }",
+  "function unary() returns (bool) { return !truth(false); }",
+  "function strict() returns (word) { return side(7) - side(3); }",
+  "function choose() returns (word) { return truth(false) ? fail() : side(11); }",
+  "function chooseTrue() returns (word) { return truth(true) ? side(13) : fail(); }",
+  "function andSkip() returns (bool) { return truth(false) && badBool(); }",
+  "function andNext() returns (bool) { return truth(true) && truth(false); }",
+  "function orSkip() returns (bool) { return truth(true) || badBool(); }",
+  "function orNext() returns (bool) { return truth(false) || truth(true); }",
+  "function firstFault() returns (word) { return fail() + side(7); }",
+  "function laterFault() returns (word) { return side(7) + fail(); }",
+  "function conditionFault() returns (word) { return badBool() ? side(13) : side(11); }"
 ]
 private def w (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def finish (compiled : SourceCoreUnifiedCompilation.Compiled) (name : String) (fuel : Nat)
@@ -2093,9 +2093,9 @@ theorem contracted_reflects_at [FunctionCalls.FaultTokens faults] (budget size :
 end ConcreteBodies
 
 private def content : String := String.intercalate "\n" [
-  "function side(n: Word) returns (Word) { let saved = n; return saved; }",
-  "function wordSide(n: Word) returns (Word) { let saved = n; return saved; }",
-  "function fail() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
+  "function side(n: word) returns (word) { let saved = n; return saved; }",
+  "function wordSide(n: word) returns (word) { let saved = n; return saved; }",
+  "function fail() returns (word) { let written: word = 5; let gap: word; return gap; }",
   "function ordered() returns (integer) { return integerSub(wordToInteger(side(7)), wordToInteger(side(3))); }",
   "function converted() returns (integer) { return wordToInteger(wordFromInteger(integerSub(wordToInteger(side(0)), wordToInteger(side(9))))); }",
   "function fromWord() returns (integer) { return wordToInteger(wordSide(11)); }",
@@ -2639,25 +2639,25 @@ theorem concrete_reflects_at [FunctionCalls.FaultTokens faults] (budget size : N
 end ConcreteBodies
 
 private def content : String := String.intercalate "\n" [
-  "enum Box { Box(Bool) }", "enum Key { Key(Bool) }",
-  "function side(n: Word) returns (Word) { let saved = n; return saved; }",
-  "function truth(flag: Bool) returns (Bool) { let saved = flag; return saved; }",
-  "function take(a: Word, b: Word) returns (Word) { return a - b; }",
-  "function fail() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
-  "function failAfter(n: Word) returns (Word) { let written = n + 10; let gap: Word; return gap; }",
-  "function badBool() returns (Bool) { let written: Word = 19; let gap: Bool; return gap; }",
-  "function ordered() returns (Word) { return take(side(7), side(3)); }",
+  "enum Box { Box(bool) }", "enum Key { Key(bool) }",
+  "function side(n: word) returns (word) { let saved = n; return saved; }",
+  "function truth(flag: bool) returns (bool) { let saved = flag; return saved; }",
+  "function take(a: word, b: word) returns (word) { return a - b; }",
+  "function fail() returns (word) { let written: word = 5; let gap: word; return gap; }",
+  "function failAfter(n: word) returns (word) { let written = n + 10; let gap: word; return gap; }",
+  "function badBool() returns (bool) { let written: word = 19; let gap: bool; return gap; }",
+  "function ordered() returns (word) { return take(side(7), side(3)); }",
   "function grouped() returns (integer) { return ((integerSub(wordToInteger(side(7)), wordToInteger(side(9))))); }",
-  "function fromIndex() returns (integer) { let m: mapping(Bool => Word); m[true] = 37; return integerAdd(wordToInteger(m[truth(true)]), wordToInteger(side(5))); }",
+  "function fromIndex() returns (integer) { let m: mapping(bool => word); m[true] = 37; return integerAdd(wordToInteger(m[truth(true)]), wordToInteger(side(5))); }",
   "function choose() returns (integer) { return truth(true) ? integerAdd(wordToInteger(side(7)), wordToInteger(side(9))) : wordToInteger(fail()); }",
   "function boxed() returns (Box) { return Box(truth(integerEq(7, 7))); }",
-  "function paired() returns ((Bool, Bool)) { return (truth(integerEq(7, 7)), truth(integerLt(7, 7))); }",
-  "function keyData() returns (Bool) { let m: mapping(Key => Bool); return m[Key(truth(integerEq(7, 7)))]; }",
-  "function skip() returns (Bool) { return false && truth(integerEq(7, 7)); }",
-  "function unary() returns (Bool) { return !truth(false); }",
+  "function paired() returns ((bool, bool)) { return (truth(integerEq(7, 7)), truth(integerLt(7, 7))); }",
+  "function keyData() returns (bool) { let m: mapping(Key => bool); return m[Key(truth(integerEq(7, 7)))]; }",
+  "function skip() returns (bool) { return false && truth(integerEq(7, 7)); }",
+  "function unary() returns (bool) { return !truth(false); }",
   "function firstFault() returns (integer) { return integerAdd(wordToInteger(fail()), wordToInteger(side(99))); }",
   "function laterFault() returns (integer) { return integerAdd(wordToInteger(side(7)), wordToInteger(fail())); }",
-  "function keyFault() returns (integer) { let m: mapping(Bool => Word); return wordToInteger(m[badBool()]); }",
+  "function keyFault() returns (integer) { let m: mapping(bool => word); return wordToInteger(m[badBool()]); }",
   "function bodyFault() returns (integer) { return wordToInteger(failAfter(side(7))); }"
 ]
 private def w (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
@@ -2876,35 +2876,35 @@ theorem tree_reflects [FunctionCalls.FaultTokens faults] {value : Core.Value} {f
 end Static
 
 private def content : String := String.intercalate "\n" [
-  "enum Box { Box(Bool) }",
-  "function wordLeaf() returns (Word) { return wordFromInteger(7); }",
-  "function wordOther() returns (Word) { return wordFromInteger(3); }",
-  "function boolLeaf() returns (Bool) { return integerEq(2, 2); }",
-  "function boolOther() returns (Bool) { return integerLt(2, 1); }",
+  "enum Box { Box(bool) }",
+  "function wordLeaf() returns (word) { return wordFromInteger(7); }",
+  "function wordOther() returns (word) { return wordFromInteger(3); }",
+  "function boolLeaf() returns (bool) { return integerEq(2, 2); }",
+  "function boolOther() returns (bool) { return integerLt(2, 1); }",
   "function intLeaf() returns (integer) { return integerAdd(2, 3); }",
   "function intOther() returns (integer) { return integerSub(9, 6); }",
   "function take(a: integer, b: integer) returns (integer) { return integerSub(a, b); }",
-  "function first(a: Word) returns (integer) { let copied = wordToInteger(a); return copied; }",
-  "function fail() returns (integer) { let written = integerAdd(2, 3); let gap: Word; return wordToInteger(gap); }",
-  "function boolFail() returns (Bool) { let gap: Bool; return gap; }",
-  "function mapLeaf(raw: mapping((Bool, Bool) => Word)) returns (mapping((Bool, Bool) => Word)) { return raw; }",
-  "function grouped() returns (Word) { return ((wordLeaf())); }",
-  "function paired() returns ((Word, Bool)) { return (wordLeaf(), boolLeaf()); }",
-  "function unary() returns (Word) { return ~wordLeaf(); }",
-  "function binary() returns (Word) { return wordLeaf() + wordOther(); }",
-  "function chosen(flag: Bool) returns (Word) { return flag ? wordLeaf() : wordOther(); }",
-  "function boolUnary() returns (Bool) { return !boolOther(); }",
-  "function boolBinary() returns (Bool) { return boolLeaf() && !boolOther(); }",
+  "function first(a: word) returns (integer) { let copied = wordToInteger(a); return copied; }",
+  "function fail() returns (integer) { let written = integerAdd(2, 3); let gap: word; return wordToInteger(gap); }",
+  "function boolFail() returns (bool) { let gap: bool; return gap; }",
+  "function mapLeaf(raw: mapping((bool, bool) => word)) returns (mapping((bool, bool) => word)) { return raw; }",
+  "function grouped() returns (word) { return ((wordLeaf())); }",
+  "function paired() returns ((word, bool)) { return (wordLeaf(), boolLeaf()); }",
+  "function unary() returns (word) { return ~wordLeaf(); }",
+  "function binary() returns (word) { return wordLeaf() + wordOther(); }",
+  "function chosen(flag: bool) returns (word) { return flag ? wordLeaf() : wordOther(); }",
+  "function boolUnary() returns (bool) { return !boolOther(); }",
+  "function boolBinary() returns (bool) { return boolLeaf() && !boolOther(); }",
   "function constructed() returns (Box) { return Box(boolLeaf()); }",
-  "function indexed(raw: mapping((Bool, Bool) => Word)) returns (Word) { return mapLeaf(raw)[(boolLeaf(), boolOther())]; }",
-  "function defaulted() returns (Word) { let empty: mapping((Bool, Bool) => Word); return empty[(boolLeaf(), boolOther())]; }",
+  "function indexed(raw: mapping((bool, bool) => word)) returns (word) { return mapLeaf(raw)[(boolLeaf(), boolOther())]; }",
+  "function defaulted() returns (word) { let empty: mapping((bool, bool) => word); return empty[(boolLeaf(), boolOther())]; }",
   "function builtinArgument() returns (integer) { return integerAdd(intLeaf(), intOther()); }",
   "function namedArguments() returns (integer) { return take(integerAdd(intLeaf(), 1), first(wordLeaf())); }",
   "function ordered() returns (integer) { return take(first(wordLeaf()), first(wordOther())); }",
-  "function skipped() returns (Bool) { return false && boolFail(); }",
+  "function skipped() returns (bool) { return false && boolFail(); }",
   "function firstFault() returns (integer) { return take(fail(), first(wordLeaf())); }",
   "function lastFault() returns (integer) { return take(first(wordLeaf()), fail()); }",
-  "function rawEcho(raw: mapping((Bool, Bool) => Word)) returns (mapping((Bool, Bool) => Word)) { return mapLeaf(raw); }"
+  "function rawEcho(raw: mapping((bool, bool) => word)) returns (mapping((bool, bool) => word)) { return mapLeaf(raw); }"
 ]
 
 private def finish (compiled : SourceCoreUnifiedCompilation.Compiled) (name : String)
@@ -3135,14 +3135,14 @@ theorem old_singleton_negative : ¬ compositionForm (.tuple [a]) := by
 end Boundaries
 
 private def content : String := String.intercalate "\n" [
-  "function side(x: Word) returns (Word) { return x; }",
-  "function fail() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
-  "function triple() returns ((Word, Bool, Word)) { return (side(7), true, 3 + 4); }",
-  "function quadruple() returns ((Word, Bool, Word, Bool)) { return (side(11), false, side(13), true); }",
-  "function nested() returns (((Word, Bool, Word), Word, Bool)) { return ((side(17), true, 5 + 6), side(19), false); }",
-  "function firstFault() returns ((Word, Word, Word)) { return (fail(), side(91), side(92)); }",
-  "function laterFault() returns ((Word, Word, Word, Word)) { return (side(23), side(29), fail(), side(99)); }",
-  "function singleton() returns (Word) { return (side(31)); }"
+  "function side(x: word) returns (word) { return x; }",
+  "function fail() returns (word) { let written: word = 5; let gap: word; return gap; }",
+  "function triple() returns ((word, bool, word)) { return (side(7), true, 3 + 4); }",
+  "function quadruple() returns ((word, bool, word, bool)) { return (side(11), false, side(13), true); }",
+  "function nested() returns (((word, bool, word), word, bool)) { return ((side(17), true, 5 + 6), side(19), false); }",
+  "function firstFault() returns ((word, word, word)) { return (fail(), side(91), side(92)); }",
+  "function laterFault() returns ((word, word, word, word)) { return (side(23), side(29), fail(), side(99)); }",
+  "function singleton() returns (word) { return (side(31)); }"
 ]
 private def w (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _

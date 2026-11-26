@@ -207,15 +207,15 @@ end CompilerConsumers
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-      "function next(value: Word) returns (Word) { return value + 1; }",
-      "function less(value: Word, bound: Word) returns (Bool) { return value < bound; }",
-      "function bad() returns (Word) { let gap: Word; return gap; }",
-      "function unitBody(seed: Word) { for (let outer = seed; less(outer, 3); outer += next(0)) { for (let inner = 0; less(inner, 4); inner += next(0)) { if (less(inner, 1)) { continue; } if (less(1, inner)) { break; } } } }",
-      "function returnedBody(seed: Word) returns (Word) { for (let outer = seed; less(outer, 3); outer += next(0)) { let inner = 0; while (less(inner, 4)) { inner += next(0); if (less(inner, 2)) { continue; } return next(outer + inner); } } return next(seed); }",
-      "function failedBody(seed: Word) returns (Word) { let seen: mapping(Bool => Word); for (let outer = seed; less(outer, 3); outer += next(0)) { let inner = 0; while (less(inner, 4)) { inner += next(0); seen[false] += next(0); if (less(inner, 2)) { continue; } seen[true] = next(outer); return bad(); } } return next(seed); }",
-      "function bitNotBody(seed: Word) returns (Word) { let result = seed; for (let count = 0; less(count, 3); count += next(0)) { result ~=; } return result; }",
-      "function postFaultBody(seed: Word) returns (Word) { let result = seed; for (let count = 0; less(count, 3); count += bad()) { result += next(0); } return result; }",
-      "function initializerFaultBody(seed: Word) returns (Word) { let result = seed; for (let count = bad(); less(count, 3); count += next(0)) { result += next(0); } return result; }"
+      "function next(value: word) returns (word) { return value + 1; }",
+      "function less(value: word, bound: word) returns (bool) { return value < bound; }",
+      "function bad() returns (word) { let gap: word; return gap; }",
+      "function unitBody(seed: word) { for (let outer = seed; less(outer, 3); outer += next(0)) { for (let inner = 0; less(inner, 4); inner += next(0)) { if (less(inner, 1)) { continue; } if (less(1, inner)) { break; } } } }",
+      "function returnedBody(seed: word) returns (word) { for (let outer = seed; less(outer, 3); outer += next(0)) { let inner = 0; while (less(inner, 4)) { inner += next(0); if (less(inner, 2)) { continue; } return next(outer + inner); } } return next(seed); }",
+      "function failedBody(seed: word) returns (word) { let seen: mapping(bool => word); for (let outer = seed; less(outer, 3); outer += next(0)) { let inner = 0; while (less(inner, 4)) { inner += next(0); seen[false] += next(0); if (less(inner, 2)) { continue; } seen[true] = next(outer); return bad(); } } return next(seed); }",
+      "function bitNotBody(seed: word) returns (word) { let result = seed; for (let count = 0; less(count, 3); count += next(0)) { result ~=; } return result; }",
+      "function postFaultBody(seed: word) returns (word) { let result = seed; for (let count = 0; less(count, 3); count += bad()) { result += next(0); } return result; }",
+      "function initializerFaultBody(seed: word) returns (word) { let result = seed; for (let count = bad(); less(count, 3); count += next(0)) { result += next(0); } return result; }"
     ]}] }
 
 private def fault_resume (entry : SourceCompilerFeatureSupport.Entry)
@@ -436,12 +436,12 @@ end CompilerConsumers
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-      "function next(value: Word) returns (Word) { return value + 1; }",
-      "function less(value: Word, bound: Word) returns (Bool) { return value < bound; }",
-      "function bad() returns (Word) { let gap: Word; return gap; }",
-      "function unitBody(seed: Word) { let outer = seed; while (less(outer, 3)) { outer += next(0); let inner = 0; while (less(inner, 4)) { inner += next(0); if (less(inner, 2)) { continue; } if (less(2, inner)) { break; } } } }",
-      "function returnedBody(seed: Word) returns (Word) { let outer = seed; while (less(outer, 3)) { outer += next(0); let inner = 0; while (less(inner, 4)) { inner += next(0); if (less(inner, 2)) { continue; } return next(outer + inner); } } return next(outer); }",
-      "function failedBody(seed: Word) returns (Word) { let seen: mapping(Bool => Word); let outer = seed; while (less(outer, 3)) { outer += next(0); let inner = 0; while (less(inner, 4)) { inner += next(0); seen[false] += next(0); if (less(inner, 2)) { continue; } seen[true] = next(outer); return bad(); } } return next(outer); }"
+      "function next(value: word) returns (word) { return value + 1; }",
+      "function less(value: word, bound: word) returns (bool) { return value < bound; }",
+      "function bad() returns (word) { let gap: word; return gap; }",
+      "function unitBody(seed: word) { let outer = seed; while (less(outer, 3)) { outer += next(0); let inner = 0; while (less(inner, 4)) { inner += next(0); if (less(inner, 2)) { continue; } if (less(2, inner)) { break; } } } }",
+      "function returnedBody(seed: word) returns (word) { let outer = seed; while (less(outer, 3)) { outer += next(0); let inner = 0; while (less(inner, 4)) { inner += next(0); if (less(inner, 2)) { continue; } return next(outer + inner); } } return next(outer); }",
+      "function failedBody(seed: word) returns (word) { let seen: mapping(bool => word); let outer = seed; while (less(outer, 3)) { outer += next(0); let inner = 0; while (less(inner, 4)) { inner += next(0); seen[false] += next(0); if (less(inner, 2)) { continue; } seen[true] = next(outer); return bad(); } } return next(outer); }"
     ]}] }
 
 private def fault_resume (entry : SourceCompilerFeatureSupport.Entry)
@@ -669,7 +669,7 @@ theorem FactoryShape.statementTyping
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function choose(flag: Bool, value: Word, stop: Bool) returns (Word) { while (flag) { flag = stop; } return value; }"}] }
+    "function choose(flag: bool, value: word, stop: bool) returns (word) { while (flag) { flag = stop; } return value; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)
@@ -958,7 +958,7 @@ theorem FactoryShape.statementTyping
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function update(value: Word, next: Word, running: Bool, done: Bool) returns (Word) { for (let flag: Bool = running; flag; flag = done) { value = next; } return value; }"}] }
+    "function update(value: word, next: word, running: bool, done: bool) returns (word) { for (let flag: bool = running; flag; flag = done) { value = next; } return value; }"}] }
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)
 abbrev observeRead := Tests.SourceCoreNamedWhile.observeRead

@@ -205,7 +205,7 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function make(seed: Word) returns (function() returns (Word)) { let local: Word = seed; return lam() { return local; }; }"}] }
+    "function make(seed: word) returns (function() returns (word)) { let local: word = seed; return lam() { return local; }; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)
@@ -1982,7 +1982,7 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function make(seed: Word) returns (function() returns (Word)) { return lam() { return seed; }; } function read(f: function() returns (Word)) returns (Word) { return f(); }"}] }
+    "function make(seed: word) returns (function() returns (word)) { return lam() { return seed; }; } function read(f: function() returns (word)) returns (word) { return f(); }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)

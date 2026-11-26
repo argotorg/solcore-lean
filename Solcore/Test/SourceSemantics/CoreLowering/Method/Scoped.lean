@@ -596,13 +596,13 @@ abbrev observeUse := Tests.SourceCoreMethodClosure.observeUse
 
 def content : String := String.intercalate "\n" [
   "trait BitNot<T> { function bnot(value: T) returns (T); }",
-  "impl BitNot<Word> { function bnot(value: Word) returns (Word) { return value; } }",
-  "impl BitNot<Bool> { function bnot(value: Bool) returns (Bool) { return value; } }",
-  "function make<T>(value: T, next: T, flag: Bool) returns (function() returns (T)) where T: BitNot { return lam() -> T { let saved = ~value; while (flag) { value = ~next; flag = false; } return ~saved; }; }",
-  "function wordRoot(value: Word, next: Word, flag: Bool) returns (function() returns (Word)) { return make(value, next, flag); }",
-  "function boolRoot(value: Bool, next: Bool, flag: Bool) returns (function() returns (Bool)) { return make(value, next, flag); }",
-  "function useWord(f: function() returns (Word)) returns (Word) { return f(); }",
-  "function useBool(f: function() returns (Bool)) returns (Bool) { return f(); }"]
+  "impl BitNot<word> { function bnot(value: word) returns (word) { return value; } }",
+  "impl BitNot<bool> { function bnot(value: bool) returns (bool) { return value; } }",
+  "function make<T>(value: T, next: T, flag: bool) returns (function() returns (T)) where T: BitNot { return lam() -> T { let saved = ~value; while (flag) { value = ~next; flag = false; } return ~saved; }; }",
+  "function wordRoot(value: word, next: word, flag: bool) returns (function() returns (word)) { return make(value, next, flag); }",
+  "function boolRoot(value: bool, next: bool, flag: bool) returns (function() returns (bool)) { return make(value, next, flag); }",
+  "function useWord(f: function() returns (word)) returns (word) { return f(); }",
+  "function useBool(f: function() returns (bool)) returns (bool) { return f(); }"]
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ content}] }

@@ -78,8 +78,8 @@ private def successSource : String := String.intercalate "\n" [
   "trait Add<T> {",
   "  function add(left: T, right: T) returns (T);",
   "}",
-  "impl Add<Word> {",
-  "  function add(left: Word, right: Word) returns (Word) {",
+  "impl Add<word> {",
+  "  function add(left: word, right: word) returns (word) {",
   "    return left - right;",
   "  }",
   "}"
@@ -89,8 +89,8 @@ private def coerceSource : String := String.intercalate "\n" [
   "trait Coerce<From, To> {",
   "  function coerce(value: From) returns (To);",
   "}",
-  "impl Coerce<Word, Bool> {",
-  "  function coerce(value: Word) returns (Bool) {",
+  "impl Coerce<word, bool> {",
+  "  function coerce(value: word) returns (bool) {",
   "    return true;",
   "  }",
   "}"
@@ -100,8 +100,8 @@ private def stagedSource : String := String.intercalate "\n" [
   "trait Stage<T> {",
   "  function stage(comptime value: T) returns (comptime<T>);",
   "}",
-  "impl Stage<Word> {",
-  "  function stage(comptime value: Word) returns (comptime<Word>) {",
+  "impl Stage<word> {",
+  "  function stage(comptime value: word) returns (comptime<word>) {",
   "    return value;",
   "  }",
   "}"
@@ -245,11 +245,11 @@ private def testMultiMethodSelection : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Add<T> {",
     "  function add(left: T, right: T) returns (T);",
-    "  function tag(value: T) returns (Bool);",
+    "  function tag(value: T) returns (bool);",
     "}",
-    "impl Add<Word> {",
-    "  function add(left: Word, right: Word) returns (Word) { return left; }",
-    "  function tag(value: Word) returns (Bool) { return true; }",
+    "impl Add<word> {",
+    "  function add(left: word, right: word) returns (word) { return left; }",
+    "  function tag(value: word) returns (bool) { return true; }",
     "}"
   ])
   let implementation ← onlyImplementation program
@@ -346,11 +346,11 @@ private def testTraitPredicateInstantiation : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Eq<T> {}",
     "trait Ord<T> where T: Eq {",
-    "  function gt(left: T, right: T) returns (Bool);",
+    "  function gt(left: T, right: T) returns (bool);",
     "}",
-    "impl Eq<Word> {}",
-    "impl Ord<Word> where Word: Eq {",
-    "  function gt(left: Word, right: Word) returns (Bool) { return true; }",
+    "impl Eq<word> {}",
+    "impl Ord<word> where word: Eq {",
+    "  function gt(left: word, right: word) returns (bool) { return true; }",
     "}",
     "pragma no-patterson-condition;"
   ])
@@ -386,7 +386,7 @@ private def testTraitPredicateInstantiation : IO Unit := do
       method.checked.type = .function (.product .word .word) .bool ∧
       method.checked.inferredBodyType = .bool ∧
       method.checked.solvedRequirements = []))
-    "Ord.gt did not retain the instantiated Eq<Word> static assumption"
+    "Ord.gt did not retain the instantiated Eq<word> static assumption"
   let elaborated ← match SourceCoreElaboration.elaborateFunction method.checked with
     | .ok elaborated => pure elaborated
     | .error error => throw (IO.userError
@@ -402,9 +402,9 @@ private def testTraitPredicateParameterOrder : IO Unit := do
     "trait Route<From, To> where From: Rel<To> {",
     "  function route(value: From) returns (To);",
     "}",
-    "impl Rel<Word, Bool> {}",
-    "impl Route<Word, Bool> where Word: Rel<Bool> {",
-    "  function route(value: Word) returns (Bool) { return true; }",
+    "impl Rel<word, bool> {}",
+    "impl Route<word, bool> where word: Rel<bool> {",
+    "  function route(value: word) returns (bool) { return true; }",
     "}",
     "pragma no-patterson-condition;"
   ])
@@ -434,11 +434,11 @@ private def testUnclosedTraitPredicateRejection : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Eq<T> {}",
     "trait Ord<T> where T: Eq {",
-    "  function gt(left: T, right: T) returns (Bool);",
+    "  function gt(left: T, right: T) returns (bool);",
     "}",
-    "impl Eq<Word> {}",
-    "impl Ord<Word> where Word: Eq {",
-    "  function gt(left: Word, right: Word) returns (Bool) { return true; }",
+    "impl Eq<word> {}",
+    "impl Ord<word> where word: Eq {",
+    "  function gt(left: word, right: word) returns (bool) { return true; }",
     "}",
     "pragma no-patterson-condition;"
   ])
@@ -480,7 +480,7 @@ private def testUnclosedTraitPredicateRejection : IO Unit := do
 private def testEmptyMarkerRejection : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Marker<T> {}",
-    "impl Marker<Word> {}"
+    "impl Marker<word> {}"
   ])
   let implementation ← onlyImplementation program
   match ExecutableImplMethods.checkMonomorphicPremiseFreeMethodWithArity program
@@ -559,11 +559,11 @@ decide one goal. -/
 private def testAmbiguousEvidenceRejection : IO Unit := do
   match checkProgram (singleSourceWorkspace (String.intercalate "\n" [
     "trait Add<T> { function add(left: T, right: T) returns (T); }",
-    "impl Add<Word> {",
-    "  function add(left: Word, right: Word) returns (Word) { return left; }",
+    "impl Add<word> {",
+    "  function add(left: word, right: word) returns (word) { return left; }",
     "}",
-    "impl Add<Word> {",
-    "  function add(left: Word, right: Word) returns (Word) { return right; }",
+    "impl Add<word> {",
+    "  function add(left: word, right: word) returns (word) { return right; }",
     "}"
   ])) with
   | .error [.signature (.overlappingImplementation implementation overlaps)] =>
@@ -595,7 +595,7 @@ private def testGenericImplementationSpecialization : IO Unit := do
       program.signatures.resolutionRules 32 goal).outcome with
     | .success evidence => pure evidence
     | outcome => throw (IO.userError
-        s!"generic Identity<Word> did not resolve: {reprStr outcome}")
+        s!"generic Identity<word> did not resolve: {reprStr outcome}")
   let method ← match ExecutableImplMethods.checkMethodWithArity program evidence
       1 "identity" with
     | .ok method => pure method
@@ -662,7 +662,7 @@ private def testUndeterminedImplementationParameterRejection : IO Unit := do
       program.signatures.resolutionRules 32 goal).outcome with
     | .success evidence => pure evidence
     | outcome => throw (IO.userError
-        s!"phantom Identity<Word> head did not resolve: {reprStr outcome}")
+        s!"phantom Identity<word> head did not resolve: {reprStr outcome}")
   match ExecutableImplMethods.checkMethodWithArity forgedProgram evidence 1
       "identity" with
   | .error (.implementationParameterNotDetermined id parameter (.flexible _)) =>
@@ -677,9 +677,9 @@ private def testImplementationPredicateEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Eq<T> {}",
     "trait Add<T> { function add(left: T, right: T) returns (T); }",
-    "impl Eq<Word> {}",
-    "impl Add<Word> where Word: Eq {",
-    "  function add(left: Word, right: Word) returns (Word) { return left; }",
+    "impl Eq<word> {}",
+    "impl Add<word> where word: Eq {",
+    "  function add(left: word, right: word) returns (word) { return left; }",
     "}",
     "pragma no-patterson-condition;"
   ])
@@ -741,15 +741,15 @@ private def testImplementationPredicateEvidence : IO Unit := do
 
 private def testMethodPredicateEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
-    "trait Eq<T> { function eq(left: T, right: T) returns (Bool); }",
+    "trait Eq<T> { function eq(left: T, right: T) returns (bool); }",
     "trait Mark<T> {}",
     "trait Guard<T> {",
     "  function guard(value: T) returns (T) where T: Eq, T: Mark;",
     "}",
-    "impl Eq<Word> {",
-    "  function eq(left: Word, right: Word) returns (Bool) { return true; }",
+    "impl Eq<word> {",
+    "  function eq(left: word, right: word) returns (bool) { return true; }",
     "}",
-    "impl Mark<Word> {}",
+    "impl Mark<word> {}",
     "impl<T> Guard<T> {",
     "  function guard(value: T) returns (T) where T: Eq, T: Mark {",
     "    value == value;",
@@ -801,17 +801,17 @@ private def testMethodPredicateEvidence : IO Unit := do
       program.signatures.resolutionRules 32 guardWord).outcome with
     | .success evidence => pure evidence
     | outcome => throw (IO.userError
-        s!"Guard<Word> evidence did not resolve: {reprStr outcome}")
+        s!"Guard<word> evidence did not resolve: {reprStr outcome}")
   let eqEvidence ← match (TypedTraitResolution.resolve
       program.signatures.resolutionRules 32 eqWord).outcome with
     | .success evidence => pure evidence
     | outcome => throw (IO.userError
-        s!"Eq<Word> evidence did not resolve: {reprStr outcome}")
+        s!"Eq<word> evidence did not resolve: {reprStr outcome}")
   let markEvidence ← match (TypedTraitResolution.resolve
       program.signatures.resolutionRules 32 markWord).outcome with
     | .success evidence => pure evidence
     | outcome => throw (IO.userError
-        s!"Mark<Word> evidence did not resolve: {reprStr outcome}")
+        s!"Mark<word> evidence did not resolve: {reprStr outcome}")
   let method ← match
       ExecutableImplMethods.checkMethodWithEvidenceAndArity program
         primaryEvidence [eqEvidence, markEvidence] 1 "guard" with
@@ -940,8 +940,8 @@ private def testMethodPredicateEvidence : IO Unit := do
 private def testBodyIsActuallyChecked : IO Unit := do
   let raw := singleSourceWorkspace (String.intercalate "\n" [
     "trait Add<T> { function add(left: T, right: T) returns (T); }",
-    "impl Add<Word> {",
-    "  function add(left: Word, right: Word) returns (Word) {",
+    "impl Add<word> {",
+    "  function add(left: word, right: word) returns (word) {",
     "    return missing;",
     "  }",
     "}"
@@ -1224,7 +1224,7 @@ private def successfulWorkspace : Workspace.RawWorkspace := {
       content := "pragma solcore;\n" ++ String.intercalate "\n" [
         "export {Eq};",
         "trait Eq<T> {}",
-        "impl Eq<Word> {}"
+        "impl Eq<word> {}"
       ]
     },
     {
@@ -1233,15 +1233,15 @@ private def successfulWorkspace : Workspace.RawWorkspace := {
         "import {Eq} from traits;",
         "export {keep, choose};",
         "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
-        "function chooseBool(value: Bool) returns (Bool) { return value; }",
-        "function choose(value: Word) returns (Word) { return value + 1; }"
+        "function chooseBool(value: bool) returns (bool) { return value; }",
+        "function choose(value: word) returns (word) { return value + 1; }"
       ]
     },
     {
       path := "main.solc"
       content := "pragma solcore;\n" ++ String.intercalate "\n" [
         "import {keep, choose} from functions;",
-        "function run() returns (Word) { return choose(keep(41)); }"
+        "function run() returns (word) { return choose(keep(41)); }"
       ]
     }
   ]
@@ -1292,7 +1292,7 @@ private def testSuccessfulProgram : IO Unit := do
             | .implementation (.byImpl goal (.builtin .intWord) premises) =>
                 goal == integerPredicate && premises.isEmpty
             | _ => false)
-        "nested literal did not retain builtin Int<Word> evidence"
+        "nested literal did not retain builtin Int<word> evidence"
 
 private def testSignatureFormationRejectsFlexibleReturn : IO Unit := do
   let checked ← match checkProgram successfulWorkspace with
@@ -1407,11 +1407,11 @@ private def defaultImplementationLines : List String := [
   "trait Ready<T> {}",
   "trait Select<T> {}",
   "default impl<T> Select<T> {}",
-  "impl Select<Word> {}",
-  "impl Select<Bool> where Bool: Ready {}",
+  "impl Select<word> {}",
+  "impl Select<bool> where bool: Ready {}",
   "enum Coin { Head }",
   "function select<T>(value: T) returns (T) where T: Select { return value; }",
-  "function selectWord(value: Word) returns (Word) { return select(value); }",
+  "function selectWord(value: word) returns (word) { return select(value); }",
   "function selectCoin(value: Coin) returns (Coin) { return select(value); }"]
 
 private def defaultImplementationWorkspace (extra : List String := []) :
@@ -1467,7 +1467,7 @@ private def testDefaultImplementationPriority : IO Unit := do
   | requirements => throw (IO.userError
       s!"selectCoin evidence changed: {reprStr requirements}")
   match checkProgram (defaultImplementationWorkspace
-      ["function selectBool(value: Bool) returns (Bool) { return select(value); }"]) with
+      ["function selectBool(value: bool) returns (bool) { return select(value); }"]) with
   | .error [.noSolution _ predicate] =>
       assertTrue (predicate.subject == .bool)
         s!"selectBool was refused at another goal: {reprStr predicate}"
@@ -1489,8 +1489,8 @@ private def defaultBitNot : List String := [
   "impl BitNot<Coin> { function bnot(value: Coin) returns (Coin) { match (value) { case Coin.Head { return Coin.Tail; } case Coin.Tail { return Coin.Head; } } } }",
   "enum Plain { Head, Tail }",
   "enum Box<A> { Wrap(A) }",
-  "function coin(value: Coin) returns (Word) { match (value) { case Coin.Head { return 1; } case Coin.Tail { return 2; } } }",
-  "function plain(value: Plain) returns (Word) { match (value) { case Plain.Head { return 1; } case Plain.Tail { return 2; } } }"]
+  "function coin(value: Coin) returns (word) { match (value) { case Coin.Head { return 1; } case Coin.Tail { return 2; } } }",
+  "function plain(value: Plain) returns (word) { match (value) { case Plain.Head { return 1; } case Plain.Tail { return 2; } } }"]
 
 /-- The subject of the one unsolved trait goal of a refused program. -/
 private def refusedDefaultSubject (label : String) (lines : List String) :
@@ -1533,22 +1533,22 @@ predicate.  Upstream's generic calls `Fee.fee`, which Lean's source syntax
 lacks, so here a generic helper that requires `T: Fee` stands for the call. -/
 private def testDefaultForTypeParameter : IO Unit := do
   let fee := [
-    "trait Fee<T> { function fee(x: T) returns (Word); }",
-    "default impl<T> Fee<T> { function fee(x: T) returns (Word) { return 0; } }",
+    "trait Fee<T> { function fee(x: T) returns (word); }",
+    "default impl<T> Fee<T> { function fee(x: T) returns (word) { return 0; } }",
     "enum B { Only }",
-    "function feeOf<T>(x: T) returns (Word) where T: Fee { return 5; }"]
+    "function feeOf<T>(x: T) returns (word) where T: Fee { return 5; }"]
   match ← refusedDefaultSubject "default_not_used_for_type_parameter" (fee ++ [
-      "impl Fee<B> { function fee(x: B) returns (Word) { return 1; } }",
-      "function charge<T>(x: T) returns (Word) { return feeOf(x); }",
-      "function viaGeneric() returns (Word) { return charge(B.Only); }"]) with
+      "impl Fee<B> { function fee(x: B) returns (word) { return 1; } }",
+      "function charge<T>(x: T) returns (word) { return feeOf(x); }",
+      "function viaGeneric() returns (word) { return charge(B.Only); }"]) with
   | .parameter parameter =>
       assertTrue (parameter.index == 0)
         "the refused goal is not on the generic's parameter"
   | subject => throw (IO.userError s!"the refused goal's subject is {reprStr subject}")
   match ← refusedDefaultSubject "default_not_used_for_tuple_of_type_parameter" (fee ++ [
-      "impl Fee<(B, B)> { function fee(x: (B, B)) returns (Word) { return 1; } }",
-      "function charge<T>(x: T) returns (Word) { return feeOf((x, x)); }",
-      "function viaGeneric() returns (Word) { return charge(B.Only); }"]) with
+      "impl Fee<(B, B)> { function fee(x: (B, B)) returns (word) { return 1; } }",
+      "function charge<T>(x: T) returns (word) { return feeOf((x, x)); }",
+      "function viaGeneric() returns (word) { return charge(B.Only); }"]) with
   | .product (.parameter first) (.parameter second) =>
       assertTrue (decide (first = second) && first.index == 0)
         "the refused tuple goal is not on the generic's parameter"
@@ -1556,14 +1556,14 @@ private def testDefaultForTypeParameter : IO Unit := do
   -- An uncalled generic, one called at a type with its own implementation and
   -- one called at a type that only the default covers, which compiled before.
   for (label, calls) in [("an uncalled generic", []),
-      ("a generic called at Coin", ["function viaCoin() returns (Word) { return coin(flip(Coin.Head)); }"]),
-      ("a generic called at Plain", ["function viaPlain() returns (Word) { return plain(flip(Plain.Head)); }"])] do
+      ("a generic called at Coin", ["function viaCoin() returns (word) { return coin(flip(Coin.Head)); }"]),
+      ("a generic called at Plain", ["function viaPlain() returns (word) { return plain(flip(Plain.Head)); }"])] do
     match ← refusedDefaultSubject label (defaultBitNot ++
         ["function flip<T>(x: T) returns (T) { return ~x; }"] ++ calls) with
     | .parameter _ => pure ()
     | subject => throw (IO.userError s!"{label}: the refused goal's subject is {reprStr subject}")
   match ← refusedDefaultSubject "a product whose first component is the parameter" (defaultBitNot ++
-      ["function flip<T>(x: T) returns ((T, Word)) { return ~(x, 3); }"]) with
+      ["function flip<T>(x: T) returns ((T, word)) { return ~(x, 3); }"]) with
   | .product (.parameter _) _ => pure ()
   | subject => throw (IO.userError s!"the refused product goal's subject is {reprStr subject}")
   -- A default implementation's body and an ordinary implementation's body.
@@ -1585,7 +1585,7 @@ private def testDefaultForTypeParameter : IO Unit := do
   -- A default still decides a goal whose coherence head is not a parameter.
   for (label, function) in [
       ("a product whose first component is not a parameter",
-        "function flip<T>(x: T) returns ((Word, T)) { return ~(3, x); }"),
+        "function flip<T>(x: T) returns ((word, T)) { return ~(3, x); }"),
       ("a nominal type of the parameter",
         "function flip<T>(x: Box<T>) returns (Box<T>) { return ~x; }")] do
     match ← acceptedDefaultEvidence label "flip" (defaultBitNot ++ [function]) with
@@ -1681,30 +1681,30 @@ parameters bound too, takes no default, whether that implementation's
 conditions hold or not. Each goal is decided so, a premise as well. -/
 private def testDefaultTierBlocking : IO Unit := do
   let base := [
-    "trait Fee<T> { function fee(x: T) returns (Word); }",
-    "trait Mark<T> { function mark(x: T) returns (Word); }",
+    "trait Fee<T> { function fee(x: T) returns (word); }",
+    "trait Mark<T> { function mark(x: T) returns (word); }",
     "enum Box<A> { Wrap(A) }",
     "enum Pack<A> { Put(A) }",
-    "default impl<T> Fee<T> { function fee(x: T) returns (Word) { return 11; } }",
-    "function needFee<T>(x: T) returns (Word) where T: Fee { return 5; }"]
+    "default impl<T> Fee<T> { function fee(x: T) returns (word) { return 11; } }",
+    "function needFee<T>(x: T) returns (word) where T: Fee { return 5; }"]
   let conditional :=
-    "impl<A> Fee<Box<A>> where A: Mark { function fee(x: Box<A>) returns (Word) { return 22; } }"
+    "impl<A> Fee<Box<A>> where A: Mark { function fee(x: Box<A>) returns (word) { return 22; } }"
   let closedBox :=
-    "impl Fee<Box<Word>> { function fee(x: Box<Word>) returns (Word) { return 22; } }"
-  let markWord := "impl Mark<Word> { function mark(x: Word) returns (Word) { return 1; } }"
+    "impl Fee<Box<word>> { function fee(x: Box<word>) returns (word) { return 22; } }"
+  let markWord := "impl Mark<word> { function mark(x: word) returns (word) { return 1; } }"
   let packed :=
-    "impl<A> Fee<Pack<A>> where A: Fee { function fee(x: Pack<A>) returns (Word) { return 33; } }"
-  let generic := "function viaGeneric<T>(x: Box<T>) returns (Word) { return needFee(x); }"
+    "impl<A> Fee<Pack<A>> where A: Fee { function fee(x: Pack<A>) returns (word) { return 33; } }"
+  let generic := "function viaGeneric<T>(x: Box<T>) returns (word) { return needFee(x); }"
   let refused : List (String × List String × (TypeSystem.Ty → Bool)) := [
     ("a matching head whose condition fails", base ++ [conditional,
-        "function run(w: Word) returns (Word) { return needFee(Box.Wrap(w)); }"],
+        "function run(w: word) returns (word) { return needFee(Box.Wrap(w)); }"],
       fun | .application _ .word => true | _ => false),
     ("a closed head that a generic goal unifies with", base ++ [closedBox, generic],
       fun | .application _ (.parameter _) => true | _ => false),
     ("a conditional head at a generic goal", base ++ [conditional, markWord, generic],
       fun | .application _ (.parameter _) => true | _ => false),
     ("a premise that a closed head unifies with", base ++ [packed, closedBox,
-        "function viaPacked<T>(x: Pack<Box<T>>) returns (Word) { return needFee(x); }"],
+        "function viaPacked<T>(x: Pack<Box<T>>) returns (word) { return needFee(x); }"],
       fun | .application _ (.application _ (.parameter _)) => true | _ => false)]
   for (label, lines, expected) in refused do
     let subject ← refusedDefaultSubject label lines
@@ -1728,27 +1728,27 @@ private def testDefaultTierBlocking : IO Unit := do
           assertTrue (selected == [tiers])
             s!"{label}: `{name}` selected {reprStr selected}, not {tiers}"
   selects "no head that a closed goal unifies with" (base ++ [closedBox,
-      "function wrapped(w: Word) returns (Word) { return needFee(Pack.Put(w)); }",
-      "function boxed(w: Word) returns (Word) { return needFee(Box.Wrap(w)); }"])
+      "function wrapped(w: word) returns (word) { return needFee(Pack.Put(w)); }",
+      "function boxed(w: word) returns (word) { return needFee(Box.Wrap(w)); }"])
     [("wrapped", "D"), ("boxed", "I")]
   selects "no head that a generic goal unifies with" (base ++ [closedBox,
-      "function viaGeneric<T>(x: Pack<T>) returns (Word) { return needFee(x); }"])
+      "function viaGeneric<T>(x: Pack<T>) returns (word) { return needFee(x); }"])
     [("viaGeneric", "D")]
   selects "a given that proves the matching head's condition" (base ++ [conditional, markWord,
-      "function viaGiven<T>(x: Box<T>) returns (Word) where T: Mark { return needFee(x); }"])
+      "function viaGiven<T>(x: Box<T>) returns (word) where T: Mark { return needFee(x); }"])
     [("viaGiven", "I(given)")]
   selects "a premise that no head unifies with" (base ++ [packed, closedBox,
-      "function closed(b: Bool) returns (Word) { return needFee(Pack.Put(Box.Wrap(b))); }",
-      "function premise(b: Bool) returns (Word) { return needFee(Box.Wrap(b)); }"])
+      "function closed(b: bool) returns (word) { return needFee(Pack.Put(Box.Wrap(b))); }",
+      "function premise(b: bool) returns (word) { return needFee(Box.Wrap(b)); }"])
     [("closed", "I(D)"), ("premise", "D")]
   -- The whole head is unified, its other arguments too.
   selects "a head whose other argument differs" [
-      "trait Conv<A, B> { function conv(x: A, y: B) returns (Word); }",
+      "trait Conv<A, B> { function conv(x: A, y: B) returns (word); }",
       "enum Box<A> { Wrap(A) }",
-      "default impl<A> Conv<A, Word> { function conv(x: A, y: Word) returns (Word) { return 11; } }",
-      "impl Conv<Box<Word>, Bool> { function conv(x: Box<Word>, y: Bool) returns (Word) { return 22; } }",
-      "function needConv<A, B>(x: A, y: B) returns (Word) where A: Conv<B> { return 5; }",
-      "function run(w: Word, v: Word) returns (Word) { return needConv(Box.Wrap(w), v); }"]
+      "default impl<A> Conv<A, word> { function conv(x: A, y: word) returns (word) { return 11; } }",
+      "impl Conv<Box<word>, bool> { function conv(x: Box<word>, y: bool) returns (word) { return 22; } }",
+      "function needConv<A, B>(x: A, y: B) returns (word) where A: Conv<B> { return 5; }",
+      "function run(w: word, v: word) returns (word) { return needConv(Box.Wrap(w), v); }"]
     [("run", "D")]
 
 /-- Row 13's second step: a body's givens are closed under their superclasses,
@@ -1951,7 +1951,7 @@ private def testSuperclassInstances : IO Unit := do
       "impl<A> D<A> {}"] .noImplementation 3
   -- An ordinary head that unifies blocks the default (step 2's `v3`).
   refused "a default beside an ordinary head" [bitNot, sub, box, defaultBitNot,
-      "impl BitNot<Box<Word>> { function bnot(value: Box<Word>) returns (Box<Word>) { return value; } }",
+      "impl BitNot<Box<word>> { function bnot(value: Box<word>) returns (Box<word>) { return value; } }",
       "impl<A> Sub<Box<A>> { function sub(left: Box<A>, right: Box<A>) returns (Box<A>) { return left; } }"]
     .noImplementation 1
   accepted "a default alone" [bitNot, sub, box, defaultBitNot,
@@ -2002,7 +2002,7 @@ private def testStageClassification : IO Unit := do
         | _ => false) "type-name failure was not classified as signature"
   | .ok _ => throw (IO.userError "unknown signature type was accepted")
   match checkProgram (singleSourceWorkspace
-      "function bad() returns (Word) { return missing; }") with
+      "function bad() returns (word) { return missing; }") with
   | .error errors =>
       assertTrue (errors.any fun error => match error with
         | .inference _ => true
@@ -2030,7 +2030,7 @@ private def testMissingSuperclassInstanceRejection : IO Unit := do
   match checkProgram (singleSourceWorkspace (String.intercalate "\n" [
       "trait Marker<T> {}",
       "trait Required<T> where T: Marker {}",
-      "impl Required<Word> {}"
+      "impl Required<word> {}"
     ])) with
   | .error [.missingSuperclassInstance implementation predicate .noImplementation] =>
       match predicate.trait with
@@ -2050,8 +2050,8 @@ private def testMissingSuperclassInstanceRejection : IO Unit := do
   match checkProgram (singleSourceWorkspace (String.intercalate "\n" [
       "trait Marker<T> {}",
       "trait Required<T> where T: Marker {}",
-      "impl Marker<Word> {}",
-      "impl Required<Word> {}"
+      "impl Marker<word> {}",
+      "impl Required<word> {}"
     ])) with
   | .ok _ => pure ()
   | .error errors => throw (IO.userError
@@ -2142,11 +2142,11 @@ private def testFunctionAndMethodErrorsAccumulate : IO Unit := do
       "  function first(value: T) returns (T);",
       "  function second(value: T) returns (T);",
       "}",
-      "impl Broken<Word> {",
-      "  function first(value: Word) returns (Word) { return missingFirst; }",
-      "  function second(value: Word) returns (Word) { return missingSecond; }",
+      "impl Broken<word> {",
+      "  function first(value: word) returns (word) { return missingFirst; }",
+      "  function second(value: word) returns (word) { return missingSecond; }",
       "}",
-      "function bad() returns (Word) { return missingTop; }"
+      "function bad() returns (word) { return missingTop; }"
     ])) with
   | .error [
       .inference {
@@ -2290,21 +2290,21 @@ private def environment : IO ProgramEnvironment := do
     "enum Box<T> { Wrap(T) }",
     "trait Show<T> {}",
     "type Identity(T) = T;",
-    "type Applied(T) = T<Word>;",
-    "type Local = Box<Word>;",
-    "type Callable = function(Box<Word>) returns (Bool);",
+    "type Applied(T) = T<word>;",
+    "type Local = Box<word>;",
+    "type Callable = function(Box<word>) returns (bool);",
     "type IntegerBuiltin = integer;",
-    "type AppliedInteger = integer<Word>;",
+    "type AppliedInteger = integer<word>;",
     "export {Box};"
   ])
   let models ← parsed .main "models.solc" (String.intercalate "\n" [
     "import * as types from types;",
     "import {Box} from types;",
     "import * as dep from @dep.containers;",
-    "type Qualified = types.Box<Bool>;",
+    "type Qualified = types.Box<bool>;",
     "type Imported = Box<word>;",
     "type External = dep.Remote;",
-    "type Tupled = (unit, Bool, Word);",
+    "type Tupled = ((), bool, word);",
     "type WrongArity = Box;",
     "type MissingAlias = Missing;",
     "type CapitalInteger = Integer;"
@@ -2827,9 +2827,9 @@ private def importedEnvironment : IO ProgramEnvironment := do
     "enum Renamed { R }",
     "trait Marker<T> {}",
     "trait HiddenTrait<T> {}",
-    "function pick(value: Word) returns (Word) { return value; }",
-    "function pick(value: Bool) returns (Bool) { return value; }",
-    "function hiddenValue() returns (Word) { return 0; }"
+    "function pick(value: word) returns (word) { return value; }",
+    "function pick(value: bool) returns (bool) { return value; }",
+    "function hiddenValue() returns (word) { return 0; }"
   ])
   let external ← parsed (.external "dep") "external.solc"
     "export {*}; enum Remote { R }"
@@ -2929,13 +2929,13 @@ private def testHiddenAndAmbiguousLookup : IO Unit := do
     "export {*};",
     "enum Shared { Left }",
     "trait Shared<T> {}",
-    "function sharedValue(value: Word) returns (Word) { return value; }"
+    "function sharedValue(value: word) returns (word) { return value; }"
   ])
   let right ← parsed .main "right.solc" (String.intercalate "\n" [
     "export {*};",
     "enum Shared { Right }",
     "trait Shared<T> {}",
-    "function sharedValue(value: Bool) returns (Bool) { return value; }"
+    "function sharedValue(value: bool) returns (bool) { return value; }"
   ])
   let consumer ← parsed .main "ambiguous.solc" (String.intercalate "\n" [
     "import * from left;",
@@ -2968,7 +2968,7 @@ private def testImportErrors : IO Unit := do
   let source ← parsed .main "source.solc"
     "export {*}; enum Present { P } function value() {} trait Marker<T> {}"
   let deferred ← parsed .main "deferred.solc"
-    "import {value, Marker} from source; type Kept = Word;"
+    "import {value, Marker} from source; type Kept = word;"
   let deferredEnvironment ← build [source, deferred]
   let deferredOwner ← declaration deferredEnvironment "deferred" "Kept"
   match buildProgramImports deferredEnvironment deferredOwner.id.moduleId with
@@ -2980,7 +2980,7 @@ private def testImportErrors : IO Unit := do
   | .error errors => throw (IO.userError
       s!"known deferred selector was rejected: {reprStr errors}")
   let badSelection ← parsed .main "bad_selection.solc"
-    "import {Missing} from source; type Kept = Word; type Trigger = Present;"
+    "import {Missing} from source; type Kept = word; type Trigger = Present;"
   let selectionEnvironment ← build [source, badSelection]
   let selectionOwner ← declaration selectionEnvironment "bad_selection" "Kept"
   match buildProgramImports selectionEnvironment selectionOwner.id.moduleId with
@@ -2996,7 +2996,7 @@ private def testImportErrors : IO Unit := do
   | result => throw (IO.userError
       s!"type resolver did not expose import failure: {reprStr result}")
   let badOperator ← parsed .main "bad_operator.solc"
-    "import {(==) as eq} from source; type Kept = Word;"
+    "import {(==) as eq} from source; type Kept = word;"
   let operatorEnvironment ← build [source, badOperator]
   let operatorOwner ← declaration operatorEnvironment "bad_operator" "Kept"
   match buildProgramImports operatorEnvironment operatorOwner.id.moduleId with
@@ -3004,7 +3004,7 @@ private def testImportErrors : IO Unit := do
   | result => throw (IO.userError
       s!"operator selector was ignored or lost its spelling: {reprStr result}")
   let badModule ← parsed .main "bad_module.solc"
-    "import absent.module; type Kept = Word;"
+    "import absent.module; type Kept = word;"
   let moduleEnvironment ← build [badModule]
   let moduleOwner ← declaration moduleEnvironment "bad_module" "Kept"
   match buildProgramImports moduleEnvironment moduleOwner.id.moduleId with
@@ -3093,13 +3093,13 @@ private def constructorVisibility?
 
 private def testExplicitLocalInterfaces : IO Unit := do
   let implicit ← parsed "implicit.solc" <|
-    "enum Private { Only } function hidden() returns (Word) { return 0; }"
+    "enum Private { Only } function hidden() returns (word) { return 0; }"
   let declared ← parsed "declared.solc" (String.intercalate "\n" [
-    "type Alias = Word;",
+    "type Alias = word;",
     "enum Choice { One }",
     "trait Marker<T> {}",
-    "function over(value: Word) returns (Word) { return value; }",
-    "function over(value: Bool) returns (Bool) { return value; }",
+    "function over(value: word) returns (word) { return value; }",
+    "function over(value: bool) returns (bool) { return value; }",
     "enum Hidden { Never }",
     "export {Alias, Choice, Marker, over};"
   ])
@@ -3286,7 +3286,7 @@ private def testConstructorVisibility : IO Unit := do
 private def testExplicitErrors : IO Unit := do
   let unsupported ← parsed "unsupported.solc" (String.intercalate "\n" [
     "enum Choice { One }",
-    "type Alias = Word;",
+    "type Alias = word;",
     "export {Choice(Missing), Alias(*), (==)};"
   ])
   let unsupportedEnvironment ← environment [unsupported]
@@ -3825,7 +3825,7 @@ private def testSuccessfulCollection : IO Unit := do
     "trait Eq<T> {}",
     "trait Convert<Subject, Target> {}",
     "enum Box<T> { Wrap(T) }",
-    "impl<T> Convert<Box<T>, Word> where T: Eq {}",
+    "impl<T> Convert<Box<T>, word> where T: Eq {}",
     "function choose<T>(left: T, right: T) returns (T) where T: Eq { left }"
   ])
   let environment ← catalog [source]
@@ -3955,7 +3955,7 @@ private def testDefaultImplementationMarkerCollection : IO Unit := do
   let source ← parsed "default_implementations.solc" (String.intercalate "\n" [
     "trait Select<T> {}",
     "default impl<T> Select<T> {}",
-    "impl Select<Word> {}"
+    "impl Select<word> {}"
   ])
   let environment ← catalog [source]
   let signatures ← match buildProgramSignatures environment with
@@ -3978,12 +3978,12 @@ private def testComptimeMarkerCollection : IO Unit := do
     "trait Stage<T> {",
     "  function stage(comptime value: T) returns (comptime<T>);",
     "}",
-    "impl Stage<Word> {",
-    "  function stage(comptime value: Word) returns (comptime<Word>) {",
+    "impl Stage<word> {",
+    "  function stage(comptime value: word) returns (comptime<word>) {",
     "    return value;",
     "  }",
     "}",
-    "function choose<T>(comptime value: T, other: Word) returns (comptime<T>) {",
+    "function choose<T>(comptime value: T, other: word) returns (comptime<T>) {",
     "  return value;",
     "}"
   ])
@@ -4042,7 +4042,7 @@ private def testComptimeMarkerCollection : IO Unit := do
 private def testBuiltinIntResolutionProfile : IO Unit := do
   let source ← parsed "source_int.solc" (String.intercalate "\n" [
     "trait Int<T> {}",
-    "impl Int<Bool> {}"
+    "impl Int<bool> {}"
   ])
   let environment ← catalog [source]
   let sourceTrait ← declarationNamed environment "Int"
@@ -4085,7 +4085,7 @@ private def testBuiltinIntResolutionProfile : IO Unit := do
       assertTrue (decide (goal = builtinWord))
         "builtin Word evidence retained the wrong goal"
   | outcome => throw (IO.userError
-      s!"builtin Int<Word> resolution changed: {reprStr outcome}")
+      s!"builtin Int<word> resolution changed: {reprStr outcome}")
   match (TypedTraitResolution.resolve signatures.resolutionRules 1
       builtinInteger).outcome with
   | .success (.byImpl goal (.builtin .intInteger) []) =>
@@ -4097,7 +4097,7 @@ private def testBuiltinIntResolutionProfile : IO Unit := do
       builtinBool).outcome with
   | .noSolution => pure ()
   | outcome => throw (IO.userError
-      s!"builtin Int<Bool> unexpectedly crossed into source Int: {reprStr outcome}")
+      s!"builtin Int<bool> unexpectedly crossed into source Int: {reprStr outcome}")
   match (TypedTraitResolution.resolve signatures.resolutionRules 1
       builtinFlexible).outcome with
   | .noSolution => pure ()
@@ -4122,8 +4122,8 @@ private def testMethodCatalog : IO Unit := do
     "trait Add<T> where T: Marker {",
     "  function add(left: T, right: T) returns (T) where T: Marker;",
     "}",
-    "impl Add<Word> where Word: Marker {",
-    "  function add(left: Word, right: Word) returns (Word) where Word: Marker {",
+    "impl Add<word> where word: Marker {",
+    "  function add(left: word, right: word) returns (word) where word: Marker {",
     "    return left - right;",
     "  }",
     "}",
@@ -4266,17 +4266,17 @@ private def testFailures : IO Unit := do
     | .traitArityMismatch _ _ 2 1 => true
     | _ => false
   expectSingleError
-    "function nested() returns (comptime<comptime<Word>>) { return 0; }"
+    "function nested() returns (comptime<comptime<word>>) { return 0; }"
     fun error => match error with
       | .nestedComptimeReturn _ 0 => true
       | _ => false
   expectSingleError
-    "function mixed() returns (Word, comptime<Word>) { return (0, 0); }"
+    "function mixed() returns (word, comptime<word>) { return (0, 0); }"
     fun error => match error with
       | .comptimeReturnMustBeSingleton _ 1 2 => true
       | _ => false
   expectSingleError
-    "enum Duplicate { Same, Same(Word) }"
+    "enum Duplicate { Same, Same(word) }"
     fun error => match error with
       | .duplicateDataConstructor _ "Same" 0 1 => true
       | _ => false
@@ -4292,7 +4292,7 @@ private def testFailures : IO Unit := do
   let implied ← parsed "implied.solc" (String.intercalate "\n" [
     "trait Marker<T> {}",
     "trait Required<T> where T: Marker {}",
-    "impl Required<Word> {}"])
+    "impl Required<word> {}"])
   match buildProgramSignatures (← catalog [implied]) with
   | .ok signatures =>
       match signatures.implementations with
@@ -4314,7 +4314,7 @@ private def testTraitPredicateContainmentAllowsReorderingAndExtras : IO Unit := 
       "trait Second<T> {}",
       "trait Extra<T> {}",
       "trait Required<T> where T: First, T: Second {}",
-      "impl Required<Word> where Word: Extra, Word: Second, Word: First {}",
+      "impl Required<word> where word: Extra, word: Second, word: First {}",
       "pragma no-patterson-condition;"
     ])
   let environment ← catalog [source]
@@ -4328,22 +4328,22 @@ private def testTraitPredicateContainmentAllowsReorderingAndExtras : IO Unit := 
 private def testMethodFailures : IO Unit := do
   expectSingleError (String.intercalate "\n" [
     "trait Add<T> { function add(left: T, right: T) returns (T); }",
-    "impl Add<Word> {}"
+    "impl Add<word> {}"
   ]) fun error => match error with
     | .missingImplMethod _ { methodIndex := 0, .. } "add" => true
     | _ => false
   expectSingleError (String.intercalate "\n" [
     "trait Add<T> {}",
-    "impl Add<Word> {",
-    "  function add(left: Word, right: Word) returns (Word) { return left; }",
+    "impl Add<word> {",
+    "  function add(left: word, right: word) returns (word) { return left; }",
     "}"
   ]) fun error => match error with
     | .extraImplMethod { methodIndex := 0, .. } "add" => true
     | _ => false
   expectSingleError (String.intercalate "\n" [
     "trait Add<T> { function add(left: T, right: T) returns (T); }",
-    "impl Add<Word> {",
-    "  function add(left: Bool, right: Bool) returns (Bool) { return left; }",
+    "impl Add<word> {",
+    "  function add(left: bool, right: bool) returns (bool) { return left; }",
     "}"
   ]) fun error => match error with
     | .implMethodSignatureMismatch { methodIndex := 0, .. }
@@ -4354,8 +4354,8 @@ private def testMethodFailures : IO Unit := do
     "trait Stage<T> {",
     "  function stage(comptime value: T) returns (comptime<T>);",
     "}",
-    "impl Stage<Word> {",
-    "  function stage(value: Word) returns (Word) { return value; }",
+    "impl Stage<word> {",
+    "  function stage(value: word) returns (word) { return value; }",
     "}"
   ]) fun error => match error with
     | .implMethodComptimeMismatch { methodIndex := 0, .. }
@@ -4366,8 +4366,8 @@ private def testMethodFailures : IO Unit := do
     "trait Add<T> {",
     "  function add(left: T, right: T) returns (T);",
     "}",
-    "impl Add<Word> {",
-    "  function add(left: Word, right: Word) returns (Word) where Word: Marker {",
+    "impl Add<word> {",
+    "  function add(left: word, right: word) returns (word) where word: Marker {",
     "    return left;",
     "  }",
     "}"
@@ -4377,16 +4377,16 @@ private def testMethodFailures : IO Unit := do
     | _ => false
   expectSingleError (String.intercalate "\n" [
     "trait Add<T> { function add(value: T) returns (T); }",
-    "impl Add<Word> {",
-    "  function add(value: Word) returns (Word) { return value; }",
-    "  function add(other: Word) returns (Word) { return other; }",
+    "impl Add<word> {",
+    "  function add(value: word) returns (word) { return value; }",
+    "  function add(other: word) returns (word) { return other; }",
     "}"
   ]) fun error => match error with
     | .duplicateImplMethod _ "add" 0 1 => true
     | _ => false
   expectSingleError (String.intercalate "\n" [
     "trait Add<T> { function add<U>(value: T) returns (T); }",
-    "impl Add<Word> {}"
+    "impl Add<word> {}"
   ]) fun error => match error with
     | .traitMethodLocalGenerics { methodIndex := 0, .. } => true
     | _ => false
@@ -4417,38 +4417,38 @@ private def testImplMethodResultTuples : IO Unit := do
     let method ← collectedImplMethod label content
     assertTrue (accept method.returnTypes) s!"{label} recorded {reprStr method.returnTypes}"
   recorded "two results for a pair" (String.intercalate "\n" [neg,
-    "impl Neg<(Word, Bool)> { function neg(p: (Word, Bool)) returns (Word, Bool) { return p; } }"])
+    "impl Neg<(word, bool)> { function neg(p: (word, bool)) returns (word, bool) { return p; } }"])
     (· == [.product .word .bool])
   recorded "a generic pair" (String.intercalate "\n" [neg,
     "impl<A, B> Neg<(A, B)> { function neg(p: (A, B)) returns (A, B) { return p; } }"])
     fun | [.product _ _] => true | _ => false
   recorded "one tuple for two results" (String.intercalate "\n" [
-    "trait Split<T> { function split(x: T) returns (Word, Word); }",
-    "impl Split<Word> { function split(x: Word) returns ((Word, Word)) { return (x, x); } }"])
+    "trait Split<T> { function split(x: T) returns (word, word); }",
+    "impl Split<word> { function split(x: word) returns ((word, word)) { return (x, x); } }"])
     (· == [.word, .word])
   recorded "three results for a nested pair" (String.intercalate "\n" [neg,
-    "impl Neg<(Word, (Bool, Word))> {",
-    "  function neg(p: (Word, (Bool, Word))) returns (Word, Bool, Word) { return p; }",
+    "impl Neg<(word, (bool, word))> {",
+    "  function neg(p: (word, (bool, word))) returns (word, bool, word) { return p; }",
     "}"])
     (· == [.product .word (.product .bool .word)])
   recorded "a nested pair for three elements" (String.intercalate "\n" [neg,
-    "impl Neg<(Word, Bool, Word)> {",
-    "  function neg(p: (Word, Bool, Word)) returns (Word, (Bool, Word)) { return p; }",
+    "impl Neg<(word, bool, word)> {",
+    "  function neg(p: (word, bool, word)) returns (word, (bool, word)) { return p; }",
     "}"])
     (· == [.product .word (.product .bool .word)])
   recorded "one tuple as before" (String.intercalate "\n" [neg,
-    "impl Neg<(Word, Bool)> { function neg(p: (Word, Bool)) returns ((Word, Bool)) { return p; } }"])
+    "impl Neg<(word, bool)> { function neg(p: (word, bool)) returns ((word, bool)) { return p; } }"])
     (· == [.product .word .bool])
   expectSingleError (String.intercalate "\n" ["pragma solcore;", neg,
-    "impl Neg<(Word, Bool)> {",
-    "  function neg(p: (Word, Bool)) returns (Word, Bool, Word) { return (1, true, 2); }",
+    "impl Neg<(word, bool)> {",
+    "  function neg(p: (word, bool)) returns (word, bool, word) { return (1, true, 2); }",
     "}"]) fun error => match error with
     | .implMethodSignatureMismatch { methodIndex := 0, .. } { methodIndex := 0, .. } _ _
         [.product .word .bool] [.word, .bool, .word] => true
     | _ => false
   expectSingleError (String.intercalate "\n" ["pragma solcore;", neg,
-    "impl Neg<(Word, Bool)> {",
-    "  function neg(p: (Word, Bool)) returns (Bool, Word) { return (true, 1); }",
+    "impl Neg<(word, bool)> {",
+    "  function neg(p: (word, bool)) returns (bool, word) { return (true, 1); }",
     "}"]) fun error => match error with
     | .implMethodSignatureMismatch { methodIndex := 0, .. } { methodIndex := 0, .. } _ _
         [.product .word .bool] [.bool, .word] => true
@@ -4480,13 +4480,13 @@ trait method's predicate is on the trait parameter. -/
 private def testImplMethodPredicateRule : IO Unit := do
   let base := [
     "pragma solcore;",
-    "trait C<T> { function c(x: T) returns (Word); }",
-    "trait D<T> { function d(x: T) returns (Word); }",
+    "trait C<T> { function c(x: T) returns (word); }",
+    "trait D<T> { function d(x: T) returns (word); }",
     "enum Box<A> { Wrap(A) }"]
   -- Nothing provides `A: D` to `C.c`.
   expectSingleError (String.intercalate "\n" (base ++ [
     "impl<A> C<Box<A>> {",
-    "  function c(x: Box<A>) returns (Word) where A: D { return 1; }",
+    "  function c(x: Box<A>) returns (word) where A: D { return 1; }",
     "}"])) fun error => match error with
     | .implMethodUndeclaredPredicate { methodIndex := 0, .. }
         { methodIndex := 0, .. } predicate =>
@@ -4499,7 +4499,7 @@ private def testImplMethodPredicateRule : IO Unit := do
     "trait E<T> where T: D {}",
     "enum Pair<A> { Two(A, A) }",
     "impl<A> C<Pair<A>> where A: E {",
-    "  function c(x: Pair<A>) returns (Word) where A: D { return 2; }",
+    "  function c(x: Pair<A>) returns (word) where A: D { return 2; }",
     "}"])) fun error => match error with
     | .implMethodUndeclaredPredicate { methodIndex := 0, .. }
         { methodIndex := 0, .. } _ => true
@@ -4507,9 +4507,9 @@ private def testImplMethodPredicateRule : IO Unit := do
   -- Restating the trait method's predicate.
   let restated ← acceptedImplMethodPredicates "a restated trait method predicate"
     (String.intercalate "\n" (base ++ [
-      "trait F<T> { function f(x: T) returns (Word) where T: D; }",
+      "trait F<T> { function f(x: T) returns (word) where T: D; }",
       "impl<A> F<Box<A>> {",
-      "  function f(x: Box<A>) returns (Word) where Box<A>: D { return 4; }",
+      "  function f(x: Box<A>) returns (word) where Box<A>: D { return 4; }",
       "}"]))
   assertTrue (restated.map List.length == [1])
     "a restated trait method predicate was not kept"
@@ -4517,14 +4517,14 @@ private def testImplMethodPredicateRule : IO Unit := do
   let condition ← acceptedImplMethodPredicates "a restated implementation predicate"
     (String.intercalate "\n" (base ++ [
       "impl<A> D<Box<A>> where A: D {",
-      "  function d(x: Box<A>) returns (Word) where A: D { return 3; }",
+      "  function d(x: Box<A>) returns (word) where A: D { return 3; }",
       "}"]))
   assertTrue (condition.map List.length == [1])
     "a restated implementation predicate was not kept"
   -- Omitting, reordering and repeating the trait method's predicates.
   let traits := base ++ [
-    "trait E<T> { function e(x: T) returns (Word); }",
-    "trait G<T> { function g(x: T) returns (Word) where T: D, T: E; }"]
+    "trait E<T> { function e(x: T) returns (word); }",
+    "trait G<T> { function g(x: T) returns (word) where T: D, T: E; }"]
   for (label, clause, count) in [
       ("an omitted trait method predicate", "", 0),
       ("reordered trait method predicates", " where Box<A>: E, Box<A>: D", 2),
@@ -4532,16 +4532,16 @@ private def testImplMethodPredicateRule : IO Unit := do
     let methods ← acceptedImplMethodPredicates label
       (String.intercalate "\n" (traits ++ [
         "impl<A> G<Box<A>> {",
-        s!"  function g(x: Box<A>) returns (Word){clause} \{ return 5; }",
+        s!"  function g(x: Box<A>) returns (word){clause} \{ return 5; }",
         "}"]))
     assertTrue (methods.map List.length == [count]) s!"{label} was not kept"
   -- Restating the trait's own where predicate, which the implementation restates.
   let superclass ← acceptedImplMethodPredicates "a restated trait where predicate"
     (String.intercalate "\n" (base ++ [
-      "trait H<T> where T: D { function h(x: T) returns (Word); }",
-      "impl<A> D<Box<A>> { function d(x: Box<A>) returns (Word) { return 7; } }",
+      "trait H<T> where T: D { function h(x: T) returns (word); }",
+      "impl<A> D<Box<A>> { function d(x: Box<A>) returns (word) { return 7; } }",
       "impl<A> H<Box<A>> where Box<A>: D {",
-      "  function h(x: Box<A>) returns (Word) where Box<A>: D { return 8; }",
+      "  function h(x: Box<A>) returns (word) where Box<A>: D { return 8; }",
       "}",
       "pragma no-patterson-condition;"]))
   assertTrue (superclass.map List.length == [0, 1])
@@ -4549,11 +4549,11 @@ private def testImplMethodPredicateRule : IO Unit := do
   -- The body sees only the predicates its method declares: an omitted
   -- predicate cannot be used, as upstream's `SC0207` refuses.
   match checkProgram (implMethodPredicateWorkspace (String.intercalate "\n" (base ++ [
-      "trait F<T> { function f(x: T) returns (Word) where T: D; }",
-      "function useD<T>(x: T) returns (Word) where T: D { return 0; }",
-      "impl<A> D<Box<A>> where A: D { function d(x: Box<A>) returns (Word) { return 7; } }",
+      "trait F<T> { function f(x: T) returns (word) where T: D; }",
+      "function useD<T>(x: T) returns (word) where T: D { return 0; }",
+      "impl<A> D<Box<A>> where A: D { function d(x: Box<A>) returns (word) { return 7; } }",
       "impl<A> F<Box<A>> {",
-      "  function f(x: Box<A>) returns (Word) { return useD(x); }",
+      "  function f(x: Box<A>) returns (word) { return useD(x); }",
       "}"]))) with
   | .ok _ => throw (IO.userError "an impl method body used an undeclared predicate")
   | .error _ => pure ()
@@ -4571,23 +4571,23 @@ either of the two has no where predicates. -/
 private def testOverlappingDefaultRule : IO Unit := do
   let base := [
     "pragma solcore;",
-    "trait Size<A> { function size(x: A) returns (Word); }",
-    "trait Marker<A> { function mark(x: A) returns (Word); }",
-    "trait Conv<A, B> { function conv(x: A, y: B) returns (Word); }",
+    "trait Size<A> { function size(x: A) returns (word); }",
+    "trait Marker<A> { function mark(x: A) returns (word); }",
+    "trait Conv<A, B> { function conv(x: A, y: B) returns (word); }",
     "enum Box<A> { Box(A) }",
     "enum Wrap<A> { Wrap(A) }",
     "enum Pair<A, B> { Pair(A, B) }"]
   let uitest := [
-    "default impl<A> Size<A> { function size(x: A) returns (Word) { return 32; } }",
-    "default impl<A> Size<Box<A>> { function size(x: Box<A>) returns (Word) { return 64; } }"]
+    "default impl<A> Size<A> { function size(x: A) returns (word) { return 32; } }",
+    "default impl<A> Size<Box<A>> { function size(x: Box<A>) returns (word) { return 64; } }"]
   for (label, lines) in [
       ("overlapping_unconditional_default", uitest),
       ("an unconditional default after a conditional one", [
-        "default impl<A> Size<Box<A>> where A: Marker { function size(x: Box<A>) returns (Word) { return 64; } }",
-        "default impl<A> Size<A> { function size(x: A) returns (Word) { return 32; } }"]),
+        "default impl<A> Size<Box<A>> where A: Marker { function size(x: Box<A>) returns (word) { return 64; } }",
+        "default impl<A> Size<A> { function size(x: A) returns (word) { return 32; } }"]),
       ("subjects that unify under other arguments that differ", [
-        "default impl<A> Conv<A, Word> { function conv(x: A, y: Word) returns (Word) { return 1; } }",
-        "default impl<A> Conv<A, Bool> { function conv(x: A, y: Bool) returns (Word) { return 2; } }"])] do
+        "default impl<A> Conv<A, word> { function conv(x: A, y: word) returns (word) { return 1; } }",
+        "default impl<A> Conv<A, bool> { function conv(x: A, y: bool) returns (word) { return 2; } }"])] do
     match ← defaultOverlapSignatures (String.intercalate "\n" (base ++ lines)) with
     | .error [.overlappingDefaultImplementation implementation overlaps] =>
         assertTrue (overlaps.declarationIndex + 1 == implementation.declarationIndex)
@@ -4595,20 +4595,20 @@ private def testOverlappingDefaultRule : IO Unit := do
     | result => throw (IO.userError s!"{label}: {reprStr result}")
   for (label, lines) in [
       ("two conditional defaults", [
-        "default impl<A> Size<Box<A>> where A: Marker { function size(x: Box<A>) returns (Word) { return 32; } }",
-        "default impl<A> Size<Box<Box<A>>> where A: Marker { function size(x: Box<Box<A>>) returns (Word) { return 64; } }"]),
+        "default impl<A> Size<Box<A>> where A: Marker { function size(x: Box<A>) returns (word) { return 32; } }",
+        "default impl<A> Size<Box<Box<A>>> where A: Marker { function size(x: Box<Box<A>>) returns (word) { return 64; } }"]),
       ("subjects that do not unify", [
-        "default impl<A> Size<Box<A>> { function size(x: Box<A>) returns (Word) { return 32; } }",
-        "default impl<A> Size<Wrap<A>> { function size(x: Wrap<A>) returns (Word) { return 64; } }"]),
+        "default impl<A> Size<Box<A>> { function size(x: Box<A>) returns (word) { return 32; } }",
+        "default impl<A> Size<Wrap<A>> { function size(x: Wrap<A>) returns (word) { return 64; } }"]),
       ("a default and an ordinary implementation", [
-        "default impl<A> Size<A> { function size(x: A) returns (Word) { return 32; } }",
-        "impl<A> Size<Box<A>> { function size(x: Box<A>) returns (Word) { return 64; } }"]),
+        "default impl<A> Size<A> { function size(x: A) returns (word) { return 32; } }",
+        "impl<A> Size<Box<A>> { function size(x: Box<A>) returns (word) { return 64; } }"]),
       ("a non-linear subject that does not unify", [
-        "default impl<A> Size<Pair<A, A>> { function size(x: Pair<A, A>) returns (Word) { return 32; } }",
-        "default impl<B> Size<Pair<Word, Box<B>>> { function size(x: Pair<Word, Box<B>>) returns (Word) { return 64; } }"]),
+        "default impl<A> Size<Pair<A, A>> { function size(x: Pair<A, A>) returns (word) { return 32; } }",
+        "default impl<B> Size<Pair<word, Box<B>>> { function size(x: Pair<word, Box<B>>) returns (word) { return 64; } }"]),
       ("subjects that differ under other arguments that unify", [
-        "default impl<A> Conv<Box<A>, A> { function conv(x: Box<A>, y: A) returns (Word) { return 1; } }",
-        "default impl<A> Conv<Wrap<A>, A> { function conv(x: Wrap<A>, y: A) returns (Word) { return 2; } }"])] do
+        "default impl<A> Conv<Box<A>, A> { function conv(x: Box<A>, y: A) returns (word) { return 1; } }",
+        "default impl<A> Conv<Wrap<A>, A> { function conv(x: Wrap<A>, y: A) returns (word) { return 2; } }"])] do
     match ← defaultOverlapSignatures (String.intercalate "\n" (base ++ lines)) with
     | .ok signatures =>
         assertTrue (signatures.implementations.length == 2)
@@ -4647,37 +4647,37 @@ component, or in a module that sees that module through imports and
 re-exports and is seen by it.  Upstream's two `invokable` uitests implement a
 built-in trait for function types, which Lean has no trait for. -/
 private def testOrphanImplementationRule : IO Unit := do
-  let fee := ["export {Fee};", "trait Fee<T> { function fee(x: T) returns (Word); }"]
+  let fee := ["export {Fee};", "trait Fee<T> { function fee(x: T) returns (word); }"]
   let feeImpl (type : String) (value : Nat) :=
-    s!"impl Fee<{type}> \{ function fee(x: {type}) returns (Word) \{ return {value}; } }"
+    s!"impl Fee<{type}> \{ function fee(x: {type}) returns (word) \{ return {value}; } }"
   let squares := ["import {Get} from table;", "enum Squares { Squares }", "enum Key { Key }",
-    "impl<I> Get<(Squares, I), Word> { function get(ci: (Squares, I)) returns (Word) { return 1; } }"]
+    "impl<I> Get<(Squares, I), word> { function get(ci: (Squares, I)) returns (word) { return 1; } }"]
   let table := ("table.solc", ["export {Get};", "trait Get<C, V> { function get(ci: C) returns (V); }"])
   for (label, expected, files) in [
       ("orphan_impl_in_sibling_module", 2, [
-        ("fees.solc", ["export {Fee, A};", "trait Fee<T> { function fee(x: T) returns (Word); }", "enum A { A }"]),
+        ("fees.solc", ["export {Fee, A};", "trait Fee<T> { function fee(x: T) returns (word); }", "enum A { A }"]),
         ("one.solc", ["import {Fee, A} from fees;", feeImpl "A" 1]),
         ("two.solc", ["import {Fee, A} from fees;", feeImpl "A" 2]),
         ("main.solc", ["import * from one;", "import * from two;"])]),
       ("orphan_tuple_impl_follows_first_element", 1, [table,
         ("main.solc", squares ++
-          ["impl Get<(Word, Key), Word> { function get(ci: (Word, Key)) returns (Word) { return 2; } }"])]),
+          ["impl Get<(word, Key), word> { function get(ci: (word, Key)) returns (word) { return 2; } }"])]),
       ("a product whose first component is defined here", 0, [table, ("main.solc", squares)]),
-      ("next to the trait", 0, [("fees.solc", fee ++ [feeImpl "Word" 1]), ("main.solc", ["import {Fee} from fees;"])]),
+      ("next to the trait", 0, [("fees.solc", fee ++ [feeImpl "word" 1]), ("main.solc", ["import {Fee} from fees;"])]),
       ("next to the type", 0, [("fees.solc", fee), ("main.solc", ["import {Fee} from fees;", "enum A { A }", feeImpl "A" 1])]),
-      ("a builtin type away from the trait", 1, [("fees.solc", fee), ("main.solc", ["import {Fee} from fees;", feeImpl "Word" 2])]),
+      ("a builtin type away from the trait", 1, [("fees.solc", fee), ("main.solc", ["import {Fee} from fees;", feeImpl "word" 2])]),
       ("an import cycle with the trait's module", 0, [
         ("main.solc", ["import {Seed} from user;"] ++ fee),
-        ("user.solc", ["import {Fee} from main;", "export {Seed};", "enum Seed { Seed }", feeImpl "Word" 2])]),
+        ("user.solc", ["import {Fee} from main;", "export {Seed};", "enum Seed { Seed }", feeImpl "word" 2])]),
       ("a transitive import cycle", 0, [
         ("main.solc", ["import {Seed} from b;"]),
-        ("b.solc", ["import {Fee} from c;", "export {Seed};", "enum Seed { Seed }", feeImpl "Word" 4]),
+        ("b.solc", ["import {Fee} from c;", "export {Seed};", "enum Seed { Seed }", feeImpl "word" 4]),
         ("c.solc", ["import {Mark} from d;"] ++ fee),
         ("d.solc", ["import {Seed} from b;", "export {Mark};", "enum Mark { Mark }"])]),
       ("a trait seen through a re-export", 1, [
         ("fees.solc", fee),
         ("facade.solc", ["export fees.{Fee};"]),
-        ("main.solc", ["import {Fee} from facade;", "enum A { A }", feeImpl "A" 5, feeImpl "Word" 6])])] do
+        ("main.solc", ["import {Fee} from facade;", "enum A { A }", feeImpl "A" 5, feeImpl "word" 6])])] do
     assertTrue (orphanCount files == some expected)
       s!"{label}: expected {expected} orphan implementations, got {reprStr (checkProgram (orphanWorkspace files))}"
 
@@ -4715,21 +4715,21 @@ private def testDeclarationConditions : IO Unit := do
     | _ => false
   let cases : List (String × List String × Option (ProgramSignatureError → Bool)) := [
     -- SC0219: a default implementation's subject holds a type parameter.
-    ("invalid_default_instance", ["trait C<A> {}", "default impl C<Word> {}"], some isDefault),
-    ("a closed nominal default", ["default impl Pick<Box<Word>> {}"], some isDefault),
+    ("invalid_default_instance", ["trait C<A> {}", "default impl C<word> {}"], some isDefault),
+    ("a closed nominal default", ["default impl Pick<Box<word>> {}"], some isDefault),
     ("an open nominal default", ["default impl<A> Pick<Box<A>> {}"], none),
     ("a default at a parameter", ["default impl<A> Pick<A> {}"], none),
-    ("a default at a pair with a parameter", ["default impl<A> Pick<(Word, A)> {}"], none),
+    ("a default at a pair with a parameter", ["default impl<A> Pick<(word, A)> {}"], none),
     ("a closed subject beside an open argument",
-      ["pragma no-coverage-condition;", "default impl<A> Conv<Word, A> {}"], some isDefault),
+      ["pragma no-coverage-condition;", "default impl<A> Conv<word, A> {}"], some isDefault),
     ("a closed default under every pragma", ["pragma no-patterson-condition;",
       "pragma no-coverage-condition;", "pragma no-bounded-variable-condition;",
-      "default impl Pick<Word> {}"], some isDefault),
+      "default impl Pick<word> {}"], some isDefault),
     -- SC0212: the other arguments' parameters occur in the subject.
-    ("coverage_condition", ["enum Holder<A> { Holder(Word) }", "trait MyClass<A, B> {}",
+    ("coverage_condition", ["enum Holder<A> { Holder(word) }", "trait MyClass<A, B> {}",
       "impl<A, B> MyClass<Holder<A>, B> {}"], some isCoverage),
     ("global_coverage_pragma", ["pragma no-coverage-condition;",
-      "enum Holder<A> { Holder(Word) }", "trait MyClass<A, B> {}",
+      "enum Holder<A> { Holder(word) }", "trait MyClass<A, B> {}",
       "impl<A, B> MyClass<Holder<A>, B> {}"], none),
     ("a coverage pragma for the trait",
       ["pragma no-coverage-condition Conv;", "impl<A, B> Conv<A, B> {}"], none),
@@ -4737,10 +4737,10 @@ private def testDeclarationConditions : IO Unit := do
       ["pragma no-coverage-condition Pick;", "impl<A, B> Conv<A, B> {}"], some isCoverage),
     ("the Patterson pragma",
       ["pragma no-patterson-condition;", "impl<A, B> Conv<A, B> {}"], some isCoverage),
-    ("coverage_condition_alias_expansion", ["type Phantom(A) = Word;",
+    ("coverage_condition_alias_expansion", ["type Phantom(A) = word;",
       "trait MyClass<A, B> {}", "impl<A> MyClass<Phantom<A>, A> {}"], some isCoverage),
     ("an argument's parameter in the subject", ["impl<A> Conv<Box<A>, A> {}"], none),
-    ("a closed subject", ["impl<A> Conv<Word, A> {}"], some isCoverage),
+    ("a closed subject", ["impl<A> Conv<word, A> {}"], some isCoverage),
     ("a parameter between other arguments", ["impl<A, B> C3<Box<A>, B, B> {}"], some isCoverage),
     -- SC0213: each declared condition is smaller than the head.
     ("patterson_condition", ["trait C1<U> {}", "trait C2<U> {}",
@@ -4754,24 +4754,24 @@ private def testDeclarationConditions : IO Unit := do
     ("a smaller condition", ["impl<A> Pick<Box<A>> where A: Neg {}"], none),
     ("a condition as large as the head", ["impl<A> Pick<Box<A>> where Box<A>: Neg {}"], some isPatterson),
     ("one condition too large", ["impl<A> Pick<Box<A>> where A: Neg, Box<A>: Neg {}"], some isPatterson),
-    ("the head's other arguments", ["impl<A> Conv<A, Word> where A: Neg {}"], none),
+    ("the head's other arguments", ["impl<A> Conv<A, word> where A: Neg {}"], none),
     ("a pair head", ["impl<A, B> Pick<(A, B)> where A: Conv<B> {}"], none),
     ("a triple, as nested pairs", ["impl<A, B, C> Pick<(A, B, C)> where (A, B): Conv<C> {}"], none),
     ("an array, as memory<DynArray<T>>", ["impl Pick<uint256[]> where Box<uint256>: Neg {}"], none),
     ("an array as large as its condition",
       ["impl Pick<uint256[]> where Box<Box<uint256>>: Neg {}"], some isPatterson),
     ("a function type's parameter",
-      ["impl<A> Pick<function(A) returns (Word)> where Box<Box<A>>: Neg {}"], some isPatterson),
+      ["impl<A> Pick<function(A) returns (word)> where Box<Box<A>>: Neg {}"], some isPatterson),
     ("a function type's tuple parameter",
-      ["impl<A, B> Pick<function((A, B)) returns (Word)> where Box<Box<Box<Box<A>>>>: Neg {}"],
+      ["impl<A, B> Pick<function((A, B)) returns (word)> where Box<Box<Box<Box<A>>>>: Neg {}"],
       some isPatterson),
     ("a function type's smaller tuple parameter",
-      ["impl<A, B> Pick<function((A, B)) returns (Word)> where Box<Box<Box<A>>>: Neg {}"], none),
+      ["impl<A, B> Pick<function((A, B)) returns (word)> where Box<Box<Box<A>>>: Neg {}"], none),
     -- Lean resolves `function(A, B)` as `function((A, B))` and `function()` as
     -- `function(())`, so it counts their parameters as one tuple, where
     -- upstream refuses these two.
     ("a function type's two parameters, counted as a tuple",
-      ["impl<A, B> Pick<function(A, B) returns (Word)> where Box<Box<Box<A>>>: Neg {}"], none),
+      ["impl<A, B> Pick<function(A, B) returns (word)> where Box<Box<Box<A>>>: Neg {}"], none),
     ("a function type with no parameter, counted as ()",
       ["impl<A> Pick<function() returns (A)> where Box<A>: Neg {}"], none),
     ("a default's condition", ["default impl<A> Pick<A> where A: Neg {}"], some isPatterson),
@@ -4793,7 +4793,7 @@ private def testDeclarationConditions : IO Unit := do
       assertTrue (parameter.index == 1) s!"the coverage error named {reprStr parameter}"
   | errors => throw (IO.userError s!"an undetermined parameter gave {reprStr errors}")
   -- A closed default with an open argument fails both, as upstream reports.
-  let both ← errorsOf ["default impl<A> Conv<Word, A> {}"]
+  let both ← errorsOf ["default impl<A> Conv<word, A> {}"]
   assertTrue (both.length == 2 && both.any isDefault && both.any isCoverage)
     s!"a closed default with an open argument gave {reprStr both}"
   -- A pragma lifts its own module's implementations only.
@@ -4812,10 +4812,10 @@ private def testDeclarationConditions : IO Unit := do
   | result => throw (IO.userError s!"an importer's pragma gave {reprStr result}")
   match checkProgram (orphanWorkspace [
       ("pragma_scope_lib.solc", ["export {helper};", "pragma no-patterson-condition C;",
-        "function helper() returns (Word) { return 1; }"]),
+        "function helper() returns (word) { return 1; }"]),
       ("main.solc", ["import pragma_scope_lib;", "enum List<A> { Nil, Cons(A, List<A>) }",
         "trait C<A, B, D> {}", "impl<A, B> C<List<B>, A, List<A>> {}",
-        "impl<X> C<X, Word, Word> where X: C<Word, Word> {}"])]) with
+        "impl<X> C<X, word, word> where X: C<word, word> {}"])]) with
   | .error errors =>
       -- And the two heads' overlap (`SC0218`), as upstream reports it.
       assertTrue (errors.length == 3 &&
@@ -4962,9 +4962,9 @@ private def testTransparentSubstitution : IO Unit := do
     "type Pair(A, B) = (A, B);",
     "type Reverse(A, B) = Pair<B, A>;",
     "type Boxed(T) = Box<Id<T>>;",
-    "type UseId = Id<Word>;",
-    "type UsePair = Reverse<Word, Bool>;",
-    "type UseBox = Boxed<Bool>;"
+    "type UseId = Id<word>;",
+    "type UsePair = Reverse<word, bool>;",
+    "type UseBox = Boxed<bool>;"
   ])
   let environment ← build [source]
   let box ← declaration environment "aliases" "Box"
@@ -5005,7 +5005,7 @@ private def testDefinitionSiteScope : IO Unit := do
 
 private def testResolvedAliasPositions : IO Unit := do
   let source ← parsed .main "positions.solc" (String.intercalate "\n" [
-    "type Scalar = Word;",
+    "type Scalar = word;",
     "type Table = mapping(Scalar => Scalar);",
     "type Reference = @Scalar;",
     "type Staged = comptime<Scalar>;",
@@ -5074,7 +5074,7 @@ private def testCycleDiagnostics : IO Unit := do
 
 private def testExpansionBudget : IO Unit := do
   let source ← parsed .main "fuel.solc" (String.intercalate "\n" [
-    "type Base = Word;",
+    "type Base = word;",
     "type Middle = Base;",
     "type Use = Middle;"
   ])
@@ -5088,7 +5088,7 @@ private def testExpansionBudget : IO Unit := do
 
 private def testSharedNodeBudget : IO Unit := do
   let source ← parsed .main "branching_fuel.solc" (String.intercalate "\n" [
-    "type Base = Word;",
+    "type Base = word;",
     "type Pair = (Base, Base);",
     "type Quad = (Pair, Pair);",
     "type Use = Quad;"
@@ -5110,7 +5110,7 @@ private def testSharedNodeBudget : IO Unit := do
 
 private def testDefaultEagerExpansionBudget : IO Unit := do
   let source ← parsed .main "default_fuel.solc" (String.intercalate "\n" [
-    "type T0 = Word;",
+    "type T0 = word;",
     "type T1 = (T0, T0);",
     "type T2 = (T1, T1);",
     "type T3 = (T2, T2);",
@@ -5140,7 +5140,7 @@ private def testUnusedAliasValidation : IO Unit := do
     "type Duplicate(T, T) = T;",
     "type Missing = Absent;",
     "type WrongArity = Id;",
-    "type TooMany = Id<Word, Bool>;",
+    "type TooMany = Id<word, bool>;",
     "type Direct = Direct;",
     "type Left = Right;",
     "type Right = Left;"

@@ -169,15 +169,15 @@ theorem accepted_reflects (native : SourceCoreGeneralFunctions.CallableContext) 
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Box { Box(Bool) }",
-    "function nested(a: Word, b: Word) returns (integer) { return wordToInteger(wordFromInteger(integerAdd(wordToInteger(a), wordToInteger(b)))); }",
-    "function binary(a: integer, b: integer) returns (Bool) { return integerEq(a, b) && !integerLt(a, b); }",
-    "function choose(a: Word, b: Word) returns (integer) { return integerEq(wordToInteger(a), wordToInteger(b)) ? wordToInteger(a) : wordToInteger(b); }",
-    "function pair(a: integer, b: integer) returns ((Bool, Bool)) { return (integerEq(a, b), integerLt(a, b)); }",
+    "enum Box { Box(bool) }",
+    "function nested(a: word, b: word) returns (integer) { return wordToInteger(wordFromInteger(integerAdd(wordToInteger(a), wordToInteger(b)))); }",
+    "function binary(a: integer, b: integer) returns (bool) { return integerEq(a, b) && !integerLt(a, b); }",
+    "function choose(a: word, b: word) returns (integer) { return integerEq(wordToInteger(a), wordToInteger(b)) ? wordToInteger(a) : wordToInteger(b); }",
+    "function pair(a: integer, b: integer) returns ((bool, bool)) { return (integerEq(a, b), integerLt(a, b)); }",
     "function construct(a: integer, b: integer) returns (Box) { return Box(integerEq(a, b)); }",
-    "function key(m: mapping((Bool, Bool) => Word), a: integer, b: integer) returns (integer) { return wordToInteger(m[(integerEq(a, b), integerLt(a, b))]); }",
-    "function skipped(a: integer) returns (integer) { let missing: Word; return true ? integerAdd(a, a) : wordToInteger(missing); }",
-    "function failed(a: Word) returns (integer) { let missing: Word; return integerAdd(wordToInteger(a), wordToInteger(missing)); }"]}]}
+    "function key(m: mapping((bool, bool) => word), a: integer, b: integer) returns (integer) { return wordToInteger(m[(integerEq(a, b), integerLt(a, b))]); }",
+    "function skipped(a: integer) returns (integer) { let missing: word; return true ? integerAdd(a, a) : wordToInteger(missing); }",
+    "function failed(a: word) returns (integer) { let missing: word; return integerAdd(wordToInteger(a), wordToInteger(missing)); }"]}]}
 
 def run : IO Unit := do
   let checked ← SourceCompilerFeatureSupport.get "recursive builtin checker" (checkProgram workspace)
@@ -343,7 +343,7 @@ theorem actual_contextual_builtins_native
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function roundtrip(a: Word) returns (integer) { return wordToInteger(wordFromInteger(wordToInteger(a))); }"}] }
+    "function roundtrip(a: word) returns (integer) { return wordToInteger(wordFromInteger(wordToInteger(a))); }"}] }
 
 def run : IO Unit := do
   let program ← SourceCompilerFeatureSupport.get "recursive builtin native checker" (checkProgram workspace)
@@ -426,10 +426,10 @@ theorem actual_ordered_cached_bootstrap
     ordered_bootstrap_evaluates compiled.base.globals.reverse rows environment store (by simpa using ordered)
 
 private def content : String := String.intercalate "\n" [
-  "function self(n: Word) returns (Word) { if (n == 0) { return 2; } return self(n - 1); }",
-  "function left(n: Word) returns (Bool) { if (n == 0) { return true; } return right(n - 1); }",
-  "function right(n: Word) returns (Bool) { let current = n; while (current != 0) { current -= 1; return left(current); } return false; }",
-  "function closure(n: Word) returns (Word) { let shared = n; let f = lam(step: Word) -> Word { shared += step; return shared; }; return f(3); }",
+  "function self(n: word) returns (word) { if (n == 0) { return 2; } return self(n - 1); }",
+  "function left(n: word) returns (bool) { if (n == 0) { return true; } return right(n - 1); }",
+  "function right(n: word) returns (bool) { let current = n; while (current != 0) { current -= 1; return left(current); } return false; }",
+  "function closure(n: word) returns (word) { let shared = n; let f = lam(step: word) -> word { shared += step; return shared; }; return f(3); }",
   "function empty() {}"
 ]
 private def rowsOf (closures : List Expr) : IO (List LambdaRow) := closures.mapM fun expression =>
@@ -862,11 +862,11 @@ private def populated : SourceTypedRuntime.Value :=
   .mapping (.comptime .word) .word [(word 1, word 7), (word 1, word 9)]
 
 private def content := String.intercalate "\n" [
-  "function fresh() returns (mapping(Word => Word)) { let table: mapping(Word => Word); return table; }",
-  "function repeat() returns ((mapping(Word => Word), mapping(Word => Word))) { let table: mapping(Word => Word); let alias = table; let second = table; return (alias, second); }",
-  "function input(table: mapping(Word => Word)) returns (mapping(Word => Word)) { let alias = table; return alias; }",
-  "function nested() returns (mapping(Word => mapping(@Word => Word))) { let table: mapping(Word => mapping(@Word => Word)); return table; }",
-  "function afterFault() returns (mapping(Word => Word)) { let marker: Word = 7; let table: mapping(Word => Word); let alias = table; let gap: Word; let late: mapping(Word => Word); let stop = gap; return late; }"
+  "function fresh() returns (mapping(word => word)) { let table: mapping(word => word); return table; }",
+  "function repeat() returns ((mapping(word => word), mapping(word => word))) { let table: mapping(word => word); let alias = table; let second = table; return (alias, second); }",
+  "function input(table: mapping(word => word)) returns (mapping(word => word)) { let alias = table; return alias; }",
+  "function nested() returns (mapping(word => mapping(@word => word))) { let table: mapping(word => mapping(@word => word)); return table; }",
+  "function afterFault() returns (mapping(word => word)) { let marker: word = 7; let table: mapping(word => word); let alias = table; let gap: word; let late: mapping(word => word); let stop = gap; return late; }"
 ]
 
 private def nativeFinish (code : Core.Expr) (environment : Core.Environment)
@@ -1172,11 +1172,11 @@ private def mapType : TypeSystem.Ty := .mapping .word .word
 private def empty : SourceTypedRuntime.Value := .mapping .word .word []
 private def populated : SourceTypedRuntime.Value := .mapping (.comptime .word) .word [(word 1, word 7), (word 1, word 9)]
 private def content := String.intercalate "\n" [
-  "function triple() returns ((mapping(Word => Word), Word, mapping(Word => Word))) { let table: mapping(Word => Word); return (table, 7, table); }",
-  "function nested() returns (((mapping(Word => Word), mapping(Word => Word)), mapping(Word => Word))) { let a: mapping(Word => Word); let b: mapping(Word => Word); return ((a, b), a); }",
-  "function input(table: mapping(Word => Word)) returns ((mapping(Word => Word), mapping(Word => Word), mapping(Word => Word))) { return (table, table, table); }",
-  "function firstFault() returns ((Word, mapping(Word => Word))) { let gap: Word; let late: mapping(Word => Word); return (gap, late); }",
-  "function laterFault() returns ((mapping(Word => Word), Word, mapping(Word => Word))) { let table: mapping(Word => Word); let gap: Word; let late: mapping(Word => Word); return (table, gap, late); }"
+  "function triple() returns ((mapping(word => word), word, mapping(word => word))) { let table: mapping(word => word); return (table, 7, table); }",
+  "function nested() returns (((mapping(word => word), mapping(word => word)), mapping(word => word))) { let a: mapping(word => word); let b: mapping(word => word); return ((a, b), a); }",
+  "function input(table: mapping(word => word)) returns ((mapping(word => word), mapping(word => word), mapping(word => word))) { return (table, table, table); }",
+  "function firstFault() returns ((word, mapping(word => word))) { let gap: word; let late: mapping(word => word); return (gap, late); }",
+  "function laterFault() returns ((mapping(word => word), word, mapping(word => word))) { let table: mapping(word => word); let gap: word; let late: mapping(word => word); return (table, gap, late); }"
 ]
 
 private def finish (compiled : SourceCoreUnifiedCompilation.Compiled) (name : String)
@@ -1447,11 +1447,11 @@ private def require := SourceCoreUnifiedCorpusSupport.assertTrue
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
 private def w (n : Nat) : Core.Value := .word (Word.ofNatModulo n)
 private def content := String.intercalate "\n" [
-  "function pairRead(a: Word, b: Word) returns ((Word, Word)) { return (a + 3, ~b); }",
-  "function shortRead(gate: Bool) returns (Bool) { let absent: Bool; return gate && absent; }",
-  "function firstFault() returns (Word) { let first: Word; let second: Word; return first + second; }",
-  "function secondFault() returns (Word) { let first: Word = 9; let second: Word; return first + second; }",
-  "function unitRoot() { let unused: Word = 13; return (); }"
+  "function pairRead(a: word, b: word) returns ((word, word)) { return (a + 3, ~b); }",
+  "function shortRead(gate: bool) returns (bool) { let absent: bool; return gate && absent; }",
+  "function firstFault() returns (word) { let first: word; let second: word; return first + second; }",
+  "function secondFault() returns (word) { let first: word = 9; let second: word; return first + second; }",
+  "function unitRoot() { let unused: word = 13; return (); }"
 ]
 
 private def finish (code : Core.Expr) (environment : Core.Environment) (store : Core.Store) (fuel : Nat) : IO (Core.Value × Core.Store) := do
@@ -1943,13 +1943,13 @@ private def require := SourceCoreUnifiedCorpusSupport.assertTrue
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
 private def w (n : Nat) : Core.Value := .word (Word.ofNatModulo n)
 private def content := String.intercalate "\n" [
-  "function empty() { let unused: Word = 13; return (); }",
-  "function single() returns (Word) { return (7); }",
-  "function pair(a: Word, b: Word) returns ((Word, Word)) { return (a + 3, ~b); }",
-  "function triple(a: Word, b: Word) returns ((Word, Bool, Word)) { return (a + 3, true, ~b); }",
-  "function nested(a: Word, b: Word) returns (((Word, Bool, Word), Word, Bool)) { return ((a, true, 3), b, false); }",
-  "function firstFault() returns ((Word, Word, Word)) { let first: Word; let second: Word; return (first, second, 3); }",
-  "function laterFault() returns ((Word, Word, Word)) { let first: Word = 9; let second: Word; return (first, second, 3); }"
+  "function empty() { let unused: word = 13; return (); }",
+  "function single() returns (word) { return (7); }",
+  "function pair(a: word, b: word) returns ((word, word)) { return (a + 3, ~b); }",
+  "function triple(a: word, b: word) returns ((word, bool, word)) { return (a + 3, true, ~b); }",
+  "function nested(a: word, b: word) returns (((word, bool, word), word, bool)) { return ((a, true, 3), b, false); }",
+  "function firstFault() returns ((word, word, word)) { let first: word; let second: word; return (first, second, 3); }",
+  "function laterFault() returns ((word, word, word)) { let first: word = 9; let second: word; return (first, second, 3); }"
 ]
 
 private def finish (code : Core.Expr) (environment : Core.Environment) (store : Core.Store) (fuel : Nat) : IO (Core.Value × Core.Store) := do

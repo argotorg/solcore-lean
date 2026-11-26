@@ -40,7 +40,7 @@ A small source program:
 ```text
 pragma solcore;
 
-function main() returns (Word) {
+function main() returns (word) {
   return 55;
 }
 ```

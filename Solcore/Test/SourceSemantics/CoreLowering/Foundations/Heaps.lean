@@ -245,16 +245,16 @@ private def get {ε α : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function allBindings(flag: Bool) returns (Word, Bool) {",
+    "function allBindings(flag: bool) returns (word, bool) {",
     " let unused = lam(unusedArg) { return unusedArg; };",
     " let f = lam(value) { return value; };",
-    " let total: Word = 0;",
-    " for (let i: Word = 0; i < 1; i = i + 1) { total = total + i; }",
+    " let total: word = 0;",
+    " for (let i: word = 0; i < 1; i = i + 1) { total = total + i; }",
     " match ((f(1), f(flag))) { case (left, right) { return (left, right); } }",
     "}",
-    "function nested(flag: Bool) returns (Word, Word) {",
+    "function nested(flag: bool) returns (word, word) {",
     " let outer = lam(value) { let inner = lam(item) { return item; }; return inner(1); };",
-    " let one: Word = 1; return (outer(one), outer(flag)); }"
+    " let one: word = 1; return (outer(one), outer(flag)); }"
   ]}]
 }
 
@@ -1080,18 +1080,18 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def require (condition : Bool) (message : String) : IO Unit := SourceCoreUnifiedCorpusSupport.assertTrue condition message
 private def word (value : Nat) : Value := .word (Core.Word.ofNatModulo value)
 private def content : String := String.intercalate "\n" [
-  "function inc(n: Word) returns (Word) { return n + 1; }",
-  "function sum(a: Word, b: Word) returns (Word) { return a + b; }",
-  "function make(seed: Word) returns (function(Word) returns (Word)) { let f: function(Word) returns (Word) = lam(step: Word) { seed += step; return seed; }; return f; }",
-  "function use(f: function(Word) returns (Word), n: Word) returns (Word) { return f(n); }",
-  "function unused(captured: Word) returns (Word) { let unused = lam(item) { return (item, captured); }; return captured; }",
-  "function stored(seed: Word) returns (Word) { let f: function(Word) returns (Word) = lam(step: Word) { seed += step; return seed; }; return seed; }",
-  "function views(seed: Word) returns (Word) { let f = lam(item) { seed += 1; return item; }; f(true); return f(4); }",
-  "function echo(table: mapping(Word => @Word)) returns (mapping(Word => @Word)) { return table; }",
-  "function sourceClosure() returns (function() returns (Word)) { let captured: Word = 7; return lam() -> Word { return captured; }; }",
-  "function sourceView(seed: Word) returns (function(Word) returns (Word)) { let f = lam(item) { return item; }; return f; }",
-  "function failure(seed: Word) returns (Word) { let f = lam() -> Word { seed += 2; let absent: Word; return absent; }; return f(); }",
-  "function spin() returns (Word) { while (true) {} return 0; }"
+  "function inc(n: word) returns (word) { return n + 1; }",
+  "function sum(a: word, b: word) returns (word) { return a + b; }",
+  "function make(seed: word) returns (function(word) returns (word)) { let f: function(word) returns (word) = lam(step: word) { seed += step; return seed; }; return f; }",
+  "function use(f: function(word) returns (word), n: word) returns (word) { return f(n); }",
+  "function unused(captured: word) returns (word) { let unused = lam(item) { return (item, captured); }; return captured; }",
+  "function stored(seed: word) returns (word) { let f: function(word) returns (word) = lam(step: word) { seed += step; return seed; }; return seed; }",
+  "function views(seed: word) returns (word) { let f = lam(item) { seed += 1; return item; }; f(true); return f(4); }",
+  "function echo(table: mapping(word => @word)) returns (mapping(word => @word)) { return table; }",
+  "function sourceClosure() returns (function() returns (word)) { let captured: word = 7; return lam() -> word { return captured; }; }",
+  "function sourceView(seed: word) returns (function(word) returns (word)) { let f = lam(item) { return item; }; return f; }",
+  "function failure(seed: word) returns (word) { let f = lam() -> word { seed += 2; let absent: word; return absent; }; return f(); }",
+  "function spin() returns (word) { while (true) {} return 0; }"
 ]
 private def names : List String := ["inc", "sum", "make", "use", "unused", "stored", "views", "echo", "sourceClosure", "sourceView", "failure", "spin"]
 
@@ -1295,17 +1295,17 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def require (condition : Bool) (message : String) : IO Unit := SourceCoreUnifiedCorpusSupport.assertTrue condition message
 private def word (value : Nat) : Value := .word (Core.Word.ofNatModulo value)
 private def content : String := String.intercalate "\n" [
-  "enum Functions { Put(function(Word) returns (Word)) }",
-  "function inc(n: Word) returns (Word) { return n + 1; }",
-  "function use(f: function(Word) returns (Word), n: Word) returns (Word) { return f(n); }",
-  "function named() returns (function(Word) returns (Word)) { return inc; }",
-  "function boxed(f: function(Word) returns (Word)) returns (Functions) { return .Put(f); }",
-  "function unbox(v: Functions) returns (function(Word) returns (Word)) { match (v) { case .Put(f) { return f; } } }",
-  "function maps(v: mapping(Word => function(Word) returns (Word))) returns (mapping(Word => function(Word) returns (Word))) { return v; }",
-  "function tuples(v: (function(Word) returns (Word), Word)) returns ((function(Word) returns (Word), Word)) { return v; }",
-  "function builtin(f: function(Word) returns (integer), n: Word) returns (integer) { return f(n); }",
-  "function builtinMap(v: mapping(Word => function(Word) returns (integer)), n: Word) returns (integer) { return v[1](n); }",
-  "function missing(v: mapping(Word => function(Word) returns (Word)), n: Word) returns (Word) { return v[n](0); }"
+  "enum Functions { Put(function(word) returns (word)) }",
+  "function inc(n: word) returns (word) { return n + 1; }",
+  "function use(f: function(word) returns (word), n: word) returns (word) { return f(n); }",
+  "function named() returns (function(word) returns (word)) { return inc; }",
+  "function boxed(f: function(word) returns (word)) returns (Functions) { return .Put(f); }",
+  "function unbox(v: Functions) returns (function(word) returns (word)) { match (v) { case .Put(f) { return f; } } }",
+  "function maps(v: mapping(word => function(word) returns (word))) returns (mapping(word => function(word) returns (word))) { return v; }",
+  "function tuples(v: (function(word) returns (word), word)) returns ((function(word) returns (word), word)) { return v; }",
+  "function builtin(f: function(word) returns (integer), n: word) returns (integer) { return f(n); }",
+  "function builtinMap(v: mapping(word => function(word) returns (integer)), n: word) returns (integer) { return v[1](n); }",
+  "function missing(v: mapping(word => function(word) returns (word)), n: word) returns (word) { return v[n](0); }"
 ]
 private def names : List String := ["inc", "use", "named", "boxed", "unbox", "maps", "tuples", "builtin", "builtinMap", "missing"]
 private def execute {artifact : Artifact} (session : Session artifact) (key : Key) (args : List Value) : IO (Completion artifact) := do
@@ -1431,21 +1431,21 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def require (condition : Bool) (message : String) : IO Unit := SourceCoreUnifiedCorpusSupport.assertTrue condition message
 private def word (value : Nat) : Value := .word (Core.Word.ofNatModulo value)
 private def content : String := String.intercalate "\n" [
-  "function add(left: Word, right: Word) returns (Word) { return left + right; }",
-  "function tuple(value: (Word, Word)) returns (Word) { return 33; }",
-  "function zero() returns (Word) { return 4; }",
-  "function make(seed: Word) returns (function(Word) returns (Word)) { return lam(step: Word) { seed += step; return seed; }; }",
-  "function twins(seed: Word) returns (function(Word) returns (Word), function(Word) returns (Word)) {",
-  " let left = lam(step: Word) -> Word { seed += step; return seed; };",
-  " let right = lam(step: Word) -> Word { seed += step; return seed; }; return (left, right); }",
-  "function failurePair(seed: Word) returns (function(Word) returns (Word), function() returns (Word)) {",
-  " let fails = lam(step: Word) -> Word { seed += step; let absent: Word; return absent; };",
-  " let observes = lam() -> Word { return seed; }; return (fails, observes); }",
-  "function spin() returns (function() returns (Word)) { return lam() -> Word { while (true) {} return 0; }; }",
-  "function marked() returns (function(Word) returns (Word)) { return lam(comptime value: Word) -> Word { return value; }; }",
-  "function markedGlobal(comptime value: Word) returns (Word) { return value; }",
-  "function markedResult() returns (comptime<Word>) { return 5; }",
-  "function stagedSource() returns (Word) { let f = markedGlobal; return f(21); }"
+  "function add(left: word, right: word) returns (word) { return left + right; }",
+  "function tuple(value: (word, word)) returns (word) { return 33; }",
+  "function zero() returns (word) { return 4; }",
+  "function make(seed: word) returns (function(word) returns (word)) { return lam(step: word) { seed += step; return seed; }; }",
+  "function twins(seed: word) returns (function(word) returns (word), function(word) returns (word)) {",
+  " let left = lam(step: word) -> word { seed += step; return seed; };",
+  " let right = lam(step: word) -> word { seed += step; return seed; }; return (left, right); }",
+  "function failurePair(seed: word) returns (function(word) returns (word), function() returns (word)) {",
+  " let fails = lam(step: word) -> word { seed += step; let absent: word; return absent; };",
+  " let observes = lam() -> word { return seed; }; return (fails, observes); }",
+  "function spin() returns (function() returns (word)) { return lam() -> word { while (true) {} return 0; }; }",
+  "function marked() returns (function(word) returns (word)) { return lam(comptime value: word) -> word { return value; }; }",
+  "function markedGlobal(comptime value: word) returns (word) { return value; }",
+  "function markedResult() returns (comptime<word>) { return 5; }",
+  "function stagedSource() returns (word) { let f = markedGlobal; return f(21); }"
 ]
 private def names : List String := ["add", "tuple", "zero", "make", "twins", "failurePair", "spin", "marked", "markedGlobal", "markedResult", "stagedSource"]
 private def handle : Value → IO Handle
@@ -1569,26 +1569,26 @@ private def require (condition : Bool) (message : String) : IO Unit := SourceCor
 private def w (n : Nat) : Core.Word := Core.Word.ofNatModulo n
 private def word (n : Nat) : Value := .word (w n)
 private def content : String := String.intercalate "\n" [
-  "enum Holder { Put(function(Word) returns (Word)) }",
-  "function inc(n: Word) returns (Word) { return n + 1; }",
-  "function make(seed: Word) returns (function(Word) returns (Word)) { return lam(step: Word) { seed += step; return inc(seed); }; }",
-  "function use(f: function(Word) returns (Word), n: Word) returns (Word) { return f(n); }",
-  "function twins(seed: Word) returns (function(Word) returns (Word), function(Word) returns (Word)) {",
-  " let f: function(Word) returns (Word) = lam(step: Word) { seed += step; return seed; };",
-  " let g: function(Word) returns (Word) = lam(step: Word) { seed += step; return seed; }; return (f, g); }",
-  "function named() returns (function(Word) returns (Word)) { return inc; }",
-  "function mirror(f: function(Word) returns (Word)) returns (function(Word) returns (Word)) { return f; }",
-  "function boxed(f: function(Word) returns (Word)) returns (Holder) { return .Put(f); }",
-  "function unbox(v: Holder) returns (function(Word) returns (Word)) { match (v) { case .Put(f) { return f; } } }",
-  "function mapEcho(v: mapping(Word => function(Word) returns (Word))) returns (mapping(Word => function(Word) returns (Word))) { return v; }",
-  "function mapGet(v: mapping(Word => function(Word) returns (Word)), k: Word) returns (function(Word) returns (Word)) { return v[k]; }",
-  "function wordMap(v: mapping(Word => Word)) returns (mapping(Word => Word)) { return v; }",
-  "function proxy(v: @Word) returns (@Word) { return v; }",
-  "function failurePair(seed: Word) returns (function(Word) returns (Word), function() returns (Word)) {",
-  " let f: function(Word) returns (Word) = lam(step: Word) { seed += step; let absent: Word; return absent; };",
-  " let g: function() returns (Word) = lam() { return seed; }; return (f, g); }",
-  "function get(f: function() returns (Word)) returns (Word) { return f(); }",
-  "function spin() returns (Word) { while (true) {} return 0; }"
+  "enum Holder { Put(function(word) returns (word)) }",
+  "function inc(n: word) returns (word) { return n + 1; }",
+  "function make(seed: word) returns (function(word) returns (word)) { return lam(step: word) { seed += step; return inc(seed); }; }",
+  "function use(f: function(word) returns (word), n: word) returns (word) { return f(n); }",
+  "function twins(seed: word) returns (function(word) returns (word), function(word) returns (word)) {",
+  " let f: function(word) returns (word) = lam(step: word) { seed += step; return seed; };",
+  " let g: function(word) returns (word) = lam(step: word) { seed += step; return seed; }; return (f, g); }",
+  "function named() returns (function(word) returns (word)) { return inc; }",
+  "function mirror(f: function(word) returns (word)) returns (function(word) returns (word)) { return f; }",
+  "function boxed(f: function(word) returns (word)) returns (Holder) { return .Put(f); }",
+  "function unbox(v: Holder) returns (function(word) returns (word)) { match (v) { case .Put(f) { return f; } } }",
+  "function mapEcho(v: mapping(word => function(word) returns (word))) returns (mapping(word => function(word) returns (word))) { return v; }",
+  "function mapGet(v: mapping(word => function(word) returns (word)), k: word) returns (function(word) returns (word)) { return v[k]; }",
+  "function wordMap(v: mapping(word => word)) returns (mapping(word => word)) { return v; }",
+  "function proxy(v: @word) returns (@word) { return v; }",
+  "function failurePair(seed: word) returns (function(word) returns (word), function() returns (word)) {",
+  " let f: function(word) returns (word) = lam(step: word) { seed += step; let absent: word; return absent; };",
+  " let g: function() returns (word) = lam() { return seed; }; return (f, g); }",
+  "function get(f: function() returns (word)) returns (word) { return f(); }",
+  "function spin() returns (word) { while (true) {} return 0; }"
 ]
 private def names : List String := ["inc", "make", "use", "twins", "named", "mirror", "boxed", "unbox", "mapEcho", "mapGet", "wordMap", "proxy", "failurePair", "get", "spin"]
 private def execute {artifact : Artifact} (session : Session artifact) (key : Key) (args : List Value)
@@ -1992,7 +1992,7 @@ private def testParsedCheckedLocalRead : IO Unit := do
   let workspace : Workspace.RawWorkspace := {
     entry := "main.solc"
     mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++
-      "function read(value: Word) returns (Word) { return value; }" }]
+      "function read(value: word) returns (word) { return value; }" }]
     externalLibraries := []
   }
   let program ← match checkProgram workspace with
@@ -2051,18 +2051,18 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
+    "trait Mark<T> {}", "impl Mark<word> {}", "impl Mark<bool> {}",
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
-    "type WordFunction = function(Word) returns (Word);",
-    "impl Coerce<WordFunction, Word> { function coerce(value: WordFunction) returns (Word) { return value(5); } }",
+    "type WordFunction = function(word) returns (word);",
+    "impl Coerce<WordFunction, word> { function coerce(value: WordFunction) returns (word) { return value(5); } }",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
-    "function qualified(flag: Bool) returns (Word, Bool) {",
+    "function qualified(flag: bool) returns (word, bool) {",
     " let f = lam(item) { return keep(item); }; return (f(1), f(flag)); }",
-    "function coerced() returns (Word) { let f: WordFunction = lam(item: Word) -> Word { return keep(item); }; return f; }",
-    "function nested(flag: Bool) returns (Word, Word) {",
+    "function coerced() returns (word) { let f: WordFunction = lam(item: word) -> word { return keep(item); }; return f; }",
+    "function nested(flag: bool) returns (word, word) {",
     " let outer = lam(value) { keep(value);",
     "   let inner = lam(item) { return keep(item); }; return inner(1); };",
-    " let one: Word = 1; return (outer(one), outer(flag)); }"
+    " let one: word = 1; return (outer(one), outer(flag)); }"
   ] }] }
 
 private def plan (program : CheckedProgram) (name : String) : IO SourceSpecializationWorklist.Plan := do
@@ -2274,24 +2274,24 @@ private def w (n : Nat) : Core.Word := Core.Word.ofNatModulo n
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
+    "trait Mark<T> {}", "impl Mark<word> {}", "impl Mark<bool> {}",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
-    "function qualified(flag: Bool) returns (Word, Bool) { let f = lam(item) { return keep(item); }; return (f(19), f(flag)); }",
-    "function qualifiedNested(flag: Bool) returns (Word, Word) { let outer = lam(value) { keep(value); let inner = lam(item) { return keep(item); }; return inner(1); }; let one: Word = 1; return (outer(one), outer(flag)); }",
-    "function qualifiedCapture(flag: Bool) returns (Word) { let count: Word = 0; let f = lam(item) { count += 1; return keep(item); }; let one: Word = 1; f(one); f(flag); return count; }",
-    "type WordFunction = function(Word) returns (Word);",
-    "function qualifiedMaker(seed: Word) returns (WordFunction) { let count: Word = seed; let f = lam(item) { keep(item); count += 1; return count; }; return f; }",
-    "function useFunction(f: WordFunction, value: Word) returns (Word) { return f(value); }",
+    "function qualified(flag: bool) returns (word, bool) { let f = lam(item) { return keep(item); }; return (f(19), f(flag)); }",
+    "function qualifiedNested(flag: bool) returns (word, word) { let outer = lam(value) { keep(value); let inner = lam(item) { return keep(item); }; return inner(1); }; let one: word = 1; return (outer(one), outer(flag)); }",
+    "function qualifiedCapture(flag: bool) returns (word) { let count: word = 0; let f = lam(item) { count += 1; return keep(item); }; let one: word = 1; f(one); f(flag); return count; }",
+    "type WordFunction = function(word) returns (word);",
+    "function qualifiedMaker(seed: word) returns (WordFunction) { let count: word = seed; let f = lam(item) { keep(item); count += 1; return count; }; return f; }",
+    "function useFunction(f: WordFunction, value: word) returns (word) { return f(value); }",
     "function identity<T>(value: T) returns (T) { return value; }",
-    "function local(flag: Bool) returns (Word, Bool) { let f = lam(item) { return identity(item); }; return (f(11), f(flag)); }",
-    "function nested(flag: Bool) returns (Word, Bool) { let outer = lam(item) { let inner = lam(value) { return identity(value); }; return inner(item); }; return (outer(13), outer(flag)); }",
-    "function recursiveContext(flag: Bool) returns (Word, Bool) { let outer = lam(value) { let middle = lam(item) { let inner = lam(innerValue) { return identity(innerValue); }; return inner(item); }; return middle(value); }; return (outer(15), outer(flag)); }",
-    "function sameInnerType(flag: Bool) returns (Word, Word) { let outer = lam(value) { let inner = lam(item) { return item; }; return inner(1); }; let one: Word = 1; return (outer(one), outer(flag)); }",
-    "function dependentInner(flag: Bool) returns ((Word, Word), (Bool, Bool)) { let outer = lam(value) { let inner = lam(item) { return (value, item); }; return inner(value); }; return (outer(1), outer(flag)); }",
-    "function repeatedCapture(flag: Bool) returns (Word) { let total: Word = 0; let f = lam(item) { total += 1; return item; }; let one: Word = 1; let two: Word = 2; f(one); f(flag); f(two); return total; }",
-    "function unused() returns (Word) { let outer = lam(value) { let inner = lam(item) { return item; }; return inner(value); }; return 9; }",
+    "function local(flag: bool) returns (word, bool) { let f = lam(item) { return identity(item); }; return (f(11), f(flag)); }",
+    "function nested(flag: bool) returns (word, bool) { let outer = lam(item) { let inner = lam(value) { return identity(value); }; return inner(item); }; return (outer(13), outer(flag)); }",
+    "function recursiveContext(flag: bool) returns (word, bool) { let outer = lam(value) { let middle = lam(item) { let inner = lam(innerValue) { return identity(innerValue); }; return inner(item); }; return middle(value); }; return (outer(15), outer(flag)); }",
+    "function sameInnerType(flag: bool) returns (word, word) { let outer = lam(value) { let inner = lam(item) { return item; }; return inner(1); }; let one: word = 1; return (outer(one), outer(flag)); }",
+    "function dependentInner(flag: bool) returns ((word, word), (bool, bool)) { let outer = lam(value) { let inner = lam(item) { return (value, item); }; return inner(value); }; return (outer(1), outer(flag)); }",
+    "function repeatedCapture(flag: bool) returns (word) { let total: word = 0; let f = lam(item) { total += 1; return item; }; let one: word = 1; let two: word = 2; f(one); f(flag); f(two); return total; }",
+    "function unused() returns (word) { let outer = lam(value) { let inner = lam(item) { return item; }; return inner(value); }; return 9; }",
     "enum Box<T> { Full(T) }",
-    "function intermediate(flag: Bool) returns (Word, Bool) { let f = lam(item) { let box = Box.Full(item); match (box) { case .Full(value) { return value; } } }; return (f(17), f(flag)); }"
+    "function intermediate(flag: bool) returns (word, bool) { let f = lam(item) { let box = Box.Full(item); match (box) { case .Full(value) { return value; } } }; return (f(17), f(flag)); }"
   ]}]
 }
 private def check (program : CheckedProgram) (name : String) (arguments : List Value) (expected : Value) : IO Unit := do

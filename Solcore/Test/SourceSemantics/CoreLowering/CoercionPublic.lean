@@ -460,12 +460,12 @@ def observeImplementation (program : CheckedProgram) (implementation : ProgramIm
   | _ => throw (IO.userError "coercion implementation methods")
 
 def content : String := String.intercalate "\n" [
-  "trait Mark<T> {}", "impl Mark<Bool> {}",
+  "trait Mark<T> {}", "impl Mark<bool> {}",
   "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
-  "impl Coerce<Bool, Word> { function coerce(value: Bool) returns (Word) { return value ? 41 : 7; } }",
+  "impl Coerce<bool, word> { function coerce(value: bool) returns (word) { return value ? 41 : 7; } }",
   "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
-  "function make(value: Bool) returns (function() returns (Word)) { return lam() -> Word { return keep(value); }; }",
-  "function use(f: function() returns (Word)) returns (Word) { return f(); }"]
+  "function make(value: bool) returns (function() returns (word)) { return lam() -> word { return keep(value); }; }",
+  "function use(f: function() returns (word)) returns (word) { return f(); }"]
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc",externalLibraries := [],mainSources := [{path := "main.solc",content := "pragma solcore;\n" ++ content}] }

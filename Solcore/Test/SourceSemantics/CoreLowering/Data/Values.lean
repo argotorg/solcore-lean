@@ -572,7 +572,7 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Tree<T> { Leaf(T), Pair(Tree<T>, Tree<T>) }",
-    "function identity(value: Word) returns (Word) { return value; }"
+    "function identity(value: word) returns (word) { return value; }"
   ] }]
 }
 
@@ -936,12 +936,12 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Tree<T> { Leaf(T), Pair(Tree<T>, Tree<T>) }",
-    "enum Row { First(Word, Bool), Other(Word, Bool) }",
+    "enum Row { First(word, bool), Other(word, bool) }",
     "function leaf(value: integer) returns (Tree<integer>) { return .Leaf(value); }",
-    "function branch(left: Tree<integer>, right: Tree<integer>, marker: Word) returns (Tree<integer>) { return .Pair(left, right); }",
-    "function proxyValue() returns (@Word) { return @Word; }",
-    "function find(marker: Word, table: mapping(Word => Word), key: Word) returns (Word) { return table[key]; }",
-    "function missing(table: mapping(Word => Tree<integer>), key: Word) returns (Tree<integer>) { return table[key]; }"
+    "function branch(left: Tree<integer>, right: Tree<integer>, marker: word) returns (Tree<integer>) { return .Pair(left, right); }",
+    "function proxyValue() returns (@word) { return @word; }",
+    "function find(marker: word, table: mapping(word => word), key: word) returns (word) { return table[key]; }",
+    "function missing(table: mapping(word => Tree<integer>), key: word) returns (Tree<integer>) { return table[key]; }"
   ] }]
 }
 
@@ -1762,8 +1762,8 @@ private def present (value : Value) : Value := .inRight .unit value
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Tree { Leaf(Word), Pair(Tree, Tree) }",
-    "function choose(tree: Tree) returns (Word) {",
+    "enum Tree { Leaf(word), Pair(Tree, Tree) }",
+    "function choose(tree: Tree) returns (word) {",
     "  match (tree) {",
     "    case .Pair(.Leaf(left), .Leaf(0)) { return left; }",
     "    case .Pair(.Leaf(left), .Leaf(right)) { left = left + right; return left; }",
@@ -1771,7 +1771,7 @@ private def workspace : Workspace.RawWorkspace := {
     "    default { return 99; }",
     "  }",
     "}",
-    "function tuple(value: (Tree, (Bool, Word))) returns (Word) {",
+    "function tuple(value: (Tree, (bool, word))) returns (word) {",
     "  match (value) {",
     "    case (.Leaf(left), (flag, right)) { return flag ? left + right : right; }",
     "    default { return 99; }",
@@ -1780,30 +1780,30 @@ private def workspace : Workspace.RawWorkspace := {
     "function integerCase(value: integer) returns (integer) {",
     "  match (value) { case 0 { return 5; } case (1) { return 6; } case other { return other; } }",
     "}",
-    "function wildcard(value: Word) returns (Word) {",
-    "  match (value) { case _ { return 3; } default { let absent: Word; return absent; } }",
+    "function wildcard(value: word) returns (word) {",
+    "  match (value) { case _ { return 3; } default { let absent: word; return absent; } }",
     "}",
-    "function unitCase(value: Unit) returns (Word) { match (value) { case () { return 7; } } }",
-    "function nestedFailure(value: Tree) returns (Word) {",
-    "  match (value) { case .Leaf(bound) { let absent: Word; return absent; } default { return 8; } }",
+    "function unitCase(value: ()) returns (word) { match (value) { case () { return 7; } } }",
+    "function nestedFailure(value: Tree) returns (word) {",
+    "  match (value) { case .Leaf(bound) { let absent: word; return absent; } default { return 8; } }",
     "}",
-    "function none(value: Word) returns (Unit) { match (value) { case 0 { return; } default {} } }",
-    "function once(value: Tree, marker: Word) returns (Word) {",
+    "function none(value: word) returns (()) { match (value) { case 0 { return; } default {} } }",
+    "function once(value: Tree, marker: word) returns (word) {",
     "  match ((lam() -> Tree { marker = marker + 1; return value; })()) {",
     "    case .Leaf(bound) { return marker + bound; } default { return marker; }",
     "  }",
     "}",
-    "function scrutineeFailure(value: Tree) returns (Word) {",
+    "function scrutineeFailure(value: Tree) returns (word) {",
     "  match ((lam() -> Tree { let missing: Tree; return missing; })()) {",
     "    case .Leaf(bound) { return bound; } default { return 9; }",
     "  }",
     "}",
-    "function functionBinder(marker: Word) returns (Word) {",
-    "  match (lam(x: Word) -> Word { marker = marker + x; return marker; }) {",
-    "    case f { let first: Word = f(2); return f(3); }",
+    "function functionBinder(marker: word) returns (word) {",
+    "  match (lam(x: word) -> word { marker = marker + x; return marker; }) {",
+    "    case f { let first: word = f(2); return f(3); }",
     "  }",
     "}",
-    "function moduloPattern(value: Word) returns (Word) {",
+    "function moduloPattern(value: word) returns (word) {",
     "  match (value) { case 115792089237316195423570985008687907853269984665640564039457584007913129639936 { return 1; } default { return 2; } }",
     "}"
   ] }]

@@ -268,15 +268,15 @@ end Meaning
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Box { Box(Word) }",
-    "function bare(a: Word, b: Word) returns (integer) { let x: Word; x = wordFromInteger(integerAdd(wordToInteger(a), wordToInteger(b))); x += wordFromInteger(wordToInteger(a)); return wordToInteger(x); }",
-    "function keys(a: Word, b: Word) returns (integer) { let m: mapping(Bool => Word); let keys: mapping(Bool => Word); m[integerEq(wordToInteger(keys[true]), wordToInteger(keys[false]))] = wordFromInteger(integerAdd(wordToInteger(b), wordToInteger(a))); return wordToInteger(m[true]); }",
-    "function nested(a: Word, b: Word) returns (integer) { let m: mapping(Bool => mapping(Bool => Word)); m[integerLt(wordToInteger(a), wordToInteger(b))][integerEq(wordToInteger(a), wordToInteger(a))] = wordFromInteger(wordToInteger(a)); return wordToInteger(m[true][true]); }",
-    "function sameRoot(a: Word, b: Word) returns (integer) { let m: mapping(Bool => Word); m[true] = wordFromInteger(integerAdd(wordToInteger(m[false]), wordToInteger(a))); return wordToInteger(m[true]); }",
-    "function missing(a: Word, b: Word) returns (integer) { let x: Word; let rhs: mapping(Bool => Word); x += wordFromInteger(wordToInteger(rhs[true])); let never = true; return 0; }",
-    "function rhsFault(a: Word, b: Word) returns (integer) { let m: mapping(Bool => Word); let keys: mapping(Bool => Word); let rhs: mapping(Bool => Word); let gap: Word; m[integerEq(wordToInteger(keys[true]), wordToInteger(a))] = wordFromInteger(integerAdd(wordToInteger(rhs[false]), wordToInteger(gap))); let never = true; return 0; }",
-    "function targetFault(a: Word, b: Word) returns (integer) { let m: mapping(Bool => Box); let keys: mapping(Bool => Word); let rhs: mapping(Bool => Word); m[integerEq(wordToInteger(keys[true]), wordToInteger(a))] = .Box(wordFromInteger(wordToInteger(rhs[false]))); let never = true; return 0; }",
-    "function keyFault(a: Word, b: Word) returns (integer) { let m: mapping(Bool => Word); let keys: mapping(Bool => Word); let gap: Word; let rhs: mapping(Bool => Word); m[integerEq(wordToInteger(keys[true]), wordToInteger(gap))] = wordFromInteger(wordToInteger(rhs[false])); let never = true; return 0; }"
+    "enum Box { Box(word) }",
+    "function bare(a: word, b: word) returns (integer) { let x: word; x = wordFromInteger(integerAdd(wordToInteger(a), wordToInteger(b))); x += wordFromInteger(wordToInteger(a)); return wordToInteger(x); }",
+    "function keys(a: word, b: word) returns (integer) { let m: mapping(bool => word); let keys: mapping(bool => word); m[integerEq(wordToInteger(keys[true]), wordToInteger(keys[false]))] = wordFromInteger(integerAdd(wordToInteger(b), wordToInteger(a))); return wordToInteger(m[true]); }",
+    "function nested(a: word, b: word) returns (integer) { let m: mapping(bool => mapping(bool => word)); m[integerLt(wordToInteger(a), wordToInteger(b))][integerEq(wordToInteger(a), wordToInteger(a))] = wordFromInteger(wordToInteger(a)); return wordToInteger(m[true][true]); }",
+    "function sameRoot(a: word, b: word) returns (integer) { let m: mapping(bool => word); m[true] = wordFromInteger(integerAdd(wordToInteger(m[false]), wordToInteger(a))); return wordToInteger(m[true]); }",
+    "function missing(a: word, b: word) returns (integer) { let x: word; let rhs: mapping(bool => word); x += wordFromInteger(wordToInteger(rhs[true])); let never = true; return 0; }",
+    "function rhsFault(a: word, b: word) returns (integer) { let m: mapping(bool => word); let keys: mapping(bool => word); let rhs: mapping(bool => word); let gap: word; m[integerEq(wordToInteger(keys[true]), wordToInteger(a))] = wordFromInteger(integerAdd(wordToInteger(rhs[false]), wordToInteger(gap))); let never = true; return 0; }",
+    "function targetFault(a: word, b: word) returns (integer) { let m: mapping(bool => Box); let keys: mapping(bool => word); let rhs: mapping(bool => word); m[integerEq(wordToInteger(keys[true]), wordToInteger(a))] = .Box(wordFromInteger(wordToInteger(rhs[false]))); let never = true; return 0; }",
+    "function keyFault(a: word, b: word) returns (integer) { let m: mapping(bool => word); let keys: mapping(bool => word); let gap: word; let rhs: mapping(bool => word); m[integerEq(wordToInteger(keys[true]), wordToInteger(gap))] = wordFromInteger(wordToInteger(rhs[false])); let never = true; return 0; }"
   ]}] }
 
 private def arguments : List SourceCompilerFeatureSupport.Value := [.word (Word.ofNatModulo 3), .word (Word.ofNatModulo 4)]
@@ -491,10 +491,10 @@ private def workspace : Workspace.RawWorkspace := {
     "function sub(a: integer, b: integer) returns (integer) { return integerSub(a, b); }",
     "function add(a: integer, b: integer) returns (integer) { return integerAdd(a, b); }",
     "function mul(a: integer, b: integer) returns (integer) { return integerMul(a, b); }",
-    "function eq(a: integer, b: integer) returns (Bool) { return integerEq(a, b); }",
-    "function lt(a: integer, b: integer) returns (Bool) { return integerLt(a, b); }",
-    "function from(a: integer) returns (Word) { return wordFromInteger(a); }",
-    "function to(a: Word) returns (integer) { return wordToInteger(a); }"]}] }
+    "function eq(a: integer, b: integer) returns (bool) { return integerEq(a, b); }",
+    "function lt(a: integer, b: integer) returns (bool) { return integerLt(a, b); }",
+    "function from(a: integer) returns (word) { return wordFromInteger(a); }",
+    "function to(a: word) returns (integer) { return wordToInteger(a); }"]}] }
 
 def run : IO Unit := do
   checkNative (TaggedFunction.call .integer (tagged .integerSub identity) arguments)
@@ -647,7 +647,7 @@ private def workspace_variant : Workspace.RawWorkspace := {
   entry := "main.solc"
   externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function identity(value: Word) returns (Word) { return value; } function make(seed: Word) returns (function() returns (Word)) { return lam() { return seed; }; } function relay(seed: Word) returns (function() returns (Word)) { return make(identity(seed) + wordFromInteger(0)); }"}] }
+    "function identity(value: word) returns (word) { return value; } function make(seed: word) returns (function() returns (word)) { return lam() { return seed; }; } function relay(seed: word) returns (function() returns (word)) { return make(identity(seed) + wordFromInteger(0)); }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)
@@ -3674,18 +3674,18 @@ end CompilerBridge
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function mixed(seed: Word) returns (integer) { let sum = 0; for (let i: Word, i = wordFromInteger(wordToInteger(seed)), let flag: Bool = integerEq(wordToInteger(seed), wordToInteger(seed)); i < 3; let copy = wordFromInteger(wordToInteger(i)), i = wordFromInteger(integerAdd(wordToInteger(copy), 1))) { if (flag) { sum += i; } } return wordToInteger(sum); }",
-    "function shadow(seed: Word) returns (integer) { let i = 17; for (let i = wordFromInteger(wordToInteger(seed)); i < 2; let copy = wordFromInteger(wordToInteger(i)), i = copy + 1) { continue; } return wordToInteger(i); }",
-    "function falseFirst(seed: Word) returns (integer) { for (let i = wordFromInteger(integerAdd(wordToInteger(seed), 5)); false; let never = wordToInteger(seed)) { return wordToInteger(seed); } return 5; }",
-    "function breaks(seed: Word) returns (integer) { for (let i = wordFromInteger(wordToInteger(seed)); true; let never = wordToInteger(seed)) { break; } return 1; }",
-    "function returns(seed: Word) returns (integer) { for (let i = wordFromInteger(wordToInteger(seed)); true; let never = wordToInteger(seed)) { return wordToInteger(i); } return 1; }",
-    "function initializerFault(seed: Word) returns (integer) { let gap: Word; let seen: mapping(Bool => Word); for (let ready = wordFromInteger(integerAdd(wordToInteger(seed), 1)), let dead = integerAdd(wordToInteger(seen[false]), wordToInteger(gap)); true; ) { return 0; } return 1; }",
-    "function postFault(seed: Word) returns (integer) { let gap: Word; let seen: mapping(Bool => Word); for (let i = wordFromInteger(wordToInteger(seed)); true; let copy = wordFromInteger(wordToInteger(i)), i = wordFromInteger(integerAdd(wordToInteger(seen[false]), wordToInteger(gap))), let never = wordToInteger(seed)) { continue; } return 1; }",
-    "function postAbsent(seed: Word) returns (integer) { for (let i = wordFromInteger(wordToInteger(seed)); true; let absent: Word, i = wordFromInteger(wordToInteger(absent))) { continue; } return 1; }"
+    "function mixed(seed: word) returns (integer) { let sum = 0; for (let i: word, i = wordFromInteger(wordToInteger(seed)), let flag: bool = integerEq(wordToInteger(seed), wordToInteger(seed)); i < 3; let copy = wordFromInteger(wordToInteger(i)), i = wordFromInteger(integerAdd(wordToInteger(copy), 1))) { if (flag) { sum += i; } } return wordToInteger(sum); }",
+    "function shadow(seed: word) returns (integer) { let i = 17; for (let i = wordFromInteger(wordToInteger(seed)); i < 2; let copy = wordFromInteger(wordToInteger(i)), i = copy + 1) { continue; } return wordToInteger(i); }",
+    "function falseFirst(seed: word) returns (integer) { for (let i = wordFromInteger(integerAdd(wordToInteger(seed), 5)); false; let never = wordToInteger(seed)) { return wordToInteger(seed); } return 5; }",
+    "function breaks(seed: word) returns (integer) { for (let i = wordFromInteger(wordToInteger(seed)); true; let never = wordToInteger(seed)) { break; } return 1; }",
+    "function returns(seed: word) returns (integer) { for (let i = wordFromInteger(wordToInteger(seed)); true; let never = wordToInteger(seed)) { return wordToInteger(i); } return 1; }",
+    "function initializerFault(seed: word) returns (integer) { let gap: word; let seen: mapping(bool => word); for (let ready = wordFromInteger(integerAdd(wordToInteger(seed), 1)), let dead = integerAdd(wordToInteger(seen[false]), wordToInteger(gap)); true; ) { return 0; } return 1; }",
+    "function postFault(seed: word) returns (integer) { let gap: word; let seen: mapping(bool => word); for (let i = wordFromInteger(wordToInteger(seed)); true; let copy = wordFromInteger(wordToInteger(i)), i = wordFromInteger(integerAdd(wordToInteger(seen[false]), wordToInteger(gap))), let never = wordToInteger(seed)) { continue; } return 1; }",
+    "function postAbsent(seed: word) returns (integer) { for (let i = wordFromInteger(wordToInteger(seed)); true; let absent: word, i = wordFromInteger(wordToInteger(absent))) { continue; } return 1; }"
   ]}] }
 private def escape : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function main(seed: Word) returns (integer) { for (let i = seed; false; let copy = wordToInteger(i)) { } return copy; }"}] }
+    "function main(seed: word) returns (integer) { for (let i = seed; false; let copy = wordToInteger(i)) { } return copy; }"}] }
 private def arguments : List SourceCompilerFeatureSupport.Value := [.word Word.zero]
 private def inputCells : List (TypeSystem.Ty × Option SourceCompilerFeatureSupport.Value) := [(.word, some (.word Word.zero))]
 private def failureResume (entry : SourceCompilerFeatureSupport.Entry) : IO Unit := do
@@ -4024,16 +4024,16 @@ end CompilerBridge
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Box { Box(Word) }",
-    "function nested(seed: Word) returns (integer) { let sum = wordFromInteger(wordToInteger(seed)); let m: mapping(Bool => Word); for (let i: Word, i = wordFromInteger(wordToInteger(seed)); integerLt(wordToInteger(i), 3); let copy = wordFromInteger(wordToInteger(i)), i = wordFromInteger(integerAdd(wordToInteger(copy), 1))) { let j = 0; while (integerLt(wordToInteger(j), 2)) { j = wordFromInteger(integerAdd(wordToInteger(j), 1)); if (integerEq(wordToInteger(j), 1)) { continue; } for (let k = 0; integerLt(wordToInteger(k), 2); k = wordFromInteger(integerAdd(wordToInteger(k), 1))) { m[integerEq(wordToInteger(i), wordToInteger(i))] = wordFromInteger(integerAdd(integerAdd(integerMul(wordToInteger(i), 10), wordToInteger(j)), wordToInteger(k))); sum += k; } } } return integerAdd(wordToInteger(m[true]), wordToInteger(sum)); }",
-    "function unary(seed: Word) returns (integer) { let x = seed; for (let i = wordFromInteger(wordToInteger(seed)); integerLt(wordToInteger(i), 2); x ~=, i = wordFromInteger(integerAdd(wordToInteger(i), 1))) { x ~=; } return wordToInteger(x); }",
-    "function transfers(seed: Word) returns (integer) { let sum = wordFromInteger(wordToInteger(seed)); for (let i = 0; integerLt(wordToInteger(i), 5); let copy = wordFromInteger(wordToInteger(i)), i = wordFromInteger(integerAdd(wordToInteger(copy), 1))) { if (integerEq(wordToInteger(i), 1)) { continue; } { let copy = i; sum += copy; } if (integerEq(wordToInteger(i), 3)) { break; } } return wordToInteger(sum); }",
-    "function early(seed: Word) returns (integer) { for (let i = 0; true; let copy = wordFromInteger(wordToInteger(i)), i = wordFromInteger(integerAdd(wordToInteger(copy), 1))) { for (let j = 0; j < 2; j += 1) { if (integerEq(wordToInteger(i), 2)) { return integerAdd(wordToInteger(i), wordToInteger(j)); } } } return 99; }",
-    "function falseFirst(seed: Word) returns (integer) { let i = 17; for (let i: Word = 3; false; let never: Word = 99) { return 0; } return wordToInteger(i); }",
-    "function bodyFault(seed: Word) returns (integer) { let m: mapping(Bool => Word); let keys: mapping(Bool => Bool); let lazy: mapping(Bool => Word); let missing: Word; for (let i: Word = 0; i < 2; let never: Word = 99) { i += 1; m[keys[true]] = wordFromInteger(integerAdd(wordToInteger(lazy[false]), wordToInteger(missing))); } return 0; }",
-    "function postFault(seed: Word) returns (integer) { let missing: Word; let seen: mapping(Bool => Word); for (let i = 0; true; let copy = i, i = wordFromInteger(integerAdd(wordToInteger(seen[false]), wordToInteger(missing))), let never: Word = 99) { continue; } return 1; }",
-    "function initializerFault(seed: Word) returns (integer) { let missing: Word; let seen: mapping(Bool => Word); for (let ready = wordFromInteger(integerAdd(wordToInteger(seed), 1)), let dead = wordFromInteger(integerAdd(wordToInteger(seen[false]), wordToInteger(missing))); true; ) { return 0; } return 1; }",
-    "function conditionFault(seed: Word) returns (integer) { let missing: Bool; let seen: mapping(Bool => Bool); for (let ready = wordFromInteger(integerAdd(wordToInteger(seed), 1)); seen[false] || missing; let never: Word = 99) { return 0; } return 1; }"
+    "enum Box { Box(word) }",
+    "function nested(seed: word) returns (integer) { let sum = wordFromInteger(wordToInteger(seed)); let m: mapping(bool => word); for (let i: word, i = wordFromInteger(wordToInteger(seed)); integerLt(wordToInteger(i), 3); let copy = wordFromInteger(wordToInteger(i)), i = wordFromInteger(integerAdd(wordToInteger(copy), 1))) { let j = 0; while (integerLt(wordToInteger(j), 2)) { j = wordFromInteger(integerAdd(wordToInteger(j), 1)); if (integerEq(wordToInteger(j), 1)) { continue; } for (let k = 0; integerLt(wordToInteger(k), 2); k = wordFromInteger(integerAdd(wordToInteger(k), 1))) { m[integerEq(wordToInteger(i), wordToInteger(i))] = wordFromInteger(integerAdd(integerAdd(integerMul(wordToInteger(i), 10), wordToInteger(j)), wordToInteger(k))); sum += k; } } } return integerAdd(wordToInteger(m[true]), wordToInteger(sum)); }",
+    "function unary(seed: word) returns (integer) { let x = seed; for (let i = wordFromInteger(wordToInteger(seed)); integerLt(wordToInteger(i), 2); x ~=, i = wordFromInteger(integerAdd(wordToInteger(i), 1))) { x ~=; } return wordToInteger(x); }",
+    "function transfers(seed: word) returns (integer) { let sum = wordFromInteger(wordToInteger(seed)); for (let i = 0; integerLt(wordToInteger(i), 5); let copy = wordFromInteger(wordToInteger(i)), i = wordFromInteger(integerAdd(wordToInteger(copy), 1))) { if (integerEq(wordToInteger(i), 1)) { continue; } { let copy = i; sum += copy; } if (integerEq(wordToInteger(i), 3)) { break; } } return wordToInteger(sum); }",
+    "function early(seed: word) returns (integer) { for (let i = 0; true; let copy = wordFromInteger(wordToInteger(i)), i = wordFromInteger(integerAdd(wordToInteger(copy), 1))) { for (let j = 0; j < 2; j += 1) { if (integerEq(wordToInteger(i), 2)) { return integerAdd(wordToInteger(i), wordToInteger(j)); } } } return 99; }",
+    "function falseFirst(seed: word) returns (integer) { let i = 17; for (let i: word = 3; false; let never: word = 99) { return 0; } return wordToInteger(i); }",
+    "function bodyFault(seed: word) returns (integer) { let m: mapping(bool => word); let keys: mapping(bool => bool); let lazy: mapping(bool => word); let missing: word; for (let i: word = 0; i < 2; let never: word = 99) { i += 1; m[keys[true]] = wordFromInteger(integerAdd(wordToInteger(lazy[false]), wordToInteger(missing))); } return 0; }",
+    "function postFault(seed: word) returns (integer) { let missing: word; let seen: mapping(bool => word); for (let i = 0; true; let copy = i, i = wordFromInteger(integerAdd(wordToInteger(seen[false]), wordToInteger(missing))), let never: word = 99) { continue; } return 1; }",
+    "function initializerFault(seed: word) returns (integer) { let missing: word; let seen: mapping(bool => word); for (let ready = wordFromInteger(integerAdd(wordToInteger(seed), 1)), let dead = wordFromInteger(integerAdd(wordToInteger(seen[false]), wordToInteger(missing))); true; ) { return 0; } return 1; }",
+    "function conditionFault(seed: word) returns (integer) { let missing: bool; let seen: mapping(bool => bool); for (let ready = wordFromInteger(integerAdd(wordToInteger(seed), 1)); seen[false] || missing; let never: word = 99) { return 0; } return 1; }"
   ]}] }
 private def escape : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
@@ -4343,13 +4343,13 @@ end CompilerBridge
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
-    "function emptyDefault(seed: Word) returns (integer) { match (seed) { case 0 {} default {} } return wordToInteger(seed); }",
-    "function constructed(seed: Word) returns (integer) { match (Box((seed, 7))) { case .Box((0, x)) { return integerAdd(wordToInteger(x), 1); } case .Box((x, y)) { for (let i = 0; integerLt(wordToInteger(i), 2); i += 1) { match (i) { case 0 { continue; } default { return integerAdd(wordToInteger(x), wordToInteger(y)); } } } } } return 99; }",
-    "function scrutineeFault(seed: Word) returns (integer) { let seen: mapping(Bool => Word); let missing: Word; match (wordFromInteger(integerAdd(wordToInteger(seen[false]), wordToInteger(missing)))) { case x { return wordToInteger(x); } default { return 99; } } return 0; }"
+    "function emptyDefault(seed: word) returns (integer) { match (seed) { case 0 {} default {} } return wordToInteger(seed); }",
+    "function constructed(seed: word) returns (integer) { match (Box((seed, 7))) { case .Box((0, x)) { return integerAdd(wordToInteger(x), 1); } case .Box((x, y)) { for (let i = 0; integerLt(wordToInteger(i), 2); i += 1) { match (i) { case 0 { continue; } default { return integerAdd(wordToInteger(x), wordToInteger(y)); } } } } } return 99; }",
+    "function scrutineeFault(seed: word) returns (integer) { let seen: mapping(bool => word); let missing: word; match (wordFromInteger(integerAdd(wordToInteger(seen[false]), wordToInteger(missing)))) { case x { return wordToInteger(x); } default { return 99; } } return 0; }"
   ]}] }
 private def nonExhaustive : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function incomplete(seed: Word) returns (integer) { match (seed) { case 0 {} } return wordToInteger(seed); }"}] }
+    "function incomplete(seed: word) returns (integer) { match (seed) { case 0 {} } return wordToInteger(seed); }"}] }
 private def faultResume (entry : SourceCompilerFeatureSupport.Entry) (arguments : List SourceCompilerFeatureSupport.Value) : IO Unit := do
   let complete ← entry.invoke arguments
   let token ← match complete.outcome with
@@ -4535,9 +4535,9 @@ theorem continue_finish {type : Ty} {environment : Environment} {store : Store}
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "enum Box<T> { Box(T) }",
-      "function unitComposite(seed: Word) { let cursor = seed; for (let i: Word = 0; i < 2; i += 1) { match (i) { case 0 { continue; } default { cursor += 1; } } } while (cursor < 2) { cursor += 1; match (cursor) { case 2 { break; } default {} } } match (cursor) { case 0 {} default { let shadow = cursor; shadow; } } }",
-      "function returnedComposite(seed: Word) returns (integer) { for (let i = 0; true; i += 1) { match (Box((seed, i))) { case .Box((0, x)) { return integerSub(wordToInteger(x), 3); } case .Box((x, y)) { while (integerLt(wordToInteger(y), 2)) { y += 1; } return integerAdd(wordToInteger(x), wordToInteger(y)); } } } return 99; }",
-      "function failedComposite(seed: Word) returns (integer) { let seen: mapping(Bool => Word); let gap: Word; for (let i: Word = 0; true; i += 1) { match (seed) { case 0 { seen[false] = seed + 5; return wordToInteger(gap); } default { seen[true] = seed; return integerSub(wordToInteger(gap), 1); } } } return 0; }"
+      "function unitComposite(seed: word) { let cursor = seed; for (let i: word = 0; i < 2; i += 1) { match (i) { case 0 { continue; } default { cursor += 1; } } } while (cursor < 2) { cursor += 1; match (cursor) { case 2 { break; } default {} } } match (cursor) { case 0 {} default { let shadow = cursor; shadow; } } }",
+      "function returnedComposite(seed: word) returns (integer) { for (let i = 0; true; i += 1) { match (Box((seed, i))) { case .Box((0, x)) { return integerSub(wordToInteger(x), 3); } case .Box((x, y)) { while (integerLt(wordToInteger(y), 2)) { y += 1; } return integerAdd(wordToInteger(x), wordToInteger(y)); } } } return 99; }",
+      "function failedComposite(seed: word) returns (integer) { let seen: mapping(bool => word); let gap: word; for (let i: word = 0; true; i += 1) { match (seed) { case 0 { seen[false] = seed + 5; return wordToInteger(gap); } default { seen[true] = seed; return integerSub(wordToInteger(gap), 1); } } } return 0; }"
     ]}] }
 
 private def fault_resume (entry : SourceCompilerFeatureSupport.Entry)
@@ -4800,14 +4800,14 @@ theorem compiled_reflects (native : SourceCoreGeneralFunctions.CallableContext)
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Box { Box(Bool) }",
-    "function initialized(a: Word, b: Word) returns (integer) { let sum = integerAdd(wordToInteger(a), wordToInteger(b)); { let sum = integerSub(sum, wordToInteger(a)); sum; } return sum; }",
-    "function branches(a: Word, b: Word) returns (integer) { if (integerLt(wordToInteger(a), wordToInteger(b))) { let out = integerAdd(wordToInteger(a), wordToInteger(b)); return out; } else { let out = integerSub(wordToInteger(a), wordToInteger(b)); return out; } return wordToInteger(a); }",
-    "function discarded(a: Word) returns (integer) { integerEq(wordToInteger(a), wordToInteger(a)); let out = integerAdd(wordToInteger(a), wordToInteger(a)); return out; }",
-    "function tail(a: Word) returns (integer) { { let hidden = wordToInteger(a); hidden; } integerAdd(wordToInteger(a), wordToInteger(a)) }",
-    "function lazy(a: Word) returns (integer) { let m: mapping(Bool => Word); { let out = wordToInteger(m[integerEq(wordToInteger(a), wordToInteger(a))]); out; } return wordToInteger(a); }",
-    "function failed(a: Word) returns (integer) { let m: mapping(Bool => Word); { let before = wordToInteger(m[integerEq(wordToInteger(a), wordToInteger(a))]); let gap: Word; let failed = integerAdd(before, wordToInteger(gap)); let unreachable = wordToInteger(a); } return wordToInteger(a); }",
-    "function missing(a: Word) returns (integer) { let m: mapping(Bool => Box); if (integerEq(wordToInteger(a), wordToInteger(a))) { let prior = integerAdd(wordToInteger(a), wordToInteger(a)); let failed = (m[true], prior); } return wordToInteger(a); }"]}]}
+    "enum Box { Box(bool) }",
+    "function initialized(a: word, b: word) returns (integer) { let sum = integerAdd(wordToInteger(a), wordToInteger(b)); { let sum = integerSub(sum, wordToInteger(a)); sum; } return sum; }",
+    "function branches(a: word, b: word) returns (integer) { if (integerLt(wordToInteger(a), wordToInteger(b))) { let out = integerAdd(wordToInteger(a), wordToInteger(b)); return out; } else { let out = integerSub(wordToInteger(a), wordToInteger(b)); return out; } return wordToInteger(a); }",
+    "function discarded(a: word) returns (integer) { integerEq(wordToInteger(a), wordToInteger(a)); let out = integerAdd(wordToInteger(a), wordToInteger(a)); return out; }",
+    "function tail(a: word) returns (integer) { { let hidden = wordToInteger(a); hidden; } integerAdd(wordToInteger(a), wordToInteger(a)) }",
+    "function lazy(a: word) returns (integer) { let m: mapping(bool => word); { let out = wordToInteger(m[integerEq(wordToInteger(a), wordToInteger(a))]); out; } return wordToInteger(a); }",
+    "function failed(a: word) returns (integer) { let m: mapping(bool => word); { let before = wordToInteger(m[integerEq(wordToInteger(a), wordToInteger(a))]); let gap: word; let failed = integerAdd(before, wordToInteger(gap)); let unreachable = wordToInteger(a); } return wordToInteger(a); }",
+    "function missing(a: word) returns (integer) { let m: mapping(bool => Box); if (integerEq(wordToInteger(a), wordToInteger(a))) { let prior = integerAdd(wordToInteger(a), wordToInteger(a)); let failed = (m[true], prior); } return wordToInteger(a); }"]}]}
 
 private def faultResume (entry : SourceCompilerFeatureSupport.Entry) (arguments : List SourceCoreExecution.Value) : IO Unit := do
   let complete ← entry.invoke arguments
@@ -5144,21 +5144,21 @@ theorem installed_body_completion {signature : SourceCoreCalls.Signature} {index
   NamedCalls.Arguments.body_complete evaluated reference read completed
 
 private def content : String := String.intercalate "\n" [
-  "enum Item { Item(Bool) }",
-  "function compute(a: Word, b: Word) returns (integer) { let sum = integerAdd(wordToInteger(a), wordToInteger(b)); { let shadow = integerSub(sum, wordToInteger(a)); shadow; } if (integerLt(wordToInteger(a), wordToInteger(b))) { return integerAdd(sum, wordToInteger(a)); } return integerSub(sum, wordToInteger(b)); }",
-  "function caller(a: Word, b: Word) returns (integer) { return compute(a, b); }",
-  "function arguments(a: Word, b: Word) returns (integer) { return compute(wordFromInteger(wordToInteger(a)), wordFromInteger(wordToInteger(b))); }",
-  "function failBody(a: Word) returns (integer) { let m: mapping(Bool => Word); let first = wordToInteger(m[integerEq(wordToInteger(a), wordToInteger(a))]); let written = integerAdd(first, wordToInteger(a)); let gap: Word; return wordToInteger(gap); }",
-  "function failed(a: Word) returns (integer) { return failBody(wordFromInteger(wordToInteger(a))); }",
-  "function skipped(a: Word) returns (integer) { let m: mapping(Bool => Word); let gap: Word; return compute(m[integerEq(wordToInteger(a), wordToInteger(a))], wordFromInteger(wordToInteger(gap))); }",
-  "function missingBody(a: Word) returns (integer) { let m: mapping(Bool => Item); let written = wordToInteger(a); let failed = (m[integerEq(wordToInteger(a), wordToInteger(a))], written); return written; }",
-  "function missing(a: Word) returns (integer) { return missingBody(a); }",
+  "enum Item { Item(bool) }",
+  "function compute(a: word, b: word) returns (integer) { let sum = integerAdd(wordToInteger(a), wordToInteger(b)); { let shadow = integerSub(sum, wordToInteger(a)); shadow; } if (integerLt(wordToInteger(a), wordToInteger(b))) { return integerAdd(sum, wordToInteger(a)); } return integerSub(sum, wordToInteger(b)); }",
+  "function caller(a: word, b: word) returns (integer) { return compute(a, b); }",
+  "function arguments(a: word, b: word) returns (integer) { return compute(wordFromInteger(wordToInteger(a)), wordFromInteger(wordToInteger(b))); }",
+  "function failBody(a: word) returns (integer) { let m: mapping(bool => word); let first = wordToInteger(m[integerEq(wordToInteger(a), wordToInteger(a))]); let written = integerAdd(first, wordToInteger(a)); let gap: word; return wordToInteger(gap); }",
+  "function failed(a: word) returns (integer) { return failBody(wordFromInteger(wordToInteger(a))); }",
+  "function skipped(a: word) returns (integer) { let m: mapping(bool => word); let gap: word; return compute(m[integerEq(wordToInteger(a), wordToInteger(a))], wordFromInteger(wordToInteger(gap))); }",
+  "function missingBody(a: word) returns (integer) { let m: mapping(bool => Item); let written = wordToInteger(a); let failed = (m[integerEq(wordToInteger(a), wordToInteger(a))], written); return written; }",
+  "function missing(a: word) returns (integer) { return missingBody(a); }",
   "function unitHelper() { { let value = wordFromInteger(0); value; } }",
   "function unitCaller() { unitHelper(); }",
-  "function tailHelper(a: Word) returns (integer) { let x = wordToInteger(a); { let y = integerSub(x, x); y; } integerAdd(x, x) }",
-  "function tail(a: Word) returns (integer) { return tailHelper(a); }",
-  "function rawEcho(raw: mapping(Bool => Word)) returns (mapping(Bool => Word)) { let flag = integerEq(0, 0); if (flag) { return raw; } return raw; }",
-  "function raw(raw: mapping(Bool => Word)) returns (mapping(Bool => Word)) { return rawEcho(raw); }"
+  "function tailHelper(a: word) returns (integer) { let x = wordToInteger(a); { let y = integerSub(x, x); y; } integerAdd(x, x) }",
+  "function tail(a: word) returns (integer) { return tailHelper(a); }",
+  "function rawEcho(raw: mapping(bool => word)) returns (mapping(bool => word)) { let flag = integerEq(0, 0); if (flag) { return raw; } return raw; }",
+  "function raw(raw: mapping(bool => word)) returns (mapping(bool => word)) { return rawEcho(raw); }"
 ]
 
 private def cells (initial final : SourceTypedRuntime.RuntimeState)

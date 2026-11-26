@@ -106,33 +106,33 @@ def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
     "pragma solcore;",
     "import { iszero } from std.opcodes;",
-    "function identity(value: Word) returns (Word) { return value; }",
-    "function relay(value: Word) returns (Word) { return identity(value); }",
-    "function twice(value: Word) returns (Word) { return identity(identity(value)); }",
-    "function narrow(value: Word) returns (uint8) { return uint8(value); }",
-    "function roundTrip(value: Word) returns (Word) { return Typedef.rep(uint8(value)); }",
-    "function doubled(value: Word) returns (uint8) { let x: uint8 = uint8(value); x += x; return x; }",
-    "function shifted(value: Word) returns (uint8) { let x: uint8 = uint8(value); x <<= value; return x; }",
-    "function flipped(value: Word) returns (uint8) { let x: uint8 = uint8(value); x ~=; return x; }",
-    "function tailed(value: Word) returns (Word) { identity(value) }",
-    "function stored(value: Word) returns (Word) { let table: mapping(Word => Word); table[value] = value; " ++
+    "function identity(value: word) returns (word) { return value; }",
+    "function relay(value: word) returns (word) { return identity(value); }",
+    "function twice(value: word) returns (word) { return identity(identity(value)); }",
+    "function narrow(value: word) returns (uint8) { return uint8(value); }",
+    "function roundTrip(value: word) returns (word) { return Typedef.rep(uint8(value)); }",
+    "function doubled(value: word) returns (uint8) { let x: uint8 = uint8(value); x += x; return x; }",
+    "function shifted(value: word) returns (uint8) { let x: uint8 = uint8(value); x <<= value; return x; }",
+    "function flipped(value: word) returns (uint8) { let x: uint8 = uint8(value); x ~=; return x; }",
+    "function tailed(value: word) returns (word) { identity(value) }",
+    "function stored(value: word) returns (word) { let table: mapping(word => word); table[value] = value; " ++
       "return table[value]; }",
-    "function summed(value: Word) returns (integer) { " ++
+    "function summed(value: word) returns (integer) { " ++
       "return integerAdd(wordToInteger(value), wordToInteger(value)); }",
-    "function zeroed(value: Word) returns (Word) { return iszero(value); }",
-    "function inverted(value: Word) returns (Word) { let table: mapping(Word => Word); table[value] ~=; " ++
+    "function zeroed(value: word) returns (word) { return iszero(value); }",
+    "function inverted(value: word) returns (word) { let table: mapping(word => word); table[value] ~=; " ++
       "return table[value]; }",
-    "function broken(value: Word) returns (Word) { while (true) { break; } return value; }",
-    "function counted(value: Word) returns (Word) { for (let go: bool = true; go; go = false) { continue; } " ++
+    "function broken(value: word) returns (word) { while (true) { break; } return value; }",
+    "function counted(value: word) returns (word) { for (let go: bool = true; go; go = false) { continue; } " ++
       "return value; }",
-    "function tripled(value: Word) returns ((Word, Word, Word)) { return (value, value, value); }",
-    "enum Box { Item(Word) }",
-    "function boxed(value: Word) returns (Box) { return .Item(value); }",
-    "function filled(value: Word) returns (uint256) { return Length.length(new Word[](uint256(value))); }",
-    "function listed(value: Word) returns (Word) { return [value, value, value][value]; }",
-    "function sliced(value: Word) returns (Word) { return [value, value, value][uint256(value):][value]; }",
-    "function copied(value: Word) returns (Word) { return toArray([value, value, value][:])[value]; }",
-    "function referenced(value: Word) returns (Word) { let a: Word[] = [value, value, value]; " ++
+    "function tripled(value: word) returns ((word, word, word)) { return (value, value, value); }",
+    "enum Box { Item(word) }",
+    "function boxed(value: word) returns (Box) { return .Item(value); }",
+    "function filled(value: word) returns (uint256) { return Length.length(new word[](uint256(value))); }",
+    "function listed(value: word) returns (word) { return [value, value, value][value]; }",
+    "function sliced(value: word) returns (word) { return [value, value, value][uint256(value):][value]; }",
+    "function copied(value: word) returns (word) { return toArray([value, value, value][:])[value]; }",
+    "function referenced(value: word) returns (word) { let a: word[] = [value, value, value]; " ++
       "CanStore.store(lidx(a, value), value); return CanStore.load(lidx(a, value)); }",
     "function bumped(value: word) returns (word) { let a: word[] = [value, value, value]; a[value] = value; " ++
       "a[value] += value; a[value] ~=; return a[value]; }" ]}] }

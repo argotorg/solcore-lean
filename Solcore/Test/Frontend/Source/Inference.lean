@@ -1276,10 +1276,10 @@ private def hasConstructorPattern (function : CheckedFunction) : Bool :=
 private def testConstructors : IO Unit := do
   let source := String.intercalate "\n" [
     "enum Box<T> { Empty, Wrap(T) }",
-    "function qualified(value: Word) returns (Box<Word>) {",
+    "function qualified(value: word) returns (Box<word>) {",
     "  return Box.Wrap(value);",
     "}",
-    "function contextual(value: Word) returns (Box<Word>) {",
+    "function contextual(value: word) returns (Box<word>) {",
     "  return .Wrap(value);",
     "}"
   ]
@@ -1294,19 +1294,19 @@ private def testConstructors : IO Unit := do
   expectInferenceError "constructor arity"
     (String.intercalate "\n" [
       "enum Box<T> { Wrap(T) }",
-      "function bad() returns (Box<Word>) { return Box.Wrap(); }"
+      "function bad() returns (Box<word>) { return Box.Wrap(); }"
     ]) fun error => error matches .constructorArityMismatch _ 1 0
   expectInferenceError "unknown contextual constructor"
     (String.intercalate "\n" [
       "enum Box<T> { Wrap(T) }",
-      "function bad(value: Word) returns (Box<Word>) {",
+      "function bad(value: word) returns (Box<word>) {",
       "  return .Missing(value);",
       "}"
     ]) fun error => error == .unknownConstructor [] "Missing"
   expectInferenceError "unknown qualified constructor"
     (String.intercalate "\n" [
       "enum Box<T> { Wrap(T) }",
-      "function bad(value: Word) returns (Box<Word>) {",
+      "function bad(value: word) returns (Box<word>) {",
       "  return Box.Missing(value);",
       "}"
     ]) fun error => error == .unknownConstructor ["Box"] "Missing"
@@ -1319,7 +1319,7 @@ private def testConstructors : IO Unit := do
 private def testConstructorPatterns : IO Unit := do
   let source := String.intercalate "\n" [
     "enum Tree<T> { Leaf(T), Pair(Tree<T>, Tree<T>) }",
-    "function nested(tree: Tree<Word>) returns (Word) {",
+    "function nested(tree: Tree<word>) returns (word) {",
     "  match (tree) {",
     "    case .Pair(.Leaf(left), .Leaf(right)) { return left; }",
     "    default { return 0; }",
@@ -1334,7 +1334,7 @@ private def testConstructorPatterns : IO Unit := do
   expectInferenceError "duplicate pattern binder"
     (String.intercalate "\n" [
       "enum Tree<T> { Leaf(T), Pair(Tree<T>, Tree<T>) }",
-      "function bad(tree: Tree<Word>) returns (Word) {",
+      "function bad(tree: Tree<word>) returns (word) {",
       "  match (tree) {",
       "    case .Pair(.Leaf(value), .Leaf(value)) { return value; }",
       "    default { return 0; }",
@@ -1344,7 +1344,7 @@ private def testConstructorPatterns : IO Unit := do
 
 private def testMultipleScrutinees : IO Unit := do
   let functions ← check "multiple scrutinees" (String.intercalate "\n" [
-    "function select(left: Word, right: Bool) returns (Word) {",
+    "function select(left: word, right: bool) returns (word) {",
     "  match (left, right) {",
     "    case (value, flag) { return flag ? value : 0; }",
     "    default { return 1; }",
@@ -1356,10 +1356,10 @@ private def testMultipleScrutinees : IO Unit := do
 
 private def testAssignments : IO Unit := do
   let functions ← check "assignments" (String.intercalate "\n" [
-    "function update() returns (Word) {",
-    "  let local: Word = 0;",
+    "function update() returns (word) {",
+    "  let local: word = 0;",
     "  local = 1;",
-    "  let table: mapping(Word => Word);",
+    "  let table: mapping(word => word);",
     "  table[local] = 2;",
     "  return table[local];",
     "}"
@@ -1378,10 +1378,10 @@ private def testAssignments : IO Unit := do
 
 private def testLoopsAndControl : IO Unit := do
   let functions ← check "loops and control" (String.intercalate "\n" [
-    "function loops(flag: Bool) returns (Word) {",
-    "  let total: Word = 0;",
+    "function loops(flag: bool) returns (word) {",
+    "  let total: word = 0;",
     "  while (flag) { total += 1; break; }",
-    "  for (let i: Word = 0; i < 2; i += 1) {",
+    "  for (let i: word = 0; i < 2; i += 1) {",
     "    if (i == 0) { continue; } else { break; }",
     "  }",
     "  return total;",
@@ -1412,7 +1412,7 @@ private def testLoopsAndControl : IO Unit := do
 
   expectInferenceError "lambda cannot break its enclosing loop"
     (String.intercalate "\n" [
-      "function bad(flag: Bool) {",
+      "function bad(flag: bool) {",
       "  while (flag) {",
       "    let escape = lam() { break; };",
       "    break;",
@@ -1422,8 +1422,8 @@ private def testLoopsAndControl : IO Unit := do
 
 private def testNonterminalMatch : IO Unit := do
   let functions ← check "nonterminal match" (String.intercalate "\n" [
-    "function route(tag: Word) returns (Word) {",
-    "  let result: Word = 0;",
+    "function route(tag: word) returns (word) {",
+    "  let result: word = 0;",
     "  match (tag) {",
     "    case 0 { result = 1; }",
     "    default { result = 2; }",
@@ -1439,7 +1439,7 @@ literal length defaults to it, and a `word` length is rejected, as difference 7
 says. -/
 private def testNewArray : IO Unit := do
   let functions ← check "new array allocation" (String.intercalate "\n" [
-    "function make(n: uint256) returns (Word) {",
+    "function make(n: uint256) returns (word) {",
     "  let m: uint256[] = new uint256[](n);",
     "  let grid = new int8[][](3);",
     "  return 0;",
@@ -1463,7 +1463,7 @@ private def testNewArray : IO Unit := do
   assertTrue (decide (lengthTypes = [uint256, uint256]))
     s!"new did not type its lengths as uint256: {reprStr lengthTypes}"
   expectInferenceError "new array with a word length"
-    "function bad(n: Word) returns (Word) { let m = new uint256[](n); return n; }" fun error =>
+    "function bad(n: word) returns (word) { let m = new uint256[](n); return n; }" fun error =>
       match error with
       | .unsupportedExpression _ => false
       | _ => true
@@ -1749,7 +1749,7 @@ private def testSlices : IO Unit := do
       (true, true, .arraySlice (.arraySlice array))]))
     s!"slices did not take their base's slice type: {reprStr slices}"
   expectInferenceError "a slice of a word"
-    "function bad(n: Word) returns (Word) { let m = n[1:2]; return n; }" fun error =>
+    "function bad(n: word) returns (word) { let m = n[1:2]; return n; }" fun error =>
       error == .unsupportedExpression "slice"
   expectInferenceError "a word bound"
     "function bad(m: uint256[], w: word) returns (uint256) { let s = m[w:]; return 0; }"
@@ -2119,22 +2119,22 @@ private def testGenericCallCommitsItsIds : IO Unit := do
     "trait Ready<T> {}",
     "trait Coerce<From, To> {}",
     "trait Eq<T> {",
-    "  function eq(left: T, right: T) returns (Bool);",
+    "  function eq(left: T, right: T) returns (bool);",
     "}",
     "enum Box { Only }",
     "enum Flag { Only }",
     "enum Token { Only }",
-    "impl Ready<Word> {}",
-    "impl Coerce<Word, Box> {}",
+    "impl Ready<word> {}",
+    "impl Coerce<word, Box> {}",
     "impl Eq<Token> {",
-    "  function eq(left: Token, right: Token) returns (Bool) { return true; }",
+    "  function eq(left: Token, right: Token) returns (bool) { return true; }",
     "}",
-    "function chooseBox(value: Box) returns (Bool) { return true; }",
-    "function chooseFlag(value: Flag) returns (Bool) { return true; }",
-    "function choose<T>(value: T) returns (Bool) where T: Ready {",
+    "function chooseBox(value: Box) returns (bool) { return true; }",
+    "function chooseFlag(value: Flag) returns (bool) { return true; }",
+    "function choose<T>(value: T) returns (bool) where T: Ready {",
     "  return true;",
     "}",
-    "function run(value: Word, token: Token) returns (Bool) {",
+    "function run(value: word, token: Token) returns (bool) {",
     "  choose(value);",
     "  return token == token;",
     "}"
@@ -2148,7 +2148,7 @@ private def testGenericCallCommitsItsIds : IO Unit := do
 
 private def testIntegerLiteralOwnsImmediateRequirementId : IO Unit := do
   let fixture ← check (String.intercalate "\n" [
-    "function compute(value: Word) returns (Word) { return value + 1; }"
+    "function compute(value: word) returns (word) { return value + 1; }"
   ])
   let compute ← checkedNamed fixture "compute"
   let integer := ProgramSignatures.builtinIntPredicate TypeSystem.Ty.word
@@ -2169,13 +2169,13 @@ private def testIntegerLiteralOwnsImmediateRequirementId : IO Unit := do
 private def testRepeatedPredicatesKeepDistinctIds : IO Unit := do
   let fixture ← check (String.intercalate "\n" [
     "trait Eq<T> {",
-    "  function eq(left: T, right: T) returns (Bool);",
+    "  function eq(left: T, right: T) returns (bool);",
     "}",
     "enum Token { Only }",
     "impl Eq<Token> {",
-    "  function eq(left: Token, right: Token) returns (Bool) { return true; }",
+    "  function eq(left: Token, right: Token) returns (bool) { return true; }",
     "}",
-    "function compareTwice(token: Token) returns (Bool) {",
+    "function compareTwice(token: Token) returns (bool) {",
     "  token == token;",
     "  return token == token;",
     "}"
@@ -2495,7 +2495,7 @@ private def testTypedInferenceFacts (fixture : Fixture)
           requirements = [integerSolved.id]))
         "the Word literal lost its exact builtin Int carrier"
   | nodes => throw (IO.userError
-      s!"expected one Int<Word> literal owner, found {nodes.length}")
+      s!"expected one Int<word> literal owner, found {nodes.length}")
 
   let attached := source.primaryRequirementIds
   let solvedIds := run.solvedRequirements.map (·.id)
@@ -2509,8 +2509,8 @@ private def testIndirectArgumentBundleCoercion : IO Unit := do
   let fixture ← check (String.intercalate "\n" [
     "trait Coerce<From, To> {}",
     "enum Box { Only }",
-    "impl Coerce<Word, Box> {}",
-    "function apply(f: function(Box) returns (Word), value: Word) returns (Word) {",
+    "impl Coerce<word, Box> {}",
+    "function apply(f: function(Box) returns (word), value: word) returns (word) {",
     "  return f(value);",
     "}"
   ])
@@ -2549,22 +2549,22 @@ def testSourceTypedIRInference : IO Unit := do
     "enum Mid { Only }",
     "enum Box { Only }",
     "enum Flag { Only }",
-    "impl Ready<Word> {}",
-    "impl Coerce<Word, Mid> {}",
+    "impl Ready<word> {}",
+    "impl Coerce<word, Mid> {}",
     "impl Coerce<Mid, Box> {}",
     "impl Add<Box> {",
     "  function add(left: Box, right: Box) returns (Box) { return left; }",
     "}",
-    "function chooseBox(value: Box) returns (Bool) { return true; }",
-    "function chooseFlag(value: Flag) returns (Bool) { return true; }",
-    "function choose<T>(value: T) returns (Bool) where T: Ready {",
+    "function chooseBox(value: Box) returns (bool) { return true; }",
+    "function chooseFlag(value: Flag) returns (bool) { return true; }",
+    "function choose<T>(value: T) returns (bool) where T: Ready {",
     "  return true;",
     "}",
     "function accept(value: Box) returns (Box) { return value; }",
-    "function run(item: Word, box: Box) returns (Box) {",
+    "function run(item: word, box: Box) returns (Box) {",
     "  {",
     "    let item = item;",
-    "    let one: Word = 1;",
+    "    let one: word = 1;",
     "    choose(item);",
     "    accept(item);",
     "  }",

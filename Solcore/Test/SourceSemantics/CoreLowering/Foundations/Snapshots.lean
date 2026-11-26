@@ -22,23 +22,23 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def require (condition : Bool) (message : String) : IO Unit := SourceCoreUnifiedCorpusSupport.assertTrue condition message
 private def word (value : Nat) : Value := .word (Core.Word.ofNatModulo value)
 private def content : String := String.intercalate "\n" [
-  "trait Mark<T> {}", "impl Mark<Word> {}",
+  "trait Mark<T> {}", "impl Mark<word> {}",
   "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
-  "enum Holder { Hold(function(Word) returns (Word)) }",
-  "function inc(n: Word) returns (Word) { return n + 1; }",
-  "function make(seed: Word) returns (function(Word) returns (Word)) { let f: function(Word) returns (Word) = lam(step: Word) { seed += step; return seed; }; return f; }",
-  "function use(f: function(Word) returns (Word), n: Word) returns (Word) { return f(n); }",
-  "function view(seed: Word) returns (function(Word) returns (Word)) { let f = lam(item) { seed += 1; return item; }; let g: function(Word) returns (Word) = f; return g; }",
-  "function qualified(seed: Word) returns (function(Word) returns (Word)) { let f = lam(item) { seed += 1; return keep(item); }; let g: function(Word) returns (Word) = f; return g; }",
-  "function history(seed: Word) returns (Word) { let shared = lam(item) { let probe: Word = 0; return item; }; let outer = lam(value) { keep(value); return shared(value); }; return outer(seed) + outer(seed); }",
-  "function unused(captured: Word) returns (Word) { let unused = lam(item) { return (item, captured); }; return captured; }",
-  "function tuple(value: (function(Word) returns (Word), Word)) returns ((function(Word) returns (Word), Word)) { return value; }",
+  "enum Holder { Hold(function(word) returns (word)) }",
+  "function inc(n: word) returns (word) { return n + 1; }",
+  "function make(seed: word) returns (function(word) returns (word)) { let f: function(word) returns (word) = lam(step: word) { seed += step; return seed; }; return f; }",
+  "function use(f: function(word) returns (word), n: word) returns (word) { return f(n); }",
+  "function view(seed: word) returns (function(word) returns (word)) { let f = lam(item) { seed += 1; return item; }; let g: function(word) returns (word) = f; return g; }",
+  "function qualified(seed: word) returns (function(word) returns (word)) { let f = lam(item) { seed += 1; return keep(item); }; let g: function(word) returns (word) = f; return g; }",
+  "function history(seed: word) returns (word) { let shared = lam(item) { let probe: word = 0; return item; }; let outer = lam(value) { keep(value); return shared(value); }; return outer(seed) + outer(seed); }",
+  "function unused(captured: word) returns (word) { let unused = lam(item) { return (item, captured); }; return captured; }",
+  "function tuple(value: (function(word) returns (word), word)) returns ((function(word) returns (word), word)) { return value; }",
   "function boxed(value: Holder) returns (Holder) { return value; }",
-  "function table(value: mapping(Word => function(Word) returns (Word))) returns (mapping(Word => function(Word) returns (Word))) { return value; }",
-  "function proxies(value: mapping(Word => @Word)) returns (mapping(Word => @Word)) { return value; }",
-  "function builtin(value: function(Word) returns (integer)) returns (function(Word) returns (integer)) { return value; }",
-  "function failure(seed: Word) returns (Word) { let f = lam() -> Word { seed += 2; let absent: Word; return absent; }; return f(); }",
-  "function spin(seed: Word) returns (Word) { let f: function(Word) returns (Word) = lam(step: Word) { seed += step; return seed; }; while (true) { f(1); } return seed; }"
+  "function table(value: mapping(word => function(word) returns (word))) returns (mapping(word => function(word) returns (word))) { return value; }",
+  "function proxies(value: mapping(word => @word)) returns (mapping(word => @word)) { return value; }",
+  "function builtin(value: function(word) returns (integer)) returns (function(word) returns (integer)) { return value; }",
+  "function failure(seed: word) returns (word) { let f = lam() -> word { seed += 2; let absent: word; return absent; }; return f(); }",
+  "function spin(seed: word) returns (word) { let f: function(word) returns (word) = lam(step: word) { seed += step; return seed; }; while (true) { f(1); } return seed; }"
 ]
 private def names : List String := ["inc", "make", "use", "view", "qualified", "history", "unused", "tuple", "boxed", "table", "proxies", "builtin", "failure", "spin"]
 private def execute {artifact : Artifact} (session : Session artifact) (key : Key) (args : List Value) : IO (Completion artifact) := do
@@ -185,10 +185,10 @@ private def execute {artifact : Artifact} (session : Session artifact) (key : Ke
   | _ => throw (IO.userError "snapshot source invocation did not succeed")
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function make(seed: Word) returns (Word) { let f: function(Word) returns (Word) = lam(step: Word) { seed += step; return seed; }; return seed; }",
-    "function unused(seed: Word) returns (Word) { let f = lam(value) { return (value, seed); }; return seed; }",
-    "function absent() returns (Word) { let missing: Word; return missing; }",
-    "function spin() returns (Word) { while (true) {} return 0; }"
+    "function make(seed: word) returns (word) { let f: function(word) returns (word) = lam(step: word) { seed += step; return seed; }; return seed; }",
+    "function unused(seed: word) returns (word) { let f = lam(value) { return (value, seed); }; return seed; }",
+    "function absent() returns (word) { let missing: word; return missing; }",
+    "function spin() returns (word) { while (true) {} return 0; }"
   ]}] }
 
 example {artifact : Artifact} (snapshot : Snapshot artifact) :

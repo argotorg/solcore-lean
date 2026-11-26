@@ -179,7 +179,7 @@ open RecursiveNamedPublicPhysicalSessionState (StartedCall PlainValue SourceCall
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function stop(value: Word) returns (Word) { for (let copy: Word = value; true; ) { break; } return value; }"}] }
+    "function stop(value: word) returns (word) { for (let copy: word = value; true; ) { break; } return value; }"}] }
 
 def options : SourceCompiler.Options := {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
 def runOptions : SourceCoreExecution.RunOptions := {executionFuel := 100000, outputValidationFuel := 1000}
@@ -517,43 +517,43 @@ private def failure {artifact : SourceCoreExecution.Artifact}
 def originalWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function whileCount(start: Word) returns (Word, Word) {",
-    "  let remaining: Word = start; let count: Word = 0;",
-    "  while (remaining > 0) { let copy: Word = remaining; remaining = remaining - 1; count = count + 1; }",
+    "function whileCount(start: word) returns (word, word) {",
+    "  let remaining: word = start; let count: word = 0;",
+    "  while (remaining > 0) { let copy: word = remaining; remaining = remaining - 1; count = count + 1; }",
     "  return (remaining, count);",
     "}",
-    "function forOrder(limit: Word) returns (Word, Word) {",
-    "  let count: Word = 0;",
-    "  for (let i: Word = 0; limit > i; i = i + 1) {",
+    "function forOrder(limit: word) returns (word, word) {",
+    "  let count: word = 0;",
+    "  for (let i: word = 0; limit > i; i = i + 1) {",
     "    count = count + 1; if (i == 1) { continue; } count = count + 10;",
     "  } return (count, limit);",
     "}",
-    "function forBreak(limit: Word) returns (Word) {",
-    "  let count: Word = 0; for (let i: Word = 0; limit > i; i = i + 1) { count = count + 1; break; }",
+    "function forBreak(limit: word) returns (word) {",
+    "  let count: word = 0; for (let i: word = 0; limit > i; i = i + 1) { count = count + 1; break; }",
     "  return count;",
     "}",
-    "function initializerScope(limit: Word) returns (Word) {",
-    "  let i: Word = 17; for (let i: Word = 0; limit > i; i = i + 1) { } return i;",
+    "function initializerScope(limit: word) returns (word) {",
+    "  let i: word = 17; for (let i: word = 0; limit > i; i = i + 1) { } return i;",
     "}",
-    "function postScope(limit: Word) returns (Word) {",
-    "  let copy: Word = 99;",
-    "  for (let i: Word = 0; limit > i; let copy: Word = i, i = copy + 1) { } return copy;",
+    "function postScope(limit: word) returns (word) {",
+    "  let copy: word = 99;",
+    "  for (let i: word = 0; limit > i; let copy: word = i, i = copy + 1) { } return copy;",
     "}",
-    "function nested() returns (Word, Word) {",
-    "  let outer: Word = 2; let count: Word = 0; while (outer > 0) {",
-    "    let inner: Word = 2; while (inner > 0) {",
+    "function nested() returns (word, word) {",
+    "  let outer: word = 2; let count: word = 0; while (outer > 0) {",
+    "    let inner: word = 2; while (inner > 0) {",
     "      inner = inner - 1; if (inner == 1) { continue; } count = count + 1; break;",
     "    } outer = outer - 1;",
     "  } return (count, outer);",
     "}",
-    "function returnInside(limit: Word) returns (Word) {",
-    "  let remaining: Word = limit; while (remaining > 0) { return remaining; } return 0;",
+    "function returnInside(limit: word) returns (word) {",
+    "  let remaining: word = limit; while (remaining > 0) { return remaining; } return 0;",
     "}",
-    "function absentCondition() returns (Word) { let missing: Bool; while (missing) { return 17; } return 0; }",
-    "function absentPost() returns (Word) { let missing: Word; for (let i: Word = 0; true; i = missing) { continue; } return 0; }",
-    "function absentInitializer() returns (Word) { let missing: Word; for (let i: Word = missing; true; i = i + 1) { break; } return 0; }",
+    "function absentCondition() returns (word) { let missing: bool; while (missing) { return 17; } return 0; }",
+    "function absentPost() returns (word) { let missing: word; for (let i: word = 0; true; i = missing) { continue; } return 0; }",
+    "function absentInitializer() returns (word) { let missing: word; for (let i: word = missing; true; i = i + 1) { break; } return 0; }",
     "function spin() { while (true) { continue; } }",
-    "function compound(limit: Word) { for (let i: Word = 0; limit > i; i += 1) { } }"
+    "function compound(limit: word) { for (let i: word = 0; limit > i; i += 1) { } }"
   ] }]
 }
 
@@ -806,7 +806,7 @@ open RecursiveNamedPublicPhysicalSessionState (StartedCall PlainValue SourceCall
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function update(value: Word, next: Word) returns (Word) { match (next) { case copy { value = copy; } } return value; }"}] }
+    "function update(value: word, next: word) returns (word) { match (next) { case copy { value = copy; } } return value; }"}] }
 
 def options : SourceCompiler.Options := {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
 def runOptions : SourceCoreExecution.RunOptions := {executionFuel := 100000, outputValidationFuel := 1000}
@@ -1098,19 +1098,19 @@ private def failure {artifact : SourceCoreExecution.Artifact}
 def casesWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function select(value: Word) returns (Word) { let result: Word = 99; match (value) { case 0 { result = 5; } case 1 { result = 6; } default { result = 7; } } return result; }",
-    "function early(value: Word) returns (Word) { match (value) { case 0 { return 5; } default { return 6; } } return 9; }",
-    "function tuple(value: (Word, Word)) returns (Word) { let result: Word = 0; match (value) { case (left, right) { result = left + right; } } return result; }",
-    "function scrutineeFault() returns (Word) { let missing: Word; match (missing) { case _ {} } return 0; }",
-    "function armFault(value: Word) returns (Word) { match (value) { case 0 { let missing: Word; return missing; } default {} } return 7; }",
-    "function control(limit: Word) returns (Word) { for (let i: Word = 0; i < limit; i = i + 1) { match (i) { case 0 { continue; } default { break; } } } return limit; }"
+    "function select(value: word) returns (word) { let result: word = 99; match (value) { case 0 { result = 5; } case 1 { result = 6; } default { result = 7; } } return result; }",
+    "function early(value: word) returns (word) { match (value) { case 0 { return 5; } default { return 6; } } return 9; }",
+    "function tuple(value: (word, word)) returns (word) { let result: word = 0; match (value) { case (left, right) { result = left + right; } } return result; }",
+    "function scrutineeFault() returns (word) { let missing: word; match (missing) { case _ {} } return 0; }",
+    "function armFault(value: word) returns (word) { match (value) { case 0 { let missing: word; return missing; } default {} } return 7; }",
+    "function control(limit: word) returns (word) { for (let i: word = 0; i < limit; i = i + 1) { match (i) { case 0 { continue; } default { break; } } } return limit; }"
   ]}]
 }
 
 def factoryWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function make(value: Word) returns (function(Word) returns (Word)) { return lam(next: Word) -> Word { match (next) { case copy { value = copy; } } return value; }; }"}]
+    "function make(value: word) returns (function(word) returns (word)) { return lam(next: word) -> word { match (next) { case copy { value = copy; } } return value; }; }"}]
 }
 
 private def boundaries (fixture : Fixture) : IO Unit := do
@@ -1212,21 +1212,21 @@ def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" (
     (wordOperators.map fun (name, operator) =>
-      s!"function {name}(left: Word, right: Word) returns (Word)" ++ " { return left " ++ operator ++ " right; }") ++
+      s!"function {name}(left: word, right: word) returns (word)" ++ " { return left " ++ operator ++ " right; }") ++
     (comparisons.map fun (name, operator) =>
-      s!"function {name}(left: Word, right: Word) returns (Bool)" ++ " { return left " ++ operator ++ " right; }") ++ [
-    "function conjunction(left: Bool, right: Bool) returns (Bool) { return left && right; }",
-    "function disjunction(left: Bool, right: Bool) returns (Bool) { return left || right; }",
-    "function negation(input: Bool) returns (Bool) { return !input; }",
-    "function complement(input: Word) returns (Word) { return ~input; }",
-    "function literal() returns (Word) { return 17; }",
-    "function hugeLiteral() returns (Word) { return " ++ toString (Core.wordModulus + 5) ++ "; }",
-    "function nested(flag: Bool, value: Word) returns (Word, Bool) {",
+      s!"function {name}(left: word, right: word) returns (bool)" ++ " { return left " ++ operator ++ " right; }") ++ [
+    "function conjunction(left: bool, right: bool) returns (bool) { return left && right; }",
+    "function disjunction(left: bool, right: bool) returns (bool) { return left || right; }",
+    "function negation(input: bool) returns (bool) { return !input; }",
+    "function complement(input: word) returns (word) { return ~input; }",
+    "function literal() returns (word) { return 17; }",
+    "function hugeLiteral() returns (word) { return " ++ toString (Core.wordModulus + 5) ++ "; }",
+    "function nested(flag: bool, value: word) returns (word, bool) {",
     "  return ((flag ? value + 2 : value * 3), (!flag || (value > 0)));",
     "}",
-    "function builtin() returns (Word) { return wordFromInteger(1); }",
-    "function lt(left: Word, right: Word) returns (Bool) { return right > left; }",
-    "function lessCall(left: Word, right: Word) returns (Bool) { return left < right; }"
+    "function builtin() returns (word) { return wordFromInteger(1); }",
+    "function lt(left: word, right: word) returns (bool) { return right > left; }",
+    "function lessCall(left: word, right: word) returns (bool) { return left < right; }"
   ]) }]
 }
 

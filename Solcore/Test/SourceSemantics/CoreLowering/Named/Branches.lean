@@ -204,7 +204,7 @@ theorem FactoryShape.statementTyping
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function choose(flag: Bool, value: Word) returns (Word) { if (flag) { let copy: Word = value; return copy; } else { return value; } }"}] }
+    "function choose(flag: bool, value: word) returns (word) { if (flag) { let copy: word = value; return copy; } else { return value; } }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)
@@ -450,7 +450,7 @@ theorem FactoryShape.statementTyping
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function update(value: Word, next: Word) returns (Word) { { let copy: Word = next; value = copy; } return value; }"}] }
+    "function update(value: word, next: word) returns (word) { { let copy: word = next; value = copy; } return value; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)
@@ -3503,7 +3503,7 @@ theorem FactoryShape.statementTyping
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function update(value: Word, next: Word) returns (Word) { match (next) { case copy { value = copy; } } return value; }"}] }
+    "function update(value: word, next: word) returns (word) { match (next) { case copy { value = copy; } } return value; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)

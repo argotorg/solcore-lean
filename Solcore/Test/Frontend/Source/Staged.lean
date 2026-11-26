@@ -126,22 +126,22 @@ private def literalRequirement (function : CheckedFunction)
   | none => throw (IO.userError "conditional literal was absent")
 
 private def positiveSource : String := String.intercalate "\n" [
-  "function ordered() returns (Word) {",
+  "function ordered() returns (word) {",
   "  return wordFromInteger(integerLt(1, 2) ? integerSub(10, 3) : integerAdd(20, 4));",
   "}",
-  "function integerElse() returns (Word) {",
+  "function integerElse() returns (word) {",
   "  return wordFromInteger(false ? integerSub(30, 5) : integerAdd(20, 2));",
   "}",
-  "function negativeComparison() returns (Word) {",
+  "function negativeComparison() returns (word) {",
   "  return wordFromInteger(integerLt(integerSub(0, 2), integerSub(0, 1)) ? 33 : 44);",
   "}",
-  "function wordConditional() returns (Word) {",
+  "function wordConditional() returns (word) {",
   "  return wordFromInteger(wordToInteger(false ? 7 : 9));",
   "}",
-  "function boolConditional() returns (Word) {",
+  "function boolConditional() returns (word) {",
   "  return wordFromInteger((true ? false : true) ? 11 : 12);",
   "}",
-  "function nestedGrouped() returns (Word) {",
+  "function nestedGrouped() returns (word) {",
   "  return wordFromInteger(((integerEq((1), (1)) ? (integerMul((2), (3))) : (integerSub((9), (4))))));",
   "}"
 ]
@@ -323,7 +323,7 @@ private def expectPublicSourceCoreError (label content name : String)
 
 private def testClosednessRejections : IO Unit := do
   let runtimeGuardSource :=
-    "function dependent(flag: Bool) returns (Word) { return wordFromInteger(flag ? 1 : 2); }"
+    "function dependent(flag: bool) returns (word) { return wordFromInteger(flag ? 1 : 2); }"
   let guardProgram ← checkedProgram runtimeGuardSource
   let guardFunction ← checkedNamed guardProgram "dependent"
   let guardRoot ← returnedExpression guardFunction
@@ -338,7 +338,7 @@ private def testClosednessRejections : IO Unit := do
       reason == .stagedBoolExpressionNotClosed
 
   let deadBranchSource :=
-    "function dead(value: Word) returns (Word) { return wordFromInteger(true ? 1 : wordToInteger(value)); }"
+    "function dead(value: word) returns (word) { return wordFromInteger(true ? 1 : wordToInteger(value)); }"
   let deadProgram ← checkedProgram deadBranchSource
   let deadFunction ← checkedNamed deadProgram "dead"
   let deadRoot ← returnedExpression deadFunction
@@ -526,7 +526,7 @@ private structure IntegerFixture where
 
 private def integerFixture : IO IntegerFixture := do
   let function ← checkedFunction
-    "function tamper() returns (Word) { return wordFromInteger(integerLt(1, 2) ? integerSub(10, 3) : integerAdd(20, 4)); }"
+    "function tamper() returns (word) { return wordFromInteger(integerLt(1, 2) ? integerSub(10, 3) : integerAdd(20, 4)); }"
   let root ← returnedExpression function
   let conditionalId ← unaryBuiltinArgument function root .wordFromInteger
   let (guard, thenBranch, elseBranch) ← conditional function conditionalId
@@ -683,7 +683,7 @@ private structure BoolFixture where
 
 private def boolFixture : IO BoolFixture := do
   let function ← checkedFunction
-    "function bools() returns (Word) { return wordFromInteger((true ? false : true) ? 1 : 2); }"
+    "function bools() returns (word) { return wordFromInteger((true ? false : true) ? 1 : 2); }"
   let root ← returnedExpression function
   let integerConditional ← unaryBuiltinArgument function root .wordFromInteger
   let (boolConditionalGroup, integerThen, _) ←
@@ -785,7 +785,7 @@ private structure WordFixture where
 
 private def wordFixture : IO WordFixture := do
   let function ← checkedFunction
-    "function words() returns (Word) { return wordFromInteger(wordToInteger(true ? 1 : 2)); }"
+    "function words() returns (word) { return wordFromInteger(wordToInteger(true ? 1 : 2)); }"
   let root ← returnedExpression function
   let conversion ← unaryBuiltinArgument function root .wordFromInteger
   let wordConditional ← unaryBuiltinArgument function conversion .wordToInteger
@@ -880,17 +880,17 @@ private def source : String := String.intercalate "\n" [
   "trait Add<T> {",
   "  function add(comptime left: T, comptime right: T) returns (comptime<T>);",
   "}",
-  "impl Add<Word> {",
-  "  function add(comptime left: Word, comptime right: Word)",
-  "      returns (comptime<Word>) {",
+  "impl Add<word> {",
+  "  function add(comptime left: word, comptime right: word)",
+  "      returns (comptime<word>) {",
   "    return 94;",
   "  }",
   "}",
   "trait Coerce<From, To> {",
   "  function coerce(comptime value: From) returns (comptime<To>);",
   "}",
-  "impl Coerce<Bool, Word> {",
-  "  function coerce(comptime value: Bool) returns (comptime<Word>) {",
+  "impl Coerce<bool, word> {",
+  "  function coerce(comptime value: bool) returns (comptime<word>) {",
   "    return value ? 93 : 92;",
   "  }",
   "}",
@@ -898,17 +898,17 @@ private def source : String := String.intercalate "\n" [
   "    returns (comptime<T>) where T: Add {",
   "  return left + right;",
   "}",
-  "function stagedFlag() returns (comptime<Bool>) { return true; }",
-  "function stagedAddEntry() returns (Word) { return stagedAdd(5, 6); }",
-  "function stagedCoerceEntry() returns (Word) { return stagedFlag(); }",
+  "function stagedFlag() returns (comptime<bool>) { return true; }",
+  "function stagedAddEntry() returns (word) { return stagedAdd(5, 6); }",
+  "function stagedCoerceEntry() returns (word) { return stagedFlag(); }",
   "function runtimeAdd<T>(left: T, right: T) returns (T) where T: Add {",
   "  return left + right;",
   "}",
-  "function runtimeAddEntry(left: Word, right: Word) returns (Word) {",
+  "function runtimeAddEntry(left: word, right: word) returns (word) {",
   "  return runtimeAdd(left, right);",
   "}",
-  "function acceptWord(value: Word) returns (Word) { return value; }",
-  "function runtimeCoerceEntry(value: Bool) returns (Word) {",
+  "function acceptWord(value: word) returns (word) { return value; }",
+  "function runtimeCoerceEntry(value: bool) returns (word) {",
   "  return acceptWord(value);",
   "}"
 ]
@@ -1065,16 +1065,16 @@ private def integerRecursionSource : String := String.intercalate "\n" [
   "function right(comptime n: integer) returns (comptime<integer>) {",
   "  return integerEq(n, 0) ? 0 : left(integerSub(n, 1));",
   "}",
-  "function countdownEntry() returns (Word) {",
+  "function countdownEntry() returns (word) {",
   "  return wordFromInteger(countdown(5));",
   "}",
-  "function factorialEntry() returns (Word) {",
+  "function factorialEntry() returns (word) {",
   "  return wordFromInteger(factorial(5));",
   "}",
-  "function fibEntry() returns (Word) {",
+  "function fibEntry() returns (word) {",
   "  return wordFromInteger(fib(10));",
   "}",
-  "function mutualEntry() returns (Word) {",
+  "function mutualEntry() returns (word) {",
   "  return wordFromInteger(left(6));",
   "}"
 ]
@@ -1090,27 +1090,27 @@ private def testIntegerRecursion : IO Unit := do
     "mutualEntry" 3 64 0
 
 private def generalRecursionSource : String := String.intercalate "\n" [
-  "function finishWord(comptime value: Word, comptime stop: Bool)",
-  "    returns (comptime<Word>) {",
+  "function finishWord(comptime value: word, comptime stop: bool)",
+  "    returns (comptime<word>) {",
   "  return stop ? value : finishWord(value, true);",
   "}",
-  "function finishBool(comptime stop: Bool) returns (comptime<Bool>) {",
+  "function finishBool(comptime stop: bool) returns (comptime<bool>) {",
   "  return stop ? true : finishBool(true);",
   "}",
-  "function finishStatement(comptime stop: Bool) returns (comptime<Word>) {",
+  "function finishStatement(comptime stop: bool) returns (comptime<word>) {",
   "  if (stop) {",
   "    return 9;",
   "  } else {",
   "    return finishStatement(true);",
   "  }",
   "}",
-  "function wordEntry() returns (Word) {",
+  "function wordEntry() returns (word) {",
   "  return finishWord(7, false);",
   "}",
-  "function boolEntry() returns (Bool) {",
+  "function boolEntry() returns (bool) {",
   "  return finishBool(false);",
   "}",
-  "function statementEntry() returns (Word) {",
+  "function statementEntry() returns (word) {",
   "  return finishStatement(false);",
   "}"
 ]
@@ -1125,12 +1125,12 @@ private def testGeneralWordAndBoolRecursion : IO Unit := do
 
 private def genericEvidenceRecursionSource : String := String.intercalate "\n" [
   "trait Marker<T> {}",
-  "impl Marker<Word> {}",
-  "function finish<T>(comptime value: T, comptime stop: Bool)",
+  "impl Marker<word> {}",
+  "function finish<T>(comptime value: T, comptime stop: bool)",
   "    returns (comptime<T>) where T: Marker {",
   "  return stop ? value : finish(value, true);",
   "}",
-  "function entry() returns (Word) { return finish(11, false); }"
+  "function entry() returns (word) { return finish(11, false); }"
 ]
 
 private def testGenericEvidenceRecursion : IO Unit :=
@@ -1138,10 +1138,10 @@ private def testGenericEvidenceRecursion : IO Unit :=
     "entry" 2 16 11
 
 private def unselectedFaultSource : String := String.intercalate "\n" [
-  "function safe() returns (comptime<Word>) {",
+  "function safe() returns (comptime<word>) {",
   "  return true ? 7 : 1 / 0;",
   "}",
-  "function entry() returns (Word) { return safe(); }"
+  "function entry() returns (word) { return safe(); }"
 ]
 
 private def testUnselectedFaultIsNotExecuted : IO Unit :=
@@ -1150,13 +1150,13 @@ private def testUnselectedFaultIsNotExecuted : IO Unit :=
 
 private def unselectedRecursiveBranchSource : String :=
   String.intercalate "\n" [
-    "function constant(comptime value: Word) returns (comptime<Word>) {",
+    "function constant(comptime value: word) returns (comptime<word>) {",
     "  return value;",
     "}",
-    "function loop(comptime value: Word) returns (comptime<Word>) {",
+    "function loop(comptime value: word) returns (comptime<word>) {",
     "  return loop(value);",
     "}",
-    "function entry() returns (Word) {",
+    "function entry() returns (word) {",
     "  return true ? constant(1) : loop(0);",
     "}"
   ]
@@ -1178,17 +1178,17 @@ private def selfCycleSource : String := String.intercalate "\n" [
   "function loop(comptime n: integer) returns (comptime<integer>) {",
   "  return loop(n);",
   "}",
-  "function entry() returns (Word) { return wordFromInteger(loop(1)); }"
+  "function entry() returns (word) { return wordFromInteger(loop(1)); }"
 ]
 
 private def mutualCycleSource : String := String.intercalate "\n" [
-  "function left(comptime value: Word) returns (comptime<Word>) {",
+  "function left(comptime value: word) returns (comptime<word>) {",
   "  return right(value);",
   "}",
-  "function right(comptime value: Word) returns (comptime<Word>) {",
+  "function right(comptime value: word) returns (comptime<word>) {",
   "  return left(value);",
   "}",
-  "function entry() returns (Word) { return left(1); }"
+  "function entry() returns (word) { return left(1); }"
 ]
 
 private def testSameValueCycles : IO Unit := do
@@ -1210,7 +1210,7 @@ private def increasingSource : String := String.intercalate "\n" [
   "function grow(comptime n: integer) returns (comptime<integer>) {",
   "  return grow(integerAdd(n, 1));",
   "}",
-  "function entry() returns (Word) { return wordFromInteger(grow(0)); }"
+  "function entry() returns (word) { return wordFromInteger(grow(0)); }"
 ]
 
 private def testStagedFuelBoundaries : IO Unit := do
@@ -1220,7 +1220,7 @@ private def testStagedFuelBoundaries : IO Unit := do
     integerRecursionSource "countdownEntry" 2 1
 
 private def runtimeRecursionSource : String := String.intercalate "\n" [
-  "function loop(value: Word) returns (Word) { return loop(value); }"
+  "function loop(value: word) returns (word) { return loop(value); }"
 ]
 
 private def testRuntimeRecursionUsesExecutionFuel : IO Unit := do
@@ -1327,7 +1327,7 @@ private def assertClosedResult (content name : String)
 
 private def evidenceSource : String := String.intercalate "\n" [
   "trait Eq<T> {",
-  "  function eq(left: T, right: T) returns (Bool);",
+  "  function eq(left: T, right: T) returns (bool);",
   "}",
   "trait Add<T> {",
   "  function add(left: T, right: T) returns (T) where T: Eq;",
@@ -1335,20 +1335,20 @@ private def evidenceSource : String := String.intercalate "\n" [
   "trait BitNot<T> {",
   "  function bnot(value: T) returns (T);",
   "}",
-  "impl Eq<Word> {",
-  "  function eq(left: Word, right: Word) returns (Bool) { return false; }",
+  "impl Eq<word> {",
+  "  function eq(left: word, right: word) returns (bool) { return false; }",
   "}",
-  "function equalWithEvidence<T>(left: T, right: T) returns (Bool)",
+  "function equalWithEvidence<T>(left: T, right: T) returns (bool)",
   "    where T: Eq {",
   "  return left == right;",
   "}",
-  "impl Add<Word> {",
-  "  function add(left: Word, right: Word) returns (Word) where Word: Eq {",
+  "impl Add<word> {",
+  "  function add(left: word, right: word) returns (word) where word: Eq {",
   "    return equalWithEvidence(left, right) ? 91 : 92;",
   "  }",
   "}",
-  "impl BitNot<Word> {",
-  "  function bnot(value: Word) returns (Word) { return 94; }",
+  "impl BitNot<word> {",
+  "  function bnot(value: word) returns (word) { return 94; }",
   "}",
   "function stagedAdd<T>(comptime left: T, comptime right: T)",
   "    returns (comptime<T>) where T: Add, T: Eq {",
@@ -1362,8 +1362,8 @@ private def evidenceSource : String := String.intercalate "\n" [
   "    where T: BitNot {",
   "  return ~value;",
   "}",
-  "function addEntry() returns (Word) { return relayAdd(5, 5); }",
-  "function bitNotEntry() returns (Word) { return stagedBitNot(7); }"
+  "function addEntry() returns (word) { return relayAdd(5, 5); }",
+  "function bitNotEntry() returns (word) { return stagedBitNot(7); }"
 ]
 
 private def testSelectedImplementationMethods : IO Unit := do
@@ -1371,11 +1371,11 @@ private def testSelectedImplementationMethods : IO Unit := do
   assertClosedResult evidenceSource "bitNotEntry" (.word (word 94))
 
 private def builtinSource : String := String.intercalate "\n" [
-  "function builtins(comptime left: Word, comptime right: Word)",
-  "    returns (comptime<(Word, Word)>) {",
+  "function builtins(comptime left: word, comptime right: word)",
+  "    returns (comptime<(word, word)>) {",
   "  return (left + right, ~left);",
   "}",
-  "function builtinEntry() returns ((Word, Word)) {",
+  "function builtinEntry() returns ((word, word)) {",
   "  return builtins(5, 6);",
   "}"
 ]
@@ -1437,35 +1437,35 @@ private def word (value : Nat) : Core.Word :=
   Core.Word.ofNatModulo value
 
 private def positiveSource : String := String.intercalate "\n" [
-  "function bump(comptime value: Word) returns (comptime<Word>) {",
-  "  let alias: Word = (value);",
+  "function bump(comptime value: word) returns (comptime<word>) {",
+  "  let alias: word = (value);",
   "  return alias + 1;",
   "}",
-  "function negate(comptime flag: Bool) returns (comptime<Bool>) {",
+  "function negate(comptime flag: bool) returns (comptime<bool>) {",
   "  return !flag;",
   "}",
   "function stagedUnit() returns (comptime<()>) { return; }",
-  "function bundle(comptime value: Word, comptime flag: Bool) returns (comptime<(Word, Bool, ())>) {",
-  "  let next: Word = bump(value);",
+  "function bundle(comptime value: word, comptime flag: bool) returns (comptime<(word, bool, ())>) {",
+  "  let next: word = bump(value);",
   "  return (next, negate(flag), stagedUnit());",
   "}",
-  "function relay(value: Word) returns (comptime<Word>) {",
-  "  let alias: Word = bump(value);",
+  "function relay(value: word) returns (comptime<word>) {",
+  "  let alias: word = bump(value);",
   "  return bump(alias);",
   "}",
-  "function entryWord() returns (Word) { return bump(41); }",
-  "function entryBool() returns (Bool) { return negate(false); }",
+  "function entryWord() returns (word) { return bump(41); }",
+  "function entryBool() returns (bool) { return negate(false); }",
   "function entryUnit() returns (()) { return stagedUnit(); }",
-  "function entryProduct() returns ((Word, Bool, ())) {",
+  "function entryProduct() returns ((word, bool, ())) {",
   "  return bundle(6, true);",
   "}",
-  "function entryNested() returns (Word) { return relay(5); }",
-  "function entryResultAlias() returns (Word) {",
-  "  let alias: Word = relay(5);",
+  "function entryNested() returns (word) { return relay(5); }",
+  "function entryResultAlias() returns (word) {",
+  "  let alias: word = relay(5);",
   "  return alias;",
   "}",
-  "function entryAlias() returns (Word) {",
-  "  let closed: Word = 8;",
+  "function entryAlias() returns (word) {",
+  "  let closed: word = 8;",
   "  return relay(closed);",
   "}"
 ]
@@ -1544,16 +1544,16 @@ private def testRuntimeCallerAlias : IO Unit := do
       s!"entryAlias: public execution failed: {reprStr error}")
 
 private def boundarySource : String := String.intercalate "\n" [
-  "function identity(comptime value: Word) returns (comptime<Word>) {",
+  "function identity(comptime value: word) returns (comptime<word>) {",
   "  return value;",
   "}",
-  "function producer(value: Word) returns (Word) { return value; }",
-  "function runtimeAlias(value: Word) returns (Word) {",
-  "  let alias: Word = value;",
+  "function producer(value: word) returns (word) { return value; }",
+  "function runtimeAlias(value: word) returns (word) {",
+  "  let alias: word = value;",
   "  return identity(alias);",
   "}",
-  "function deferredAlias(value: Word) returns (Word) {",
-  "  let alias: Word = producer(value);",
+  "function deferredAlias(value: word) returns (word) {",
+  "  let alias: word = producer(value);",
   "  return identity(alias);",
   "}"
 ]
@@ -1635,17 +1635,17 @@ private def word (value : Nat) : Core.Word :=
 
 private def predicateSource : String := String.intercalate "\n" [
   "trait Marker<T> {}",
-  "impl Marker<Word> {}",
+  "impl Marker<word> {}",
   "function marked<T>(comptime value: T) returns (comptime<T>) where T: Marker {",
   "  return value;",
   "}",
   "function relay<T>(comptime value: T) returns (comptime<T>) where T: Marker {",
   "  return marked(value);",
   "}",
-  "function wrapper(comptime value: Word) returns (Word) where Word: Marker {",
+  "function wrapper(comptime value: word) returns (word) where word: Marker {",
   "  return relay(value);",
   "}",
-  "function entry() returns (Word) { return wrapper(3); }"
+  "function entry() returns (word) { return wrapper(3); }"
 ]
 
 private def testPredicateEvidenceForwarded : IO Unit := do
@@ -1672,13 +1672,13 @@ private def coercionSource : String := String.intercalate "\n" [
   "trait Coerce<From, To> {",
   "  function coerce(value: From) returns (To);",
   "}",
-  "impl Coerce<Bool, Word> {",
-  "  function coerce(value: Bool) returns (Word) {",
+  "impl Coerce<bool, word> {",
+  "  function coerce(value: bool) returns (word) {",
   "    return value ? 41 : 7;",
   "  }",
   "}",
-  "function staged() returns (comptime<Bool>) { return true; }",
-  "function entry() returns (Word) { return staged(); }"
+  "function staged() returns (comptime<bool>) { return true; }",
+  "function entry() returns (word) { return staged(); }"
 ]
 
 private def testResultCoercionExecuted : IO Unit := do
@@ -1698,15 +1698,15 @@ private def argumentAndResultCoercionSource : String := String.intercalate "\n" 
   "trait Coerce<From, To> {",
   "  function coerce(value: From) returns (To);",
   "}",
-  "impl Coerce<Bool, Word> {",
-  "  function coerce(value: Bool) returns (Word) {",
+  "impl Coerce<bool, word> {",
+  "  function coerce(value: bool) returns (word) {",
   "    return value ? 41 : 7;",
   "  }",
   "}",
-  "function stagedFlag(comptime value: Word) returns (comptime<Bool>) {",
+  "function stagedFlag(comptime value: word) returns (comptime<bool>) {",
   "  return false;",
   "}",
-  "function entry() returns (Word) { return stagedFlag(true); }"
+  "function entry() returns (word) { return stagedFlag(true); }"
 ]
 
 private def testArgumentAndResultCoercions : IO Unit := do
@@ -1725,20 +1725,20 @@ private def genericCoercionSource : String := String.intercalate "\n" [
   "trait Coerce<From, To> {",
   "  function coerce(value: From) returns (To);",
   "}",
-  "impl Coerce<Bool, Word> {",
-  "  function coerce(value: Bool) returns (Word) {",
+  "impl Coerce<bool, word> {",
+  "  function coerce(value: bool) returns (word) {",
   "    return value ? 41 : 7;",
   "  }",
   "}",
-  "function convert<T>(comptime value: T) returns (comptime<Word>)",
-  "    where T: Coerce<Word> {",
+  "function convert<T>(comptime value: T) returns (comptime<word>)",
+  "    where T: Coerce<word> {",
   "  return value;",
   "}",
-  "function relay<T>(comptime value: T) returns (comptime<Word>)",
-  "    where T: Coerce<Word> {",
+  "function relay<T>(comptime value: T) returns (comptime<word>)",
+  "    where T: Coerce<word> {",
   "  return convert(value);",
   "}",
-  "function entry() returns (Word) { return relay(true); }"
+  "function entry() returns (word) { return relay(true); }"
 ]
 
 private def testGenericCoercionEvidenceForwarded : IO Unit := do
@@ -1764,30 +1764,30 @@ private def expectStagedCycle (label content root : String)
       s!"{label}: recursive staged call was not rejected: {reprStr result}")
 
 private def selfRecursiveSource : String := String.intercalate "\n" [
-  "function loop(comptime value: Word) returns (comptime<Word>) {",
+  "function loop(comptime value: word) returns (comptime<word>) {",
   "  return loop(value);",
   "}",
-  "function entry() returns (Word) { return loop(1); }"
+  "function entry() returns (word) { return loop(1); }"
 ]
 
 private def mutualRecursiveSource : String := String.intercalate "\n" [
-  "function left(comptime value: Word) returns (comptime<Word>) {",
+  "function left(comptime value: word) returns (comptime<word>) {",
   "  return right(value);",
   "}",
-  "function right(comptime value: Word) returns (comptime<Word>) {",
+  "function right(comptime value: word) returns (comptime<word>) {",
   "  return left(value);",
   "}",
-  "function entry() returns (Word) { return left(1); }"
+  "function entry() returns (word) { return left(1); }"
 ]
 
 private def eagerRecursiveSource : String := String.intercalate "\n" [
-  "function constant(comptime value: Word) returns (comptime<Word>) {",
+  "function constant(comptime value: word) returns (comptime<word>) {",
   "  return value;",
   "}",
-  "function loop(comptime value: Word) returns (comptime<Word>) {",
+  "function loop(comptime value: word) returns (comptime<word>) {",
   "  return loop(value);",
   "}",
-  "function entry() returns (Word) {",
+  "function entry() returns (word) {",
   "  return true ? constant(1) : loop(0);",
   "}"
 ]
@@ -1806,19 +1806,19 @@ private def testRecursiveBoundaries : IO Unit := do
     "selected staged branch did not retain its value"
 
 private def deepAcyclicSource : String := String.intercalate "\n" [
-  "function leaf(comptime value: Word) returns (comptime<Word>) {",
+  "function leaf(comptime value: word) returns (comptime<word>) {",
   "  return value + 1;",
   "}",
-  "function stepOne(value: Word) returns (comptime<Word>) {",
+  "function stepOne(value: word) returns (comptime<word>) {",
   "  return leaf(value) + 1;",
   "}",
-  "function stepTwo(value: Word) returns (comptime<Word>) {",
+  "function stepTwo(value: word) returns (comptime<word>) {",
   "  return stepOne(value) + 1;",
   "}",
-  "function stepThree(value: Word) returns (comptime<Word>) {",
+  "function stepThree(value: word) returns (comptime<word>) {",
   "  return stepTwo(value) + 1;",
   "}",
-  "function entry() returns (Word) { return stepThree(5); }"
+  "function entry() returns (word) { return stepThree(5); }"
 ]
 
 private def testDeepAcyclicCall : IO Unit := do
@@ -1842,11 +1842,11 @@ private def ordinaryEvidenceLetSource : String := String.intercalate "\n" [
   "trait Coerce<From, To> {",
   "  function coerce(value: From) returns (To);",
   "}",
-  "impl Coerce<Bool, Word> {",
-  "  function coerce(value: Bool) returns (Word) { return 91; }",
+  "impl Coerce<bool, word> {",
+  "  function coerce(value: bool) returns (word) { return 91; }",
   "}",
-  "function entry() returns (Word) {",
-  "  let alias: Word = true;",
+  "function entry() returns (word) {",
+  "  let alias: word = true;",
   "  return alias;",
   "}"
 ]
@@ -1863,16 +1863,16 @@ private def testOrdinaryEvidenceLetPreserved : IO Unit := do
     "general staged caching bypassed ordinary coercion evidence execution"
 
 private def comptimeInputDraftSource : String := String.intercalate "\n" [
-  "function staged() returns (comptime<Word>) { return 7; }",
-  "function direct(comptime unused: Word) returns (Word) {",
+  "function staged() returns (comptime<word>) { return 7; }",
+  "function direct(comptime unused: word) returns (word) {",
   "  return staged();",
   "}",
-  "function cached(comptime unused: Word) returns (Word) {",
-  "  let closed: Word = staged();",
+  "function cached(comptime unused: word) returns (word) {",
+  "  let closed: word = staged();",
   "  return closed;",
   "}",
-  "function entryDirect() returns (Word) { return direct(1); }",
-  "function entryCached() returns (Word) { return cached(1); }"
+  "function entryDirect() returns (word) { return direct(1); }",
+  "function entryCached() returns (word) { return cached(1); }"
 ]
 
 private def testIndependentComptimeInputDraft : IO Unit := do
@@ -1903,18 +1903,18 @@ private def testIndependentComptimeInputDraft : IO Unit := do
         s!"{name}: unexpected resolved draft shape: {reprStr resolved}")
 
 private def knownComptimeInputSource : String := String.intercalate "\n" [
-  "function increment(comptime value: Word) returns (comptime<Word>) {",
+  "function increment(comptime value: word) returns (comptime<word>) {",
   "  return value + 1;",
   "}",
-  "function helper(comptime value: Word) returns (Word) {",
+  "function helper(comptime value: word) returns (word) {",
   "  return increment(value);",
   "}",
-  "function entry() returns (Word) { return helper(7); }",
-  "function entryAlias() returns (Word) {",
-  "  let known: Word = 12;",
+  "function entry() returns (word) { return helper(7); }",
+  "function entryAlias() returns (word) {",
+  "  let known: word = 12;",
   "  return helper(known);",
   "}",
-  "function entryPair() returns ((Word, Word)) {",
+  "function entryPair() returns ((word, word)) {",
   "  return (helper(2), helper(9));",
   "}"
 ]
@@ -1958,14 +1958,14 @@ private def testKnownComptimeInputPropagation : IO Unit := do
     "caller-local staged alias did not reach the runtime callee draft"
 
 private def mixedKnownInputSource : String := String.intercalate "\n" [
-  "function choose(comptime flag: Bool) returns (comptime<Word>) {",
+  "function choose(comptime flag: bool) returns (comptime<word>) {",
   "  return flag ? 2 : 9;",
   "}",
-  "function helper(comptime flag: Bool, value: Word, select: Bool) returns (Word) {",
-  "  let selected: Word = choose(flag);",
+  "function helper(comptime flag: bool, value: word, select: bool) returns (word) {",
+  "  let selected: word = choose(flag);",
   "  return select ? selected : value;",
   "}",
-  "function entry(value: Word, select: Bool) returns (Word) {",
+  "function entry(value: word, select: bool) returns (word) {",
   "  return helper(true, value, select);",
   "}"
 ]
@@ -1988,13 +1988,13 @@ private def testMixedKnownAndRuntimeInputs : IO Unit := do
     "runtime Word or Bool input was erased while propagating staged knowledge"
 
 private def productKnownInputSource : String := String.intercalate "\n" [
-  "function stagedProduct(comptime value: (Word, Bool)) returns (comptime<(Word, Bool)>) {",
+  "function stagedProduct(comptime value: (word, bool)) returns (comptime<(word, bool)>) {",
   "  return value;",
   "}",
-  "function helper(comptime value: (Word, Bool)) returns ((Word, Bool)) {",
+  "function helper(comptime value: (word, bool)) returns ((word, bool)) {",
   "  return stagedProduct(value);",
   "}",
-  "function entry() returns ((Word, Bool)) {",
+  "function entry() returns ((word, bool)) {",
   "  return helper((4, true));",
   "}"
 ]
@@ -2023,17 +2023,17 @@ private def testProductKnownInput : IO Unit := do
       s!"known product input has the wrong resolved shape: {reprStr resolved}")
 
 private def unavailableKnownInputSource : String := String.intercalate "\n" [
-  "function identity(comptime value: Word) returns (comptime<Word>) {",
+  "function identity(comptime value: word) returns (comptime<word>) {",
   "  return value;",
   "}",
-  "function helper(comptime value: Word) returns (Word) {",
+  "function helper(comptime value: word) returns (word) {",
   "  return identity(value);",
   "}",
-  "function producer(value: Word) returns (Word) { return value; }",
-  "function runtimeEntry(value: Word) returns (Word) {",
+  "function producer(value: word) returns (word) { return value; }",
+  "function runtimeEntry(value: word) returns (word) {",
   "  return helper(value);",
   "}",
-  "function deferredEntry(value: Word) returns (Word) {",
+  "function deferredEntry(value: word) returns (word) {",
   "  return helper(producer(value));",
   "}"
 ]
@@ -2103,23 +2103,23 @@ private def workspace (content : String) : Workspace.RawWorkspace := {
 
 private def fixtureSource : String := String.intercalate "\n" [
   "function stagedUnit() returns (comptime<()>) { return; }",
-  "function stagedBool(comptime value: Word, comptime flag: Bool) returns (comptime<Bool>) {",
+  "function stagedBool(comptime value: word, comptime flag: bool) returns (comptime<bool>) {",
   "  return !(value < 10) || flag;",
   "}",
-  "function stagedWord(comptime value: Word) returns (comptime<Word>) {",
-  "  let alias: Word = (value);",
-  "  let alias: Word = alias + 1;",
+  "function stagedWord(comptime value: word) returns (comptime<word>) {",
+  "  let alias: word = (value);",
+  "  let alias: word = alias + 1;",
   "  return ~alias;",
   "}",
-  "function stagedProduct(comptime flag: Bool, comptime value: Word) returns (comptime<(Word, Bool, ())>) {",
-  "  let alias: Word = (value);",
-  "  let alias: Word = alias + 1;",
+  "function stagedProduct(comptime flag: bool, comptime value: word) returns (comptime<(word, bool, ())>) {",
+  "  let alias: word = (value);",
+  "  let alias: word = alias + 1;",
   "  return flag ? (alias, !flag, ()) : (9, false || flag, ());",
   "}",
-  "function stagedProductInput(comptime value: (Word, Bool)) returns (comptime<(Word, Bool)>) {",
+  "function stagedProductInput(comptime value: (word, bool)) returns (comptime<(word, bool)>) {",
   "  return value;",
   "}",
-  "function stagedStatements(comptime flag: Bool, comptime value: Word) returns (comptime<Word>) {",
+  "function stagedStatements(comptime flag: bool, comptime value: word) returns (comptime<word>) {",
   "  {",
   "    if (flag) {",
   "      return value + 2;",
@@ -2128,14 +2128,14 @@ private def fixtureSource : String := String.intercalate "\n" [
   "    }",
   "  }",
   "}",
-  "function eagerProduct() returns (comptime<(Word, Bool, ())>) {",
+  "function eagerProduct() returns (comptime<(word, bool, ())>) {",
   "  return true ? (1, true, ()) : (2, false, ());",
   "}",
-  "function runtimeValue(value: Word) returns (Word) { return value; }",
-  "function producer(value: Word) returns (Word) { return value; }",
-  "function deferredValue() returns (Word) { return producer(1); }",
-  "function markedConstant() returns (comptime<Word>) { return 7; }",
-  "function unsupportedCall() returns (Word) { return markedConstant(); }"
+  "function runtimeValue(value: word) returns (word) { return value; }",
+  "function producer(value: word) returns (word) { return value; }",
+  "function deferredValue() returns (word) { return producer(1); }",
+  "function markedConstant() returns (comptime<word>) { return 7; }",
+  "function unsupportedCall() returns (word) { return markedConstant(); }"
 ]
 
 private def checkedProgram : IO CheckedProgram := do
@@ -2397,19 +2397,19 @@ private def workspace (content : String) : Workspace.RawWorkspace := {
 }
 
 private def fixtureSource : String := String.intercalate "\n" [
-  "function stagedPair(comptime left: Word, comptime right: Word) returns (comptime<Word>) {",
+  "function stagedPair(comptime left: word, comptime right: word) returns (comptime<word>) {",
   "  return left + right;",
   "}",
-  "function stagedChoice() returns (comptime<Word>) {",
+  "function stagedChoice() returns (comptime<word>) {",
   "  return true ? 1 : 2;",
   "}",
-  "function stagedIdentity(comptime value: Word) returns (comptime<Word>) {",
+  "function stagedIdentity(comptime value: word) returns (comptime<word>) {",
   "  return value;",
   "}",
-  "function stagedCaller() returns (comptime<Word>) {",
+  "function stagedCaller() returns (comptime<word>) {",
   "  return stagedIdentity(1);",
   "}",
-  "function unrelated() returns (comptime<Word>) { return 3; }"
+  "function unrelated() returns (comptime<word>) { return 3; }"
 ]
 
 private def checkedProgram : IO CheckedProgram := do

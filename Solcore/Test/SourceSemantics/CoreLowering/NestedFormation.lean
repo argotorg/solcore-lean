@@ -232,7 +232,7 @@ def observeFactory (function : CheckedFunction) (signature identity : ProgramFun
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function identity(value: Word) returns (Word) { return value; } function make(seed: Word) returns (function() returns (function() returns (Word))) { return lam() { let saved: Word = identity(seed); return lam() { return identity(saved); }; }; }"}] }
+    "function identity(value: word) returns (word) { return value; } function make(seed: word) returns (function() returns (function() returns (word))) { return lam() { let saved: word = identity(seed); return lam() { return identity(saved); }; }; }"}] }
 
 structure CheckedFixture where
   program : CheckedProgram

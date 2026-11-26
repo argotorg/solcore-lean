@@ -22,21 +22,21 @@ open Solcore Frontend
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function replace(table: mapping(Word => Word), key: Word, right: Word) returns (mapping(Word => Word)) { table[key] = right; return table; }",
-    "function add(table: mapping(Word => Word), key: Word, right: Word) returns (mapping(Word => Word)) { table[key] += right; return table; }",
-    "function divide(table: mapping(Word => Word), key: Word, right: Word) returns (mapping(Word => Word)) { table[key] /= right; return table; }",
-    "function ordered(table: mapping(Word => Word)) returns (mapping(Word => Word)) { table[7] = 80; table[9] = 90; return table; }",
-    "function nested(table: mapping(Word => mapping(Word => Word)), first: Word, second: Word, right: Word) returns (Word) { table[first][second] += right; return table[first][second]; }",
-    "function key(value: Word) returns (Word) { let copy: Word = value; return copy; }",
-    "function failedKey(value: Word) returns (Word) { let copy: Word = value; let absent: Word; return absent; }",
-    "function effects(table: mapping(Word => Word), index: Word, right: Word) returns (mapping(Word => Word)) { table[key(index)] += key(right); return table; }",
-    "function keyFailure(table: mapping(Word => Word), index: Word, right: Word) returns (mapping(Word => Word)) { table[failedKey(index)] += key(right); return table; }",
-    "function rhsFailure(table: mapping(Word => Word), index: Word, right: Word) returns (mapping(Word => Word)) { table[key(index)] += failedKey(right); return table; }",
-    "function missing(table: mapping(Word => Word), index: Word) returns (mapping(Word => Word)) { let absent: Word; table[index] += absent; return table; }",
-    "function initialize(table: mapping(Word => Word), index: Word, right: Word) returns (mapping(Word => Word)) { for (table[index] = right; false; table[index] += 1) { } return table; }",
-    "function post(table: mapping(Word => Word)) returns (mapping(Word => Word)) { for (let i: Word = 0; i < 1; table[i] += 2, i += 1) { continue; } return table; }",
-    "function stop(table: mapping(Word => Word)) returns (mapping(Word => Word)) { for (let i: Word = 0; true; table[i] += 2) { break; } return table; }",
-    "function make(table: mapping(Word => Word)) returns (function(Word) returns (Word)) { return lam(index: Word) -> Word { table[index] += 1; return table[index]; }; }"
+    "function replace(table: mapping(word => word), key: word, right: word) returns (mapping(word => word)) { table[key] = right; return table; }",
+    "function add(table: mapping(word => word), key: word, right: word) returns (mapping(word => word)) { table[key] += right; return table; }",
+    "function divide(table: mapping(word => word), key: word, right: word) returns (mapping(word => word)) { table[key] /= right; return table; }",
+    "function ordered(table: mapping(word => word)) returns (mapping(word => word)) { table[7] = 80; table[9] = 90; return table; }",
+    "function nested(table: mapping(word => mapping(word => word)), first: word, second: word, right: word) returns (word) { table[first][second] += right; return table[first][second]; }",
+    "function key(value: word) returns (word) { let copy: word = value; return copy; }",
+    "function failedKey(value: word) returns (word) { let copy: word = value; let absent: word; return absent; }",
+    "function effects(table: mapping(word => word), index: word, right: word) returns (mapping(word => word)) { table[key(index)] += key(right); return table; }",
+    "function keyFailure(table: mapping(word => word), index: word, right: word) returns (mapping(word => word)) { table[failedKey(index)] += key(right); return table; }",
+    "function rhsFailure(table: mapping(word => word), index: word, right: word) returns (mapping(word => word)) { table[key(index)] += failedKey(right); return table; }",
+    "function missing(table: mapping(word => word), index: word) returns (mapping(word => word)) { let absent: word; table[index] += absent; return table; }",
+    "function initialize(table: mapping(word => word), index: word, right: word) returns (mapping(word => word)) { for (table[index] = right; false; table[index] += 1) { } return table; }",
+    "function post(table: mapping(word => word)) returns (mapping(word => word)) { for (let i: word = 0; i < 1; table[i] += 2, i += 1) { continue; } return table; }",
+    "function stop(table: mapping(word => word)) returns (mapping(word => word)) { for (let i: word = 0; true; table[i] += 2) { break; } return table; }",
+    "function make(table: mapping(word => word)) returns (function(word) returns (word)) { return lam(index: word) -> word { table[index] += 1; return table[index]; }; }"
   ]}] }
 
 def options : SourceCompiler.Options :=
@@ -1662,19 +1662,19 @@ open Solcore Frontend
 complete runtime companion configures every declaration as a seed. -/
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function key(value: Word) returns (Word) { let copy: Word = value; return copy; }",
-    "function failedKey(value: Word) returns (Word) { let copy: Word = value; let absent: Word; return absent; }",
-    "function invert(table: mapping(Word => Word), index: Word) returns (mapping(Word => Word)) { table[index] ~=; return table; }",
-    "function nested(table: mapping(Word => mapping(Word => Word)), first: Word, second: Word) returns (Word) { table[first][second] ~=; return table[first][second]; }",
-    "function effects(table: mapping(Word => Word), index: Word) returns (mapping(Word => Word)) { table[key(index)] ~=; return table; }",
-    "function keyFailure(table: mapping(Word => Word), index: Word) returns (mapping(Word => Word)) { let absent: Word; table[absent] ~=; return table; }",
-    "function calledKeyFailure(table: mapping(Word => Word), index: Word) returns (mapping(Word => Word)) { table[failedKey(index)] ~=; return table; }",
-    "function nestedFailure(table: mapping(Word => mapping(Word => Word)), first: Word, second: Word) returns (Word) { table[key(first)][failedKey(second)] ~=; return 0; }",
-    "function initialize(table: mapping(Word => Word), index: Word) returns (mapping(Word => Word)) { for (table[index] ~=; false; table[index] ~=) { } return table; }",
-    "function post(table: mapping(Word => Word)) returns (mapping(Word => Word)) { for (let i: Word = 0; i < 1; table[i] ~=, i += 1) { continue; } return table; }",
-    "function stop(table: mapping(Word => Word)) returns (mapping(Word => Word)) { for (let i: Word = 0; true; table[i] ~=) { break; } return table; }",
-    "function make(table: mapping(Word => Word)) returns (function(Word) returns (Word)) { return lam(index: Word) -> Word { table[index] ~=; return table[index]; }; }",
-    "function defaultLocal() returns (Word) { let table: mapping(Word => Word); table[1] ~=; return table[1]; }"
+    "function key(value: word) returns (word) { let copy: word = value; return copy; }",
+    "function failedKey(value: word) returns (word) { let copy: word = value; let absent: word; return absent; }",
+    "function invert(table: mapping(word => word), index: word) returns (mapping(word => word)) { table[index] ~=; return table; }",
+    "function nested(table: mapping(word => mapping(word => word)), first: word, second: word) returns (word) { table[first][second] ~=; return table[first][second]; }",
+    "function effects(table: mapping(word => word), index: word) returns (mapping(word => word)) { table[key(index)] ~=; return table; }",
+    "function keyFailure(table: mapping(word => word), index: word) returns (mapping(word => word)) { let absent: word; table[absent] ~=; return table; }",
+    "function calledKeyFailure(table: mapping(word => word), index: word) returns (mapping(word => word)) { table[failedKey(index)] ~=; return table; }",
+    "function nestedFailure(table: mapping(word => mapping(word => word)), first: word, second: word) returns (word) { table[key(first)][failedKey(second)] ~=; return 0; }",
+    "function initialize(table: mapping(word => word), index: word) returns (mapping(word => word)) { for (table[index] ~=; false; table[index] ~=) { } return table; }",
+    "function post(table: mapping(word => word)) returns (mapping(word => word)) { for (let i: word = 0; i < 1; table[i] ~=, i += 1) { continue; } return table; }",
+    "function stop(table: mapping(word => word)) returns (mapping(word => word)) { for (let i: word = 0; true; table[i] ~=) { break; } return table; }",
+    "function make(table: mapping(word => word)) returns (function(word) returns (word)) { return lam(index: word) -> word { table[index] ~=; return table[index]; }; }",
+    "function defaultLocal() returns (word) { let table: mapping(word => word); table[1] ~=; return table[1]; }"
   ]}] }
 
 def options : SourceCompiler.Options :=
@@ -4199,9 +4199,9 @@ open RecursiveNamedPublicPhysicalSessionState (PlainValue)
 kept distinct even though every proxy has the same native unit payload. -/
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function proxyWord() returns (@Word) { return @Word; }",
-    "function proxyBool() returns (@Bool) { return @Bool; }",
-    "function echoWord(value: @Word) returns (@Word) { return value; }"
+    "function proxyWord() returns (@word) { return @word; }",
+    "function proxyBool() returns (@bool) { return @bool; }",
+    "function echoWord(value: @word) returns (@word) { return value; }"
   ]}] }
 def options : SourceCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}

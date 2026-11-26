@@ -602,7 +602,7 @@ private def get {ε α : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def word (n : Nat) : Word := Word.ofNatModulo n
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function main(seed: Word) returns (Word) { let cache: mapping(Word => Word); cache[0] = seed; return cache[0]; }"}] }
+    "function main(seed: word) returns (word) { let cache: mapping(word => word); cache[0] = seed; return cache[0]; }"}] }
 
 private def complete (code : Expr) (environment : Environment) (store : Store) : IO (Value × Store) := do
   let output ← match runStateful 100000 (.initial code environment store) with
@@ -729,12 +729,12 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Box { Item(Word) }",
-    "function probe(seed: Word) returns (Word) { let f = lam(item: Word) { return item; }; return f(seed); }",
-    "enum Holder<T> { Wrap(mapping(Word => T), Word), Other(mapping(Word => T), Word) }",
-    "function mixed(root: mapping(Word => Holder<Word>), value: Holder<Word>, key: Word) returns (Word) { root[key] = value; return 0; }",
-    "function missing(root: mapping(Word => Holder<Box>), value: Holder<Box>, key: Word) returns (Word) { root[key] = value; return 0; }",
-    "function nested(root: mapping(Word => mapping(Word => @Word)), value: mapping(Word => @Word), key: Word) returns (Word) { root[key] = value; return 0; }"
+    "enum Box { Item(word) }",
+    "function probe(seed: word) returns (word) { let f = lam(item: word) { return item; }; return f(seed); }",
+    "enum Holder<T> { Wrap(mapping(word => T), word), Other(mapping(word => T), word) }",
+    "function mixed(root: mapping(word => Holder<word>), value: Holder<word>, key: word) returns (word) { root[key] = value; return 0; }",
+    "function missing(root: mapping(word => Holder<Box>), value: Holder<Box>, key: word) returns (word) { root[key] = value; return 0; }",
+    "function nested(root: mapping(word => mapping(word => @word)), value: mapping(word => @word), key: word) returns (word) { root[key] = value; return 0; }"
   ]}] }
 private def sourceFor (program : CheckedProgram) (name : String) : IO TypedSource := do
   let signature ← match program.signatures.functions.find? (·.name == name) with
@@ -1041,17 +1041,17 @@ private def get {ε α : Type} [Repr ε] (label : String) : Except ε α → IO 
   | .ok value => pure value | .error error => throw (IO.userError s!"{label}: {reprStr error}")
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function effects(root: mapping(Word => Word)) returns (Word) {",
-    " let key = lam(x: Word) { root[1] = 20; return x; };",
-    " let rhs = lam(x: Word) { root[1] = 30; root[2] = 40; return x; };",
+    "function effects(root: mapping(word => word)) returns (word) {",
+    " let key = lam(x: word) { root[1] = 20; return x; };",
+    " let rhs = lam(x: word) { root[1] = 30; root[2] = 40; return x; };",
     " root[key(1)] += rhs(3); return root[1] + root[2]; }",
-    "function keyFault(root: mapping(Word => Word)) returns (Word) {",
-    " let key = lam(x: Word) { root[1] = 20; let absent: Word; return absent; };",
-    " let rhs = lam(x: Word) { root[2] = 40; return x; };",
+    "function keyFault(root: mapping(word => word)) returns (word) {",
+    " let key = lam(x: word) { root[1] = 20; let absent: word; return absent; };",
+    " let rhs = lam(x: word) { root[2] = 40; return x; };",
     " root[key(1)] += rhs(3); root[3] = 50; return 0; }",
-    "function rhsFault(root: mapping(Word => Word)) returns (Word) {",
-    " let key = lam(x: Word) { root[1] = 20; return x; };",
-    " let rhs = lam(x: Word) { root[2] = 40; let absent: Word; return absent; };",
+    "function rhsFault(root: mapping(word => word)) returns (word) {",
+    " let key = lam(x: word) { root[1] = 20; return x; };",
+    " let rhs = lam(x: word) { root[2] = 40; let absent: word; return absent; };",
     " root[key(1)] += rhs(3); root[3] = 50; return 0; }"
   ]}] }
 
@@ -1224,10 +1224,10 @@ private def require (condition : Bool) (message : String) : IO Unit := do
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Box { Item(Word) }",
-    "function probe(seed: Word) returns (Word) { let f = lam(item: Word) { return item; }; return f(seed); }",
-    "function selected(root: mapping(Word => Word), key: Word) returns (Word) { return root[key]; }",
-    "function missing(root: mapping(Word => Box), key: Word) returns (Box) { return root[key]; }"
+    "enum Box { Item(word) }",
+    "function probe(seed: word) returns (word) { let f = lam(item: word) { return item; }; return f(seed); }",
+    "function selected(root: mapping(word => word), key: word) returns (word) { return root[key]; }",
+    "function missing(root: mapping(word => Box), key: word) returns (Box) { return root[key]; }"
   ]}] }
 
 private def exercise (initial : SourceCoreCompatibleValues.Context)
@@ -1397,14 +1397,14 @@ private def get {ε α : Type} [Repr ε] (label : String) : Except ε α → IO 
   | .ok value => pure value | .error error => throw (IO.userError s!"{label}: {reprStr error}")
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "type F = function(Word) returns (Word);",
-    "function inc(x: Word) returns (Word) { return x + 1; }",
-    "function replace(root: mapping(Word => F), seed: Word) returns (mapping(Word => F)) {",
-    " root[1] = lam(x: Word) { return x + seed; }; return root; }",
-    "function invoke(root: mapping(Word => F), seed: Word) returns (Word) {",
-    " root[1] = lam(x: Word) { return x + seed; }; return root[1](8) + root[2](8); }",
-    "function removed(root: mapping(Word => F), seed: Word) returns (Word) {",
-    " let rhs = lam() -> F { let empty: mapping(Word => F); root = empty; return lam(x: Word) { return x + seed; }; };",
+    "type F = function(word) returns (word);",
+    "function inc(x: word) returns (word) { return x + 1; }",
+    "function replace(root: mapping(word => F), seed: word) returns (mapping(word => F)) {",
+    " root[1] = lam(x: word) { return x + seed; }; return root; }",
+    "function invoke(root: mapping(word => F), seed: word) returns (word) {",
+    " root[1] = lam(x: word) { return x + seed; }; return root[1](8) + root[2](8); }",
+    "function removed(root: mapping(word => F), seed: word) returns (word) {",
+    " let rhs = lam() -> F { let empty: mapping(word => F); root = empty; return lam(x: word) { return x + seed; }; };",
     " root[1] = rhs(); return 999; }"
   ]}] }
 private structure Projection (checked : SourceCoreCompatibleCatalog.Checked) (source : TypeSystem.Ty) (native : Ty) : Type where
@@ -1646,14 +1646,14 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit :=
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
-    "function initializeWord() returns (Word) { let root: Word; let vals: mapping(Bool => Word); root = vals[false] + 2; return root; }",
-    "function initializeBool() returns (Bool) { let root: Bool; root = false; return root; }",
-    "function initializePair() returns ((Word, Bool)) { let root: (Word, Bool); root = (2, false); return root; }",
-    "function initializeNominal() returns (Box<Word>) { let root: Box<Word>; root = .Box(2); return root; }",
-    "function initializeMapping() returns (Word) { let root: mapping(Bool => Word); let donor: mapping(Bool => Word); root = donor; return root[true]; }",
-    "function compoundPresent() returns (Word) { let root: Word = 10; let vals: mapping(Bool => Word); root += vals[false] + 2; return root; }",
-    "function compoundAbsent() returns (Word) { let root: Word; let vals: mapping(Bool => Word); root += vals[false] + 2; return root; }",
-    "function rhsFault() returns (Word) { let root: Word; let vals: mapping(Bool => Word); let missing: Word; root += vals[false] + missing; return root; }"
+    "function initializeWord() returns (word) { let root: word; let vals: mapping(bool => word); root = vals[false] + 2; return root; }",
+    "function initializeBool() returns (bool) { let root: bool; root = false; return root; }",
+    "function initializePair() returns ((word, bool)) { let root: (word, bool); root = (2, false); return root; }",
+    "function initializeNominal() returns (Box<word>) { let root: Box<word>; root = .Box(2); return root; }",
+    "function initializeMapping() returns (word) { let root: mapping(bool => word); let donor: mapping(bool => word); root = donor; return root[true]; }",
+    "function compoundPresent() returns (word) { let root: word = 10; let vals: mapping(bool => word); root += vals[false] + 2; return root; }",
+    "function compoundAbsent() returns (word) { let root: word; let vals: mapping(bool => word); root += vals[false] + 2; return root; }",
+    "function rhsFault() returns (word) { let root: word; let vals: mapping(bool => word); let missing: word; root += vals[false] + missing; return root; }"
   ]}] }
 
 private def inspect {checked : SourceCoreCompatibleCatalog.Checked}

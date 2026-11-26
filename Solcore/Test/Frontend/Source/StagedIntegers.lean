@@ -98,19 +98,19 @@ private def positiveSource : String := String.intercalate "\n" [
   "function legacyDec(x: integer) returns (integer) {",
   "  return integerSub(x, 1);",
   "}",
-  "function baseline() returns (Word) {",
+  "function baseline() returns (word) {",
   "  return wordFromInteger(dec(10));",
   "}",
-  "function legacyFallback() returns (Word) {",
+  "function legacyFallback() returns (word) {",
   "  return wordFromInteger(legacyDec(10));",
   "}",
-  "function repeated() returns (Word) {",
+  "function repeated() returns (word) {",
   "  return wordFromInteger(integerAdd(dec(10), dec(4)));",
   "}",
-  "function nested() returns (Word) {",
+  "function nested() returns (word) {",
   "  return wordFromInteger(dec2(10));",
   "}",
-  "function eagerBranches() returns (Word) {",
+  "function eagerBranches() returns (word) {",
   "  return wordFromInteger(true ? dec(10) : dec(0));",
   "}"
 ]
@@ -339,8 +339,8 @@ private def testIntegerRootBoundary : IO Unit := do
 private def testRuntimeComptimeBoundaries : IO Unit := do
   let moduleId ← mainModule
   let closedParameterSource := String.intercalate "\n" [
-    "function identity(comptime value: Word) returns (Word) { return value; }",
-    "function main() returns (Word) { return identity(7); }"
+    "function identity(comptime value: word) returns (word) { return value; }",
+    "function main() returns (word) { return identity(7); }"
   ]
   let prepared ← match prepare (workspace closedParameterSource)
       (Seed.named moduleId "main") (limits 2) with
@@ -353,8 +353,8 @@ private def testRuntimeComptimeBoundaries : IO Unit := do
     "closed literal did not satisfy a comptime parameter"
 
   let runtimeArgumentSource := String.intercalate "\n" [
-    "function identity(comptime value: Word) returns (Word) { return value; }",
-    "function main(value: Word) returns (Word) { return identity(value); }"
+    "function identity(comptime value: word) returns (word) { return value; }",
+    "function main(value: word) returns (word) { return identity(value); }"
   ]
   match prepare (workspace runtimeArgumentSource) (Seed.named moduleId "main")
       (limits 2) with
@@ -363,9 +363,9 @@ private def testRuntimeComptimeBoundaries : IO Unit := do
       s!"runtime argument crossed a comptime parameter: {reprStr result}")
 
   let deferredRuntimeArgumentSource := String.intercalate "\n" [
-    "function identity(comptime value: Word) returns (Word) { return value; }",
-    "function producer(value: Word) returns (Word) { return value; }",
-    "function main(value: Word) returns (Word) { return identity(producer(value)); }"
+    "function identity(comptime value: word) returns (word) { return value; }",
+    "function producer(value: word) returns (word) { return value; }",
+    "function main(value: word) returns (word) { return identity(producer(value)); }"
   ]
   match prepare (workspace deferredRuntimeArgumentSource)
       (Seed.named moduleId "main") (limits 3) with
@@ -374,9 +374,9 @@ private def testRuntimeComptimeBoundaries : IO Unit := do
       s!"deferred call crossed a comptime parameter: {reprStr result}")
 
   let runtimeLocalArgumentSource := String.intercalate "\n" [
-    "function identity(comptime value: Word) returns (Word) { return value; }",
-    "function main(value: Word) returns (Word) {",
-    "  let alias: Word = value;",
+    "function identity(comptime value: word) returns (word) { return value; }",
+    "function main(value: word) returns (word) {",
+    "  let alias: word = value;",
     "  return identity(alias);",
     "}"
   ]
@@ -387,10 +387,10 @@ private def testRuntimeComptimeBoundaries : IO Unit := do
       s!"runtime-dependent local crossed a comptime parameter: {reprStr result}")
 
   let deferredLocalArgumentSource := String.intercalate "\n" [
-    "function identity(comptime value: Word) returns (Word) { return value; }",
-    "function producer(value: Word) returns (Word) { return value; }",
-    "function main(value: Word) returns (Word) {",
-    "  let alias: Word = producer(value);",
+    "function identity(comptime value: word) returns (word) { return value; }",
+    "function producer(value: word) returns (word) { return value; }",
+    "function main(value: word) returns (word) {",
+    "  let alias: word = producer(value);",
     "  return identity(alias);",
     "}"
   ]
@@ -401,7 +401,7 @@ private def testRuntimeComptimeBoundaries : IO Unit := do
       s!"deferred local crossed a comptime parameter: {reprStr result}")
 
   let markedRootParameter :=
-    "function identity(comptime value: Word) returns (Word) { return value; }"
+    "function identity(comptime value: word) returns (word) { return value; }"
   match prepare (workspace markedRootParameter)
       (Seed.named moduleId "identity") (limits 1) with
   | .error (.linking (.runtimeRootComptimeParameter _ 0 _)) => pure ()
@@ -409,7 +409,7 @@ private def testRuntimeComptimeBoundaries : IO Unit := do
       s!"comptime parameter escaped as a runtime root: {reprStr result}")
 
   let markedRootResult :=
-    "function constant() returns (comptime<Word>) { return 7; }"
+    "function constant() returns (comptime<word>) { return 7; }"
   match prepare (workspace markedRootResult)
       (Seed.named moduleId "constant") (limits 1) with
   | .error (.linking (.runtimeRootComptimeResult _)) => pure ()
@@ -417,8 +417,8 @@ private def testRuntimeComptimeBoundaries : IO Unit := do
       s!"comptime result escaped as a runtime root: {reprStr result}")
 
   let markedRuntimeResult := String.intercalate "\n" [
-    "function constant() returns (comptime<Word>) { return 7; }",
-    "function main() returns (Word) { return constant(); }"
+    "function constant() returns (comptime<word>) { return 7; }",
+    "function main() returns (word) { return constant(); }"
   ]
   match prepare (workspace markedRuntimeResult) (Seed.named moduleId "main")
       (limits 2) with
@@ -447,7 +447,7 @@ private def expectStagedCycle (label source root expected : String)
 private def testRecursiveBoundaries : IO Unit := do
   let selfSource := String.intercalate "\n" [
     "function loop(comptime x: integer) returns (comptime<integer>) { return loop(x); }",
-    "function main() returns (Word) { return wordFromInteger(loop(1)); }"
+    "function main() returns (word) { return wordFromInteger(loop(1)); }"
   ]
   let selfProgram ← checkedProgram selfSource
   let loop ← signatureNamed selfProgram "loop"
@@ -466,7 +466,7 @@ private def testRecursiveBoundaries : IO Unit := do
   let mutualSource := String.intercalate "\n" [
     "function left(comptime x: integer) returns (comptime<integer>) { return right(x); }",
     "function right(comptime x: integer) returns (comptime<integer>) { return left(x); }",
-    "function main() returns (Word) { return wordFromInteger(left(1)); }"
+    "function main() returns (word) { return wordFromInteger(left(1)); }"
   ]
   let mutualProgram ← checkedProgram mutualSource
   let mutualMain ← signatureNamed mutualProgram "main"
@@ -482,7 +482,7 @@ private def testRecursiveBoundaries : IO Unit := do
   let deadSource := String.intercalate "\n" [
     "function dec(comptime x: integer) returns (comptime<integer>) { return integerSub(x, 1); }",
     "function loop(comptime x: integer) returns (comptime<integer>) { return loop(x); }",
-    "function main() returns (Word) {",
+    "function main() returns (word) {",
     "  return wordFromInteger(true ? dec(10) : loop(0));",
     "}"
   ]
@@ -536,7 +536,7 @@ private def source : String := String.intercalate "\n" [
   "  let sum: integer = integerAdd(left, right);",
   "  return sum;",
   "}",
-  "function entry() returns (Word) {",
+  "function entry() returns (word) {",
   "  return wordFromInteger(combine(7, 5));",
   "}"
 ]
@@ -927,7 +927,7 @@ private def testPredicateEvidenceForwarded : IO Unit := do
     "function relay(comptime value: integer) returns (comptime<integer>) where integer: Marker {",
     "  return marked(value);",
     "}",
-    "function entry() returns (Word) {",
+    "function entry() returns (word) {",
     "  return wordFromInteger(relay(3));",
     "}"
   ]
@@ -1043,34 +1043,34 @@ private def positiveSource : String :=
   let modulus := toString Core.wordModulus
   let successor := toString (Core.wordModulus + 1)
   String.intercalate "\n" [
-    "function basic() returns (Word) {",
+    "function basic() returns (word) {",
     "  return wordFromInteger(integerSub(10, 3));",
     "}",
-    "function negative() returns (Word) {",
+    "function negative() returns (word) {",
     "  return wordFromInteger(integerSub(1, 2));",
     "}",
-    "function deepNegative() returns (Word) {",
+    "function deepNegative() returns (word) {",
     "  return wordFromInteger(integerSub(0, " ++ successor ++ "));",
     "}",
-    "function exactNegativeModulus() returns (Word) {",
+    "function exactNegativeModulus() returns (word) {",
     "  return wordFromInteger(integerSub(0, " ++ modulus ++ "));",
     "}",
-    "function positiveWrap() returns (Word) {",
+    "function positiveWrap() returns (word) {",
     "  return wordFromInteger(integerSub(" ++ successor ++ ", 1));",
     "}",
-    "function hexadecimal() returns (Word) {",
+    "function hexadecimal() returns (word) {",
     "  return wordFromInteger(integerSub(0x20, 0x01));",
     "}",
-    "function directHexadecimal() returns (Word) {",
+    "function directHexadecimal() returns (word) {",
     "  return wordFromInteger(0x100);",
     "}",
-    "function nested() returns (Word) {",
+    "function nested() returns (word) {",
     "  return wordFromInteger(integerSub(integerSub(20, 3), integerSub(9, 4)));",
     "}",
-    "function grouped() returns (Word) {",
+    "function grouped() returns (word) {",
     "  return wordFromInteger((integerSub((5), (8))));",
     "}",
-    "function direct() returns (Word) {",
+    "function direct() returns (word) {",
     "  return wordFromInteger(" ++ successor ++ ");",
     "}"
   ]
@@ -1083,75 +1083,75 @@ private def expandedSource : String :=
   let halfModulus : Nat := 2 ^ 128
   let half := toString halfModulus
   String.intercalate "\n" [
-    "function addHugeNegative() returns (Word) {",
+    "function addHugeNegative() returns (word) {",
     "  return wordFromInteger(integerAdd(" ++ plusFive ++
       ", integerSub(0, " ++ plusSeven ++ ")));",
     "}",
-    "function addNegatives() returns (Word) {",
+    "function addNegatives() returns (word) {",
     "  return wordFromInteger(integerAdd(integerSub(0, 5), integerSub(0, 8)));",
     "}",
-    "function arithmeticNested() returns (Word) {",
+    "function arithmeticNested() returns (word) {",
     "  return wordFromInteger(integerSub(integerAdd(20, integerSub(0, 3)), integerAdd(4, 5)));",
     "}",
-    "function mulPower() returns (Word) {",
+    "function mulPower() returns (word) {",
     "  return wordFromInteger(integerMul(" ++ half ++ ", " ++ half ++ "));",
     "}",
-    "function mulNegative() returns (Word) {",
+    "function mulNegative() returns (word) {",
     "  return wordFromInteger(integerMul(integerSub(0, 3), 5));",
     "}",
-    "function mulNegativeBoth() returns (Word) {",
+    "function mulNegativeBoth() returns (word) {",
     "  return wordFromInteger(integerMul(integerSub(0, 3), integerSub(0, 5)));",
     "}",
-    "function mulZero() returns (Word) {",
+    "function mulZero() returns (word) {",
     "  return wordFromInteger(integerMul(0, integerSub(0, " ++ plusSeven ++ ")));",
     "}",
-    "function mulNested() returns (Word) {",
+    "function mulNested() returns (word) {",
     "  return wordFromInteger(integerMul(integerAdd(7, integerSub(0, 2)), integerSub(6, 3)));",
     "}",
-    "function mulEqBeforeModulo() returns (Bool) {",
+    "function mulEqBeforeModulo() returns (bool) {",
     "  return integerEq(integerMul(" ++ modulus ++ ", " ++ modulus ++ "), 0);",
     "}",
-    "function wordToModulo() returns (Word) {",
+    "function wordToModulo() returns (word) {",
     "  return wordFromInteger(wordToInteger(" ++ successor ++ "));",
     "}",
-    "function wordToGrouped() returns (Word) {",
+    "function wordToGrouped() returns (word) {",
     "  return wordFromInteger(wordToInteger((" ++ successor ++ ")));",
     "}",
-    "function wordRoundtripNegative() returns (Word) {",
+    "function wordRoundtripNegative() returns (word) {",
     "  return wordFromInteger(wordToInteger(wordFromInteger(integerSub(0, 1))));",
     "}",
-    "function wordBridgeNested() returns (Word) {",
+    "function wordBridgeNested() returns (word) {",
     "  return wordFromInteger(integerAdd(wordToInteger(wordFromInteger(integerSub(0, 3))), 5));",
     "}",
-    "function wordLiteralArithmetic() returns (Word) {",
+    "function wordLiteralArithmetic() returns (word) {",
     "  return wordFromInteger(integerAdd(wordToInteger(" ++ successor ++ "), 2));",
     "}",
-    "function wordBridgeComparison() returns (Bool) {",
+    "function wordBridgeComparison() returns (bool) {",
     "  return integerEq(wordToInteger(wordFromInteger(integerSub(0, 1))), integerSub(0, 1));",
     "}",
-    "function eqBeforeModulo() returns (Bool) {",
+    "function eqBeforeModulo() returns (bool) {",
     "  return integerEq(0, " ++ modulus ++ ");",
     "}",
-    "function eqSignedExact() returns (Bool) {",
+    "function eqSignedExact() returns (bool) {",
     "  return integerEq(integerAdd(" ++ plusFive ++
       ", integerSub(0, " ++ plusSeven ++ ")), integerSub(0, 2));",
     "}",
-    "function ltBeforeModulo() returns (Bool) {",
+    "function ltBeforeModulo() returns (bool) {",
     "  return integerLt(" ++ successor ++ ", 2);",
     "}",
-    "function ltNegative() returns (Bool) {",
+    "function ltNegative() returns (bool) {",
     "  return integerLt(integerSub(0, 2), integerSub(0, 1));",
     "}",
-    "function ltNegativeReverse() returns (Bool) {",
+    "function ltNegativeReverse() returns (bool) {",
     "  return integerLt(integerSub(0, 1), integerSub(0, 2));",
     "}",
-    "function eqConditional() returns (Word) {",
+    "function eqConditional() returns (word) {",
     "  return integerEq(0, " ++ modulus ++ ") ? 11 : 22;",
     "}",
-    "function ltConditional() returns (Word) {",
+    "function ltConditional() returns (word) {",
     "  return integerLt(integerSub(0, 2), integerSub(0, 1)) ? 33 : 44;",
     "}",
-    "function typedSpine() returns (Bool) {",
+    "function typedSpine() returns (bool) {",
     "  return integerLt(integerAdd(1, 2), integerSub(4, 5));",
     "}"
   ]
@@ -1324,9 +1324,9 @@ private def expectWordLiteral (function : CheckedFunction)
           match solved with
           | [evidence] =>
               assertTrue (builtinWordEvidence evidence)
-                "staged Word literal retained the wrong Int<Word> evidence"
+                "staged Word literal retained the wrong Int<word> evidence"
           | _ => throw (IO.userError
-              "staged Word literal did not retain unique Int<Word> evidence")
+              "staged Word literal did not retain unique Int<word> evidence")
           pure resolution.requirement
       | _ => throw (IO.userError
           s!"staged Word literal changed form: {reprStr node}")
@@ -1607,7 +1607,7 @@ private def testWordToIntegerTypedCarrierAndWorklist : IO Unit := do
     (.decimal (toString (Core.wordModulus + 1))) (Core.wordModulus + 1)
   assertTrue (decide (modulo.solvedRequirements.map (·.id) =
       [literalRequirement]) && modulo.solvedRequirements.all builtinWordEvidence)
-    "wordToInteger did not retain exact Int<Word> literal evidence"
+    "wordToInteger did not retain exact Int<word> literal evidence"
   match SourceCoreElaboration.evaluateStagedWord modulo.solvedRequirements
       modulo.typedBody literal with
   | .ok evaluated =>
@@ -1677,7 +1677,7 @@ private def testWordToIntegerTypedCarrierAndWorklist : IO Unit := do
   let mixedRequirements := [mixedWordRequirement, mixedIntegerRequirement]
   assertTrue (decide (mixed.solvedRequirements.map (·.id) =
       mixedRequirements))
-    "mixed Int<Word>/Int<integer> evidence lost source order"
+    "mixed Int<word>/Int<integer> evidence lost source order"
   match SourceCoreElaboration.evaluateStagedInteger mixed.solvedRequirements
       mixed.typedBody mixedAdd with
   | .ok evaluated =>
@@ -1757,11 +1757,11 @@ private def testExpandedPublicExecution : IO Unit := do
 
 private def testSourceDeclarationsShadowBuiltins : IO Unit := do
   let content := String.intercalate "\n" [
-    "function integerSub(left: Word, right: Word) returns (Word) {",
+    "function integerSub(left: word, right: word) returns (word) {",
     "  return 41;",
     "}",
-    "function wordFromInteger(value: Word) returns (Word) { return value; }",
-    "function shadowed() returns (Word) {",
+    "function wordFromInteger(value: word) returns (word) { return value; }",
+    "function shadowed() returns (word) {",
     "  return wordFromInteger(integerSub(1, 2));",
     "}"
   ]
@@ -1789,22 +1789,22 @@ private def testSourceDeclarationsShadowBuiltins : IO Unit := do
 
 private def testExpandedSourceDeclarationsShadowBuiltins : IO Unit := do
   let content := String.intercalate "\n" [
-    "function integerAdd(left: Word, right: Word) returns (Word) {",
+    "function integerAdd(left: word, right: word) returns (word) {",
     "  return 40;",
     "}",
-    "function integerEq(left: Word, right: Word) returns (Bool) {",
+    "function integerEq(left: word, right: word) returns (bool) {",
     "  return false;",
     "}",
-    "function integerLt(left: Word, right: Word) returns (Bool) {",
+    "function integerLt(left: word, right: word) returns (bool) {",
     "  return true;",
     "}",
-    "function integerMul(left: Word, right: Word) returns (Word) {",
+    "function integerMul(left: word, right: word) returns (word) {",
     "  return 41;",
     "}",
-    "function wordToInteger(value: Word) returns (Word) {",
+    "function wordToInteger(value: word) returns (word) {",
     "  return value;",
     "}",
-    "function shadowed() returns (Word) {",
+    "function shadowed() returns (word) {",
     "  return integerEq(integerAdd(1, 2), 40) ? 9 :",
     "    (integerLt(1, 2) ? integerMul(wordToInteger(1), 2) : 42);",
     "}"
@@ -1845,22 +1845,22 @@ private def testInferenceRejections : IO Unit := do
     "function bad() returns (integer) { return integerSub(1); }"
     fun error => error == .builtinFunctionArityMismatch .integerSub 2 1
   expectBodyError "wordFromInteger arity"
-    "function bad() returns (Word) { return wordFromInteger(); }"
+    "function bad() returns (word) { return wordFromInteger(); }"
     fun error => error == .builtinFunctionArityMismatch .wordFromInteger 1 0
   expectBodyError "integerSub operand type"
-    "function bad() returns (Word) { return wordFromInteger(integerSub(true, 1)); }"
+    "function bad() returns (word) { return wordFromInteger(integerSub(true, 1)); }"
     fun error => error matches .unification _
   expectBodyError "wordFromInteger operand type"
-    "function bad() returns (Word) { return wordFromInteger(true); }"
+    "function bad() returns (word) { return wordFromInteger(true); }"
     fun error => error matches .unification _
   expectBodyError "integerAdd arity"
     "function bad() returns (integer) { return integerAdd(1); }"
     fun error => error == .builtinFunctionArityMismatch .integerAdd 2 1
   expectBodyError "integerEq arity"
-    "function bad() returns (Bool) { return integerEq(1); }"
+    "function bad() returns (bool) { return integerEq(1); }"
     fun error => error == .builtinFunctionArityMismatch .integerEq 2 1
   expectBodyError "integerLt arity"
-    "function bad() returns (Bool) { return integerLt(); }"
+    "function bad() returns (bool) { return integerLt(); }"
     fun error => error == .builtinFunctionArityMismatch .integerLt 2 0
   expectBodyError "integerMul arity"
     "function bad() returns (integer) { return integerMul(1); }"
@@ -1872,10 +1872,10 @@ private def testInferenceRejections : IO Unit := do
     "function bad() returns (integer) { return integerAdd(true, 1); }"
     fun error => error matches .unification _
   expectBodyError "integerEq operand type"
-    "function bad() returns (Bool) { return integerEq(true, 1); }"
+    "function bad() returns (bool) { return integerEq(true, 1); }"
     fun error => error matches .unification _
   expectBodyError "integerLt operand type"
-    "function bad() returns (Bool) { return integerLt(1, false); }"
+    "function bad() returns (bool) { return integerLt(1, false); }"
     fun error => error matches .unification _
   expectBodyError "integerMul operand type"
     "function bad() returns (integer) { return integerMul(false, 1); }"
@@ -1885,10 +1885,10 @@ private def testInferenceRejections : IO Unit := do
     fun error => error matches .unification _
 
   let blocked := String.intercalate "\n" [
-    "function integerSub(left: Bool, right: Bool) returns (Bool) {",
+    "function integerSub(left: bool, right: bool) returns (bool) {",
     "  return left;",
     "}",
-    "function bad() returns (Word) {",
+    "function bad() returns (word) {",
     "  return wordFromInteger(integerSub(1, 2));",
     "}"
   ]
@@ -1916,24 +1916,24 @@ private def testInferenceRejections : IO Unit := do
     | .ok _ => throw (IO.userError
         s!"{name}: incompatible source declaration fell through to builtin")
   expectExpandedNoFallback "integerAdd"
-    "function integerAdd(left: Bool, right: Bool) returns (Bool) { return left; }"
-    "function bad() returns (Word) { return wordFromInteger(integerAdd(1, 2)); }"
+    "function integerAdd(left: bool, right: bool) returns (bool) { return left; }"
+    "function bad() returns (word) { return wordFromInteger(integerAdd(1, 2)); }"
   expectExpandedNoFallback "integerEq"
-    "function integerEq(left: Bool, right: Bool) returns (Bool) { return left; }"
-    "function bad() returns (Bool) { return integerEq(1, 2); }"
+    "function integerEq(left: bool, right: bool) returns (bool) { return left; }"
+    "function bad() returns (bool) { return integerEq(1, 2); }"
   expectExpandedNoFallback "integerLt"
-    "function integerLt(left: Bool, right: Bool) returns (Bool) { return left; }"
-    "function bad() returns (Bool) { return integerLt(1, 2); }"
+    "function integerLt(left: bool, right: bool) returns (bool) { return left; }"
+    "function bad() returns (bool) { return integerLt(1, 2); }"
   expectExpandedNoFallback "integerMul"
-    "function integerMul(left: Bool, right: Bool) returns (Bool) { return left; }"
-    "function bad() returns (Word) { return wordFromInteger(integerMul(1, 2)); }"
+    "function integerMul(left: bool, right: bool) returns (bool) { return left; }"
+    "function bad() returns (word) { return wordFromInteger(integerMul(1, 2)); }"
   expectExpandedNoFallback "wordToInteger"
-    "function wordToInteger(value: Bool) returns (Bool) { return value; }"
-    "function bad() returns (Word) { return wordFromInteger(wordToInteger(1)); }"
+    "function wordToInteger(value: bool) returns (bool) { return value; }"
+    "function bad() returns (word) { return wordFromInteger(wordToInteger(1)); }"
 
 private def testRuntimeBoundaryRejections : IO Unit := do
   let dependentProgram ← checkedProgram
-    "function dependent(flag: Bool) returns (Word) { return wordFromInteger(flag ? 1 : 2); }"
+    "function dependent(flag: bool) returns (word) { return wordFromInteger(flag ? 1 : 2); }"
   let dependent ← checkedNamed dependentProgram "dependent"
   let root ← returnedExpression dependent
   let argument ← match dependent.typedBody.lookupExpression? root with
@@ -1992,7 +1992,7 @@ private def testRuntimeBoundaryRejections : IO Unit := do
         s!"wordToInteger leakage produced the wrong error: {reprStr error}"
 
   let localWordProgram ← checkedProgram
-    "function localWord(value: Word) returns (Word) { return wordFromInteger(wordToInteger(value)); }"
+    "function localWord(value: word) returns (word) { return wordFromInteger(wordToInteger(value)); }"
   let localWord ← checkedNamed localWordProgram "localWord"
   let localRoot ← returnedExpression localWord
   let localOuter ← expectBuiltinCall localWord localRoot .wordFromInteger
@@ -2015,7 +2015,7 @@ private def testRuntimeBoundaryRejections : IO Unit := do
         s!"runtime Word local produced the wrong staged error: {reprStr error}"
 
   let wordOperatorProgram ← checkedProgram
-    "function wordOperator() returns (Word) { return wordFromInteger(wordToInteger(1 + 2)); }"
+    "function wordOperator() returns (word) { return wordFromInteger(wordToInteger(1 + 2)); }"
   let wordOperator ← checkedNamed wordOperatorProgram "wordOperator"
   let operatorRoot ← returnedExpression wordOperator
   let operatorOuter ← expectBuiltinCall wordOperator operatorRoot
@@ -2040,8 +2040,8 @@ private def testRuntimeBoundaryRejections : IO Unit := do
         s!"runtime Word operator produced the wrong staged error: {reprStr error}"
 
   let sourceCallProgram ← checkedProgram (String.intercalate "\n" [
-    "function sourceWord() returns (Word) { return 7; }",
-    "function stagedCall() returns (Word) {",
+    "function sourceWord() returns (word) { return 7; }",
+    "function stagedCall() returns (word) {",
     "  return wordFromInteger(wordToInteger(sourceWord()));",
     "}"
   ])
@@ -2069,7 +2069,7 @@ private def testRuntimeBoundaryRejections : IO Unit := do
         s!"Word-returning source call produced the wrong staged error: {reprStr error}"
 
   let comparisonProgram ← checkedProgram
-    "function dependentEq(flag: Bool) returns (Bool) { return integerEq(flag ? 1 : 2, 1); }"
+    "function dependentEq(flag: bool) returns (bool) { return integerEq(flag ? 1 : 2, 1); }"
   let comparison ← checkedNamed comparisonProgram "dependentEq"
   let comparisonRoot ← returnedExpression comparison
   let comparisonArguments ← expectBuiltinCall comparison comparisonRoot .integerEq
@@ -2132,7 +2132,7 @@ private def workspace (content : String) : Workspace.RawWorkspace := {
 
 private def checkedFunction : IO CheckedFunction := do
   let content :=
-    "function negative() returns (Word) { return wordFromInteger(integerSub(1, 2)); }"
+    "function negative() returns (word) { return wordFromInteger(integerSub(1, 2)); }"
   let program ← match checkProgram (workspace content) with
     | .ok program => pure program
     | .error errors => throw (IO.userError
@@ -2945,16 +2945,16 @@ private def testExpandedBinaryContract (fixture : BinaryFixture) : IO Unit := do
 
 private def testExpandedBuiltinTampering : IO Unit := do
   let add ← binaryFixture
-    "function add() returns (Word) { return wordFromInteger(integerAdd(1, 2)); }"
+    "function add() returns (word) { return wordFromInteger(integerAdd(1, 2)); }"
     .integerAdd
   let multiply ← binaryFixture
-    "function multiply() returns (Word) { return wordFromInteger(integerMul(1, 2)); }"
+    "function multiply() returns (word) { return wordFromInteger(integerMul(1, 2)); }"
     .integerMul
   let equality ← binaryFixture
-    "function equality() returns (Bool) { return integerEq(1, 2); }"
+    "function equality() returns (bool) { return integerEq(1, 2); }"
     .integerEq
   let less ← binaryFixture
-    "function less() returns (Bool) { return integerLt(1, 2); }"
+    "function less() returns (bool) { return integerLt(1, 2); }"
     .integerLt
   for fixture in [add, multiply, equality, less] do
     testExpandedBinaryBaseline fixture
@@ -2970,7 +2970,7 @@ private structure WordToFixture where
 
 private def wordToFixture : IO WordToFixture := do
   let successor := toString (Core.wordModulus + 1)
-  let content := "function convert() returns (Word) { return wordFromInteger(wordToInteger(" ++
+  let content := "function convert() returns (word) { return wordFromInteger(wordToInteger(" ++
     successor ++ ")); }"
   let program ← match checkProgram (workspace content) with
     | .ok program => pure program
@@ -3032,7 +3032,7 @@ private def testWordToBaseline (fixture : WordToFixture) : IO Unit := do
           | .implementation (.byImpl goal (.builtin .intWord) []) =>
               goal == solved.predicate
           | _ => false))
-    "wordToInteger fixture lost exact Int<Word> evidence"
+    "wordToInteger fixture lost exact Int<word> evidence"
   match SourceCoreElaboration.evaluateStagedWord
       fixture.function.solvedRequirements fixture.function.typedBody
       fixture.word with
@@ -3246,7 +3246,7 @@ private structure NestedWordFromFixture where
 
 private def nestedWordFromFixture : IO NestedWordFromFixture := do
   let content :=
-    "function roundtrip() returns (Word) { return wordFromInteger(wordToInteger(wordFromInteger(integerSub(0, 1)))); }"
+    "function roundtrip() returns (word) { return wordFromInteger(wordToInteger(wordFromInteger(integerSub(0, 1)))); }"
   let program ← match checkProgram (workspace content) with
     | .ok program => pure program
     | .error errors => throw (IO.userError
@@ -3420,7 +3420,7 @@ private def testNestedWordFromMetadata
 
 private def testWordRequirementAccounting : IO Unit := do
   let content :=
-    "function duplicateWord() returns (Word) { return wordFromInteger(integerAdd(wordToInteger(1), wordToInteger(2))); }"
+    "function duplicateWord() returns (word) { return wordFromInteger(integerAdd(wordToInteger(1), wordToInteger(2))); }"
   let program ← match checkProgram (workspace content) with
     | .ok program => pure program
     | .error errors => throw (IO.userError
@@ -3650,48 +3650,48 @@ private def integerLiteralRequirement (function : CheckedFunction)
   | none => throw (IO.userError "staged integer literal was absent")
 
 private def positiveSource : String := String.intercalate "\n" [
-  "function basic() returns (Word) {",
+  "function basic() returns (word) {",
   "  let x = 42;",
   "  let y = integerAdd(x, 8);",
   "  return wordFromInteger(integerMul(y, 2));",
   "}",
-  "function negative() returns (Word) {",
+  "function negative() returns (word) {",
   "  let x: integer = integerSub(0, 3);",
   "  let y: integer = integerMul(x, 5);",
   "  return wordFromInteger(y);",
   "}",
-  "function reuse() returns (Word) {",
+  "function reuse() returns (word) {",
   "  let x: integer = integerSub(1, 2);",
   "  return wordFromInteger(integerAdd(x, x));",
   "}",
-  "function shadow() returns (Word) {",
+  "function shadow() returns (word) {",
   "  let x: integer = 3;",
   "  let x: integer = integerAdd(x, 1);",
   "  return wordFromInteger(x);",
   "}",
-  "function chain() returns (Word) {",
+  "function chain() returns (word) {",
   "  let a: integer = 2;",
   "  let b: integer = integerMul(a, 3);",
   "  let c: integer = integerSub(b, 1);",
   "  return wordFromInteger(c);",
   "}",
-  "function unused() returns (Word) {",
+  "function unused() returns (word) {",
   "  let ignored: integer = integerAdd(20, 22);",
   "  return 7;",
   "}",
-  "function composed() returns (Word) {",
+  "function composed() returns (word) {",
   "  let base = integerSub(10, 3);",
   "  {",
   "    let chosen = integerLt(base, 8) ? integerAdd(base, 5) : wordToInteger(99);",
   "    return wordFromInteger(chosen);",
   "  }",
   "}",
-  "function roundtripEq() returns (Word) {",
+  "function roundtripEq() returns (word) {",
   "  let x = 5;",
   "  return integerEq(wordToInteger(wordFromInteger(x)), x) ? 1 : 0;",
   "}",
-  "function runtimeWord(value: Word) returns (Word) {",
-  "  let next: Word = value + 1;",
+  "function runtimeWord(value: word) returns (word) {",
+  "  let next: word = value + 1;",
   "  return next * 2;",
   "}"
 ]
@@ -3886,7 +3886,7 @@ private def expectSourceCoreError (label content name : String)
 
 private def testBoundaryRejections : IO Unit := do
   let parameterSource := String.intercalate "\n" [
-    "function parameter(value: integer) returns (Word) {",
+    "function parameter(value: integer) returns (word) {",
     "  let local: integer = value;",
     "  return wordFromInteger(local);",
     "}"
@@ -3902,7 +3902,7 @@ private def testBoundaryRejections : IO Unit := do
       reason == .unsupportedType Ty.integer
 
   let uninitializedSource := String.intercalate "\n" [
-    "function uninitialized() returns (Word) {",
+    "function uninitialized() returns (word) {",
     "  let value: integer;",
     "  return wordFromInteger(value);",
     "}"
@@ -3918,7 +3918,7 @@ private def testBoundaryRejections : IO Unit := do
       reason == .uninitializedLet
 
   let strictSource := String.intercalate "\n" [
-    "function strict(value: Word) returns (Word) {",
+    "function strict(value: word) returns (word) {",
     "  let ignored: integer = wordToInteger(value);",
     "  return 7;",
     "}"
@@ -3973,7 +3973,7 @@ private def workspace (content : String) : Workspace.RawWorkspace := {
 
 private def checkedFunction : IO CheckedFunction := do
   let content := String.intercalate "\n" [
-    "function tamper() returns (Word) {",
+    "function tamper() returns (word) {",
     "  let x: integer = 5;",
     "  let y: integer = integerAdd(x, 7);",
     "  return wordFromInteger(integerMul(y, 2));",

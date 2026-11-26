@@ -316,7 +316,7 @@ open Solcore Core Frontend SourceInference SourceSemantics
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function local(flag: Bool) returns (Word, Bool) { let f = lam(value) { return value; }; let y: Word = f(11); let absent: Word; return (absent, f(flag)); }"}] }
+    "function local(flag: bool) returns (word, bool) { let f = lam(value) { return value; }; let y: word = f(11); let absent: word; return (absent, f(flag)); }"}] }
 def options : SourceCoreCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
 def runOptions : SourceCoreExecution.RunOptions :=
@@ -2072,12 +2072,12 @@ open RecursiveNamedPublicPhysicalSessionState (PlainValue)
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Key { Key(Bool) }",
-    "function pairRead(table: mapping((Bool, Bool) => Word)) returns (Word) { return table[(true, false)]; }",
-    "function pairWrite(table: mapping((Bool, Bool) => Word)) returns (mapping((Bool, Bool) => Word)) { table[(true, false)] += 3; return table; }",
-    "function proxyRead(table: mapping(@Word => Word)) returns (Word) { return table[@Word]; }",
-    "function proxyWrite(table: mapping(@Word => Word)) returns (mapping(@Word => Word)) { table[@Word] += 3; return table; }",
-    "function nominalRead(table: mapping(Key => Word)) returns (Word) { return table[Key(true)]; }"]}] }
+    "enum Key { Key(bool) }",
+    "function pairRead(table: mapping((bool, bool) => word)) returns (word) { return table[(true, false)]; }",
+    "function pairWrite(table: mapping((bool, bool) => word)) returns (mapping((bool, bool) => word)) { table[(true, false)] += 3; return table; }",
+    "function proxyRead(table: mapping(@word => word)) returns (word) { return table[@word]; }",
+    "function proxyWrite(table: mapping(@word => word)) returns (mapping(@word => word)) { table[@word] += 3; return table; }",
+    "function nominalRead(table: mapping(Key => word)) returns (word) { return table[Key(true)]; }"]}] }
 def options : SourceCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
 def runOptions : SourceCoreExecution.RunOptions :=

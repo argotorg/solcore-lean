@@ -42,19 +42,19 @@ private def w (value : Nat) : Core.Word := Core.Word.ofNatModulo value
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Marker<T> {}", "impl Marker<Word> {}",
+    "trait Marker<T> {}", "impl Marker<word> {}",
     "function keep<T>(value: T) returns (T) where T: Marker { return value; }",
     "function relay<T>(value: T) returns (T) where T: Marker { return keep(value); }",
-    "function constrained(value: Word) returns (Word) where Word: Marker { let table: mapping(Word => Word); table[0] = relay(value); return table[0]; }",
+    "function constrained(value: word) returns (word) where word: Marker { let table: mapping(word => word); table[0] = relay(value); return table[0]; }",
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
-    "impl Coerce<Bool, Word> { function coerce(value: Bool) returns (Word) { let table: mapping(Word => Word); table[0] = value ? 40 : 6; table[0] += 2; return table[0]; } }",
-    "function converted(flag: Bool) returns (Word) { let table: mapping(Word => Word); table[0] = flag; return table[0]; }",
-    "function indirect(flag: Bool) returns (Word) { let f: function(Word) returns (Word) = lam(value: Word) -> Word { return value + 5; }; return f(flag); }",
-    "function identity(value: Word) returns (Word) { return value; }",
-    "type WordFunction = function(Word) returns (Word);",
-    "impl Coerce<Word, WordFunction> { function coerce(value: Word) returns (WordFunction) { return identity; } }",
-    "function convertedFunction(value: Word) returns (WordFunction) { return value; }",
-    "function useFunction(f: WordFunction, value: Word) returns (Word) { return f(value); }",
+    "impl Coerce<bool, word> { function coerce(value: bool) returns (word) { let table: mapping(word => word); table[0] = value ? 40 : 6; table[0] += 2; return table[0]; } }",
+    "function converted(flag: bool) returns (word) { let table: mapping(word => word); table[0] = flag; return table[0]; }",
+    "function indirect(flag: bool) returns (word) { let f: function(word) returns (word) = lam(value: word) -> word { return value + 5; }; return f(flag); }",
+    "function identity(value: word) returns (word) { return value; }",
+    "type WordFunction = function(word) returns (word);",
+    "impl Coerce<word, WordFunction> { function coerce(value: word) returns (WordFunction) { return identity; } }",
+    "function convertedFunction(value: word) returns (WordFunction) { return value; }",
+    "function useFunction(f: WordFunction, value: word) returns (word) { return f(value); }",
     "enum Token { A, B, C }",
     "trait Add<T> { function add(left: T, right: T) returns (T) where T: Marker; }",
     "trait BitNot<T> { function bnot(value: T) returns (T) where T: Marker; }",
@@ -62,7 +62,7 @@ private def workspace : Workspace.RawWorkspace := {
     "impl Add<Token> { function add(left: Token, right: Token) returns (Token) where Token: Marker { match (left) { case .A { return right; } case .B { return .C; } default { return .A; } } } }",
     "impl BitNot<Token> { function bnot(value: Token) returns (Token) where Token: Marker { match (value) { case .A { return .B; } case .B { return .C; } default { return .A; } } } }",
     "function operatorResult() returns (Token) { return ~(Token.A + Token.B); }",
-    "function operatorEffects() returns (Word) { let count: Word = 0; let left = lam() -> Token { count = count * 10 + 1; return .A; }; let right = lam() -> Token { count = count * 10 + 2; return .B; }; let token: Token = left() + right(); return count; }"
+    "function operatorEffects() returns (word) { let count: word = 0; let left = lam() -> Token { count = count * 10 + 1; return .A; }; let right = lam() -> Token { count = count * 10 + 2; return .B; }; let token: Token = left() + right(); return count; }"
   ]}]
 }
 
@@ -478,11 +478,11 @@ def observeFactory (function : CheckedFunction) (signature generic : ProgramFunc
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
+    "trait Mark<T> {}", "impl Mark<word> {}", "impl Mark<bool> {}",
     "function choose<A, B>(a: A, b: B) returns (A) where A: Mark { return a; }",
     "function factory<A, B>(a: A, b: B) returns (function() returns (A)) where A: Mark { return lam() -> A { return choose(a, b); }; }",
-    "function wordRoot(value: Word, flag: Bool) returns (function() returns (Word)) { return factory(value, flag); }",
-    "function boolRoot(flag: Bool, value: Word) returns (function() returns (Bool)) { return factory(flag, value); }"]}] }
+    "function wordRoot(value: word, flag: bool) returns (function() returns (word)) { return factory(value, flag); }",
+    "function boolRoot(flag: bool, value: word) returns (function() returns (bool)) { return factory(flag, value); }"]}] }
 
 structure CheckedFixture where
   program : CheckedProgram

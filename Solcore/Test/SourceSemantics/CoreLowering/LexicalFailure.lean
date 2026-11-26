@@ -199,7 +199,7 @@ theorem IdentityShape.statementTyping {function : CheckedFunction} {signature : 
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function failed() returns (Word) { let local: Word; return local; } function identity(seed: Word) returns (Word) { return seed; }"}] }
+    "function failed() returns (word) { let local: word; return local; } function identity(seed: word) returns (word) { return seed; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)

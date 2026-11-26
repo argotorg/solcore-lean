@@ -134,12 +134,12 @@ open Tests.SourceCompilerFeatureSupport in
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function first(value: Word) returns (Word) { let copied = value; return copied; }",
-    "function bad(value: Word) returns (Word) { let copied = value; let gap: Word; return gap; }",
-    "function equalNamed(seed: Word) returns (Word) { let root: Word; root = first(seed); return first(root); }",
-    "function compoundNamed(seed: Word) returns (Word) { let root: Word; root += first(seed); return first(99); }",
-    "function equalRhsFault(seed: Word) returns (Word) { let root: Word; root = bad(seed); return first(99); }",
-    "function compoundRhsFault(seed: Word) returns (Word) { let root: Word; root += bad(seed); return first(99); }"
+    "function first(value: word) returns (word) { let copied = value; return copied; }",
+    "function bad(value: word) returns (word) { let copied = value; let gap: word; return gap; }",
+    "function equalNamed(seed: word) returns (word) { let root: word; root = first(seed); return first(root); }",
+    "function compoundNamed(seed: word) returns (word) { let root: word; root += first(seed); return first(99); }",
+    "function equalRhsFault(seed: word) returns (word) { let root: word; root = bad(seed); return first(99); }",
+    "function compoundRhsFault(seed: word) returns (word) { let root: word; root += bad(seed); return first(99); }"
   ]}]
 }
 
@@ -327,17 +327,17 @@ theorem concrete_named_reflects [FunctionCalls.FaultTokens faults] (errors : hea
 end Static
 
 private def content : String := String.intercalate "\n" [
-  "function first(value: Word) returns (Word) { let copied = value; return copied; }",
-  "function key(value: Word) returns (Word) { let copied = value; return copied; }",
-  "function same(raw: mapping(Word => Word)) returns (mapping(Word => Word)) { let copied = raw; return copied; }",
-  "function bad(value: Word) returns (Word) { let gap: Word; return gap; }",
-  "function absentEqual(seed: Word) returns (Word) { let root: Word; root = first(seed); return first(root); }",
-  "function compoundPresent(seed: Word) returns (Word) { let root = first(10); root += first(seed); return first(root); }",
-  "function absentCompound(seed: Word) returns (Word) { let root: Word; root += first(seed); return first(99); }",
-  "function rhsFault(seed: Word) returns (Word) { let root = first(10); root += bad(seed); return first(99); }",
-  "function lateFault(seed: Word) returns (Word) { let root = first(10); root += first(seed); return bad(root); }",
-  "function assignmentUnit(seed: Word) { let root: Word; root = first(seed); first(root); }",
-  "function rawEqual(raw: mapping(Word => Word)) returns (Word) { let root: mapping(Word => Word); root = same(raw); return first(root[key(1)]); }"
+  "function first(value: word) returns (word) { let copied = value; return copied; }",
+  "function key(value: word) returns (word) { let copied = value; return copied; }",
+  "function same(raw: mapping(word => word)) returns (mapping(word => word)) { let copied = raw; return copied; }",
+  "function bad(value: word) returns (word) { let gap: word; return gap; }",
+  "function absentEqual(seed: word) returns (word) { let root: word; root = first(seed); return first(root); }",
+  "function compoundPresent(seed: word) returns (word) { let root = first(10); root += first(seed); return first(root); }",
+  "function absentCompound(seed: word) returns (word) { let root: word; root += first(seed); return first(99); }",
+  "function rhsFault(seed: word) returns (word) { let root = first(10); root += bad(seed); return first(99); }",
+  "function lateFault(seed: word) returns (word) { let root = first(10); root += first(seed); return bad(root); }",
+  "function assignmentUnit(seed: word) { let root: word; root = first(seed); first(root); }",
+  "function rawEqual(raw: mapping(word => word)) returns (word) { let root: mapping(word => word); root = same(raw); return first(root[key(1)]); }"
 ]
 private def wordValue (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def present (n : Nat) : TypeSystem.Ty × Option SourceTypedRuntime.Value := (.word,some (wordValue n))
@@ -549,20 +549,20 @@ theorem concrete_named_empty_post_reflects [FunctionCalls.FaultTokens faults] {c
 end Concrete
 
 private def content : String := String.intercalate "\n" [
-  "function next(value: Word) returns (Word) { return value + 1; }",
-  "function copied(value: Word) returns (Word) { let local = value; return local; }",
-  "function less(value: Word, bound: Word) returns (Bool) { return value < bound; }",
-  "function bad(value: Word) returns (Word) { let gap: Word; return gap; }",
-  "function stopOrFail(value: Word) returns (Bool) { if (value < 3) { return true; } let gap: Word; return gap == value; }",
-  "function transfers(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (; less(index, 4); index += next(0)) { raw[next(0)] += copied(1); if (less(index, 2)) { continue; } raw[next(0)] += copied(1); } return copied(index + raw[next(0)]); }",
-  "function breaks(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (; less(index, 4); raw[next(0)] += copied(10), index += next(0)) { raw[next(0)] += copied(1); break; } return copied(index + raw[next(0)]); }",
-  "function early(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (; true; raw[next(0)] += copied(10), index += next(0)) { raw[next(0)] += copied(2); return copied(raw[next(0)]); } return copied(99); }",
-  "function zero(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index: Word = 0; for (; false; raw[next(0)] += bad(seed)) { bad(seed); } return copied(raw[next(0)]); }",
-  "function nested(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (; less(index, 2); index += next(0)) { let inner = 0; while (less(inner, 3)) { inner += next(0); if (less(inner, 2)) { continue; } raw[next(0)] += copied(1); break; } for (let local = 0; less(local, 2); local += next(0)) { if (less(local, 1)) { continue; } raw[next(0)] += copied(1); } } return copied(index + raw[next(0)]); }",
-  "function bodyFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (; true; raw[next(0)] += copied(9), index += next(0)) { raw[next(0)] += copied(2); bad(seed); } return copied(99); }",
-  "function postFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (; true; raw[next(0)] += copied(3), let failed = bad(seed), index += next(0)) { raw[next(0)] += copied(2); continue; } return copied(99); }",
-  "function conditionFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (; stopOrFail(index); index += next(0)) { raw[next(0)] += copied(2); } return copied(99); }",
-  "function initializerFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index: Word = 0; for (raw[next(0)] += copied(3), let failed = bad(seed); true; ) { raw[next(0)] += copied(99); } return copied(99); }"
+  "function next(value: word) returns (word) { return value + 1; }",
+  "function copied(value: word) returns (word) { let local = value; return local; }",
+  "function less(value: word, bound: word) returns (bool) { return value < bound; }",
+  "function bad(value: word) returns (word) { let gap: word; return gap; }",
+  "function stopOrFail(value: word) returns (bool) { if (value < 3) { return true; } let gap: word; return gap == value; }",
+  "function transfers(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (; less(index, 4); index += next(0)) { raw[next(0)] += copied(1); if (less(index, 2)) { continue; } raw[next(0)] += copied(1); } return copied(index + raw[next(0)]); }",
+  "function breaks(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (; less(index, 4); raw[next(0)] += copied(10), index += next(0)) { raw[next(0)] += copied(1); break; } return copied(index + raw[next(0)]); }",
+  "function early(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (; true; raw[next(0)] += copied(10), index += next(0)) { raw[next(0)] += copied(2); return copied(raw[next(0)]); } return copied(99); }",
+  "function zero(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index: word = 0; for (; false; raw[next(0)] += bad(seed)) { bad(seed); } return copied(raw[next(0)]); }",
+  "function nested(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (; less(index, 2); index += next(0)) { let inner = 0; while (less(inner, 3)) { inner += next(0); if (less(inner, 2)) { continue; } raw[next(0)] += copied(1); break; } for (let local = 0; less(local, 2); local += next(0)) { if (less(local, 1)) { continue; } raw[next(0)] += copied(1); } } return copied(index + raw[next(0)]); }",
+  "function bodyFault(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (; true; raw[next(0)] += copied(9), index += next(0)) { raw[next(0)] += copied(2); bad(seed); } return copied(99); }",
+  "function postFault(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (; true; raw[next(0)] += copied(3), let failed = bad(seed), index += next(0)) { raw[next(0)] += copied(2); continue; } return copied(99); }",
+  "function conditionFault(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (; stopOrFail(index); index += next(0)) { raw[next(0)] += copied(2); } return copied(99); }",
+  "function initializerFault(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index: word = 0; for (raw[next(0)] += copied(3), let failed = bad(seed); true; ) { raw[next(0)] += copied(99); } return copied(99); }"
 ]
 
 private def wordValue (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
@@ -834,18 +834,18 @@ theorem concrete_named_post_loop_reflects [FunctionCalls.FaultTokens faults] {co
 end Concrete
 
 private def content : String := String.intercalate "\n" [
-  "function next(value: Word) returns (Word) { return value + 1; }",
-  "function copied(value: Word) returns (Word) { let local = value; return local; }",
-  "function less(value: Word, bound: Word) returns (Bool) { return value < bound; }",
-  "function bad(value: Word) returns (Word) { let gap: Word; return gap; }",
-  "function localsContinue(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (let first: Word, first = copied(0), let header = next(0), copied(header); less(first, 3); let absent: Word, absent = next(first), let retained = copied(absent), copied(retained), raw[next(0)] += copied(retained), first += copied(1)) { index += copied(1); continue; } return copied(index + raw[next(0)]); }",
-  "function localsFallthrough(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (let first: Word, first = copied(0), let header = next(0), copied(header); less(first, 3); let absent: Word, absent = next(first), let retained = copied(absent), copied(retained), raw[next(0)] += copied(retained), first += copied(1)) { index += copied(1); } return copied(index + raw[next(0)]); }",
-  "function postBreak(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index: Word = 0; for (let first = copied(0); true; let never = bad(seed), raw[next(0)] += copied(99)) { raw[next(0)] += copied(1); break; } return copied(raw[next(0)]); }",
-  "function postReturn(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index: Word = 0; for (let first = copied(0); true; let never = bad(seed), raw[next(0)] += copied(99)) { raw[next(0)] += copied(2); return copied(raw[next(0)]); } return copied(99); }",
-  "function bitNot(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (let mask = copied(0); less(index, 2); mask ~=, mask ~=, index += next(0)) { raw[next(0)] += copied(1); } return copied(index + raw[next(0)]); }",
-  "function postFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (let first = copied(0); true; let staged = copied(3), raw[next(0)] += copied(staged), let missing: Word, raw[next(0)] += copied(missing), index += copied(9)) { raw[next(0)] += copied(2); index += copied(1); continue; } return copied(99); }",
-  "function initialFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index: Word = 0; for (raw[next(0)] += copied(3), let ready = copied(0), let missing: Word, let dead = copied(missing); true; ) { raw[next(0)] += copied(99); } return copied(99); }",
-  "function bitNotFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (let missing: Word; true; missing ~=, raw[next(0)] += copied(99)) { raw[next(0)] += copied(2); index += copied(1); continue; } return copied(99); }"
+  "function next(value: word) returns (word) { return value + 1; }",
+  "function copied(value: word) returns (word) { let local = value; return local; }",
+  "function less(value: word, bound: word) returns (bool) { return value < bound; }",
+  "function bad(value: word) returns (word) { let gap: word; return gap; }",
+  "function localsContinue(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (let first: word, first = copied(0), let header = next(0), copied(header); less(first, 3); let absent: word, absent = next(first), let retained = copied(absent), copied(retained), raw[next(0)] += copied(retained), first += copied(1)) { index += copied(1); continue; } return copied(index + raw[next(0)]); }",
+  "function localsFallthrough(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (let first: word, first = copied(0), let header = next(0), copied(header); less(first, 3); let absent: word, absent = next(first), let retained = copied(absent), copied(retained), raw[next(0)] += copied(retained), first += copied(1)) { index += copied(1); } return copied(index + raw[next(0)]); }",
+  "function postBreak(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index: word = 0; for (let first = copied(0); true; let never = bad(seed), raw[next(0)] += copied(99)) { raw[next(0)] += copied(1); break; } return copied(raw[next(0)]); }",
+  "function postReturn(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index: word = 0; for (let first = copied(0); true; let never = bad(seed), raw[next(0)] += copied(99)) { raw[next(0)] += copied(2); return copied(raw[next(0)]); } return copied(99); }",
+  "function bitNot(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (let mask = copied(0); less(index, 2); mask ~=, mask ~=, index += next(0)) { raw[next(0)] += copied(1); } return copied(index + raw[next(0)]); }",
+  "function postFault(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (let first = copied(0); true; let staged = copied(3), raw[next(0)] += copied(staged), let missing: word, raw[next(0)] += copied(missing), index += copied(9)) { raw[next(0)] += copied(2); index += copied(1); continue; } return copied(99); }",
+  "function initialFault(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index: word = 0; for (raw[next(0)] += copied(3), let ready = copied(0), let missing: word, let dead = copied(missing); true; ) { raw[next(0)] += copied(99); } return copied(99); }",
+  "function bitNotFault(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (let missing: word; true; missing ~=, raw[next(0)] += copied(99)) { raw[next(0)] += copied(2); index += copied(1); continue; } return copied(99); }"
 ]
 
 private def wordValue (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
@@ -1032,15 +1032,15 @@ theorem concrete_named_reflects [FunctionCalls.FaultTokens faults] {mode : Bool}
 end Static
 
 private def content : String := String.intercalate "\n" [
-  "function key(value: Word) returns (Word) { return value; }",
-  "function first(value: Word) returns (Word) { let copied = value; return copied; }",
-  "function bad(value: Word) returns (Word) { let gap: Word; return gap; }",
-  "function compound(raw: mapping(Word => Word), seed: Word) returns (Word) { raw[key(seed)] += first(seed); first(seed); return raw[key(seed)]; }",
-  "function keyFault(raw: mapping(Word => Word), seed: Word) returns (Word) { raw[bad(seed)] += first(seed); return seed; }",
-  "function rhsFault(raw: mapping(Word => Word), seed: Word) returns (Word) { raw[key(seed)] += bad(seed); return seed; }",
-  "function tailFault(raw: mapping(Word => Word), seed: Word) returns (Word) { raw[key(seed)] += first(seed); return bad(seed); }",
-  "function unitTail(raw: mapping(Word => Word), seed: Word) { raw[key(seed)] = first(seed); first(seed); }",
-  "function getterFault(table: mapping(Word => mapping(Word => function(Word) returns (Word))), seed: Word, replacement: function(Word) returns (Word)) returns (Word) { table[key(seed)][first(seed)] = replacement; return seed; }"
+  "function key(value: word) returns (word) { return value; }",
+  "function first(value: word) returns (word) { let copied = value; return copied; }",
+  "function bad(value: word) returns (word) { let gap: word; return gap; }",
+  "function compound(raw: mapping(word => word), seed: word) returns (word) { raw[key(seed)] += first(seed); first(seed); return raw[key(seed)]; }",
+  "function keyFault(raw: mapping(word => word), seed: word) returns (word) { raw[bad(seed)] += first(seed); return seed; }",
+  "function rhsFault(raw: mapping(word => word), seed: word) returns (word) { raw[key(seed)] += bad(seed); return seed; }",
+  "function tailFault(raw: mapping(word => word), seed: word) returns (word) { raw[key(seed)] += first(seed); return bad(seed); }",
+  "function unitTail(raw: mapping(word => word), seed: word) { raw[key(seed)] = first(seed); first(seed); }",
+  "function getterFault(table: mapping(word => mapping(word => function(word) returns (word))), seed: word, replacement: function(word) returns (word)) returns (word) { table[key(seed)][first(seed)] = replacement; return seed; }"
 ]
 
 private def finish (compiled : SourceCoreUnifiedCompilation.Compiled) (name : String)
@@ -1249,25 +1249,25 @@ theorem concrete_for_reflects [FunctionCalls.FaultTokens faults] {context : Sour
 end Static
 
 private def content : String := String.intercalate "\n" [
-  "function next(value: Word) returns (Word) { return value + 1; }",
-  "function copied(value: Word) returns (Word) { let local = value; return local; }",
-  "function less(value: Word, bound: Word) returns (Bool) { return value < bound; }",
-  "function bad(value: Word) returns (Word) { let gap: Word; return gap; }",
-  "function bodyCallFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (let first = copied(0); true; raw[next(0)] += copied(99)) { raw[next(0)] += copied(5); index += copied(1); copied(bad(seed)); } return copied(99); }",
-  "function nestedFor(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; let mask = copied(0); mask ~=; mask ~=; for (let outer = copied(0); less(outer, 2); let postLocal = next(outer), copied(postLocal), outer += copied(1)) { for (let inner: Word, inner = copied(0); less(inner, 3); let local = next(inner), copied(local), inner += copied(1)) { index += copied(1); if (less(inner, 1)) { continue; } raw[next(0)] += copied(2); if (less(outer, 1)) { break; } } } return copied(index + raw[next(0)]); }",
-  "function forWhile(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (let outer = copied(0); less(outer, 2); outer += copied(1)) { let inner = copied(0); while (less(inner, 2)) { inner += copied(1); index += copied(1); if (less(inner, 2)) { continue; } raw[next(0)] += copied(3); break; } } return copied(index + raw[next(0)]); }",
-  "function whileFor(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; let outer = copied(0); while (less(outer, 2)) { outer += copied(1); for (let inner = copied(0); less(inner, 2); inner += copied(1)) { index += copied(1); raw[next(0)] += copied(2); if (less(outer, 2)) { continue; } break; } } return copied(index + raw[next(0)]); }",
-  "function nestedReturn(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (let outer = copied(0); true; let dead = bad(seed)) { while (true) { for (let inner = copied(0); true; let dead = bad(seed)) { raw[next(0)] += copied(4); index += copied(1); return copied(index + raw[next(0)]); } } } return copied(99); }",
-  "function bodyBitNot(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (let mask = copied(0), mask ~=, mask ~=; less(index, 2); index += copied(1), mask ~=, mask ~=) { mask ~=; mask ~=; raw[next(0)] += copied(2); } return copied(index + raw[next(0)]); }",
-  "function bodyBitNotFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (let outer = copied(0); true; raw[next(0)] += copied(99)) { let absent: Word; index += copied(1); raw[next(0)] += copied(3); absent ~=; } return copied(99); }",
-  "function localsContinue(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (let first: Word, first = copied(0), let header = next(0), copied(header); less(first, 3); let absent: Word, absent = next(first), let retained = copied(absent), copied(retained), raw[next(0)] += copied(retained), first += copied(1)) { index += copied(1); continue; } return copied(index + raw[next(0)]); }",
-  "function localsFallthrough(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (let first: Word, first = copied(0), let header = next(0), copied(header); less(first, 3); let absent: Word, absent = next(first), let retained = copied(absent), copied(retained), raw[next(0)] += copied(retained), first += copied(1)) { index += copied(1); } return copied(index + raw[next(0)]); }",
-  "function postBreak(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index: Word = 0; for (let first = copied(0); true; let never = bad(seed), raw[next(0)] += copied(99)) { raw[next(0)] += copied(1); break; } return copied(raw[next(0)]); }",
-  "function postReturn(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index: Word = 0; for (let first = copied(0); true; let never = bad(seed), raw[next(0)] += copied(99)) { raw[next(0)] += copied(2); return copied(raw[next(0)]); } return copied(99); }",
-  "function bitNot(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (let mask = copied(0); less(index, 2); mask ~=, mask ~=, index += next(0)) { raw[next(0)] += copied(1); } return copied(index + raw[next(0)]); }",
-  "function postFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (let first = copied(0); true; let staged = copied(3), raw[next(0)] += copied(staged), let missing: Word, raw[next(0)] += copied(missing), index += copied(9)) { raw[next(0)] += copied(2); index += copied(1); continue; } return copied(99); }",
-  "function initialFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index: Word = 0; for (raw[next(0)] += copied(3), let ready = copied(0), let missing: Word, let dead = copied(missing); true; ) { raw[next(0)] += copied(99); } return copied(99); }",
-  "function bitNotFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (let missing: Word; true; missing ~=, raw[next(0)] += copied(99)) { raw[next(0)] += copied(2); index += copied(1); continue; } return copied(99); }"
+  "function next(value: word) returns (word) { return value + 1; }",
+  "function copied(value: word) returns (word) { let local = value; return local; }",
+  "function less(value: word, bound: word) returns (bool) { return value < bound; }",
+  "function bad(value: word) returns (word) { let gap: word; return gap; }",
+  "function bodyCallFault(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (let first = copied(0); true; raw[next(0)] += copied(99)) { raw[next(0)] += copied(5); index += copied(1); copied(bad(seed)); } return copied(99); }",
+  "function nestedFor(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; let mask = copied(0); mask ~=; mask ~=; for (let outer = copied(0); less(outer, 2); let postLocal = next(outer), copied(postLocal), outer += copied(1)) { for (let inner: word, inner = copied(0); less(inner, 3); let local = next(inner), copied(local), inner += copied(1)) { index += copied(1); if (less(inner, 1)) { continue; } raw[next(0)] += copied(2); if (less(outer, 1)) { break; } } } return copied(index + raw[next(0)]); }",
+  "function forWhile(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (let outer = copied(0); less(outer, 2); outer += copied(1)) { let inner = copied(0); while (less(inner, 2)) { inner += copied(1); index += copied(1); if (less(inner, 2)) { continue; } raw[next(0)] += copied(3); break; } } return copied(index + raw[next(0)]); }",
+  "function whileFor(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; let outer = copied(0); while (less(outer, 2)) { outer += copied(1); for (let inner = copied(0); less(inner, 2); inner += copied(1)) { index += copied(1); raw[next(0)] += copied(2); if (less(outer, 2)) { continue; } break; } } return copied(index + raw[next(0)]); }",
+  "function nestedReturn(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (let outer = copied(0); true; let dead = bad(seed)) { while (true) { for (let inner = copied(0); true; let dead = bad(seed)) { raw[next(0)] += copied(4); index += copied(1); return copied(index + raw[next(0)]); } } } return copied(99); }",
+  "function bodyBitNot(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (let mask = copied(0), mask ~=, mask ~=; less(index, 2); index += copied(1), mask ~=, mask ~=) { mask ~=; mask ~=; raw[next(0)] += copied(2); } return copied(index + raw[next(0)]); }",
+  "function bodyBitNotFault(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (let outer = copied(0); true; raw[next(0)] += copied(99)) { let absent: word; index += copied(1); raw[next(0)] += copied(3); absent ~=; } return copied(99); }",
+  "function localsContinue(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (let first: word, first = copied(0), let header = next(0), copied(header); less(first, 3); let absent: word, absent = next(first), let retained = copied(absent), copied(retained), raw[next(0)] += copied(retained), first += copied(1)) { index += copied(1); continue; } return copied(index + raw[next(0)]); }",
+  "function localsFallthrough(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (let first: word, first = copied(0), let header = next(0), copied(header); less(first, 3); let absent: word, absent = next(first), let retained = copied(absent), copied(retained), raw[next(0)] += copied(retained), first += copied(1)) { index += copied(1); } return copied(index + raw[next(0)]); }",
+  "function postBreak(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index: word = 0; for (let first = copied(0); true; let never = bad(seed), raw[next(0)] += copied(99)) { raw[next(0)] += copied(1); break; } return copied(raw[next(0)]); }",
+  "function postReturn(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index: word = 0; for (let first = copied(0); true; let never = bad(seed), raw[next(0)] += copied(99)) { raw[next(0)] += copied(2); return copied(raw[next(0)]); } return copied(99); }",
+  "function bitNot(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (let mask = copied(0); less(index, 2); mask ~=, mask ~=, index += next(0)) { raw[next(0)] += copied(1); } return copied(index + raw[next(0)]); }",
+  "function postFault(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (let first = copied(0); true; let staged = copied(3), raw[next(0)] += copied(staged), let missing: word, raw[next(0)] += copied(missing), index += copied(9)) { raw[next(0)] += copied(2); index += copied(1); continue; } return copied(99); }",
+  "function initialFault(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index: word = 0; for (raw[next(0)] += copied(3), let ready = copied(0), let missing: word, let dead = copied(missing); true; ) { raw[next(0)] += copied(99); } return copied(99); }",
+  "function bitNotFault(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; for (let missing: word; true; missing ~=, raw[next(0)] += copied(99)) { raw[next(0)] += copied(2); index += copied(1); continue; } return copied(99); }"
 ]
 
 private def wordValue (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
@@ -1432,16 +1432,16 @@ theorem concrete_named_reflects [FunctionCalls.FaultTokens faults] {context : So
 end Static
 
 private def content : String := String.intercalate "\n" [
-  "function first(value: Word) returns (Word) { let copied = value; return copied; }",
-  "function predicate(value: Word) returns (Bool) { let copied = value; return copied > 0; }",
-  "function bad(value: Word) returns (Word) { let gap: Word; return gap; }",
-  "function nested(seed: Word) returns (Word) { let saved = first(seed); { let hidden = first(saved + 1); hidden; } if (predicate(saved)) { let chosen = first(saved + 2); chosen; } else { let unused = bad(saved); unused; } return first(saved + 3); }",
-  "function shadow(seed: Word) returns (Word) { let saved = first(seed); { let saved = first(4); if (predicate(saved)) { let inside = first(saved + 1); inside; } } return first(saved); }",
-  "function branches(seed: Word) returns (Word) { let saved = first(seed); if (predicate(saved)) { return first(9); } else { return first(5); } return bad(saved); }",
-  "function initializerFault(seed: Word) returns (Word) { let saved = first(seed); let failed = bad(saved); return first(99); }",
-  "function conditionFault(seed: Word) returns (Word) { let saved = first(seed); if (predicate(bad(saved))) { let unreachable = first(99); unreachable; } return first(100); }",
-  "function discardedFault(seed: Word) returns (Word) { let saved = first(seed); { let retained = first(4); bad(saved); } return first(99); }",
-  "function unitTail(seed: Word) { let saved = first(seed); let gap: Word; { let hidden = first(saved + 1); hidden; } if (predicate(saved)) { first(saved + 2); } else { bad(saved); } }"
+  "function first(value: word) returns (word) { let copied = value; return copied; }",
+  "function predicate(value: word) returns (bool) { let copied = value; return copied > 0; }",
+  "function bad(value: word) returns (word) { let gap: word; return gap; }",
+  "function nested(seed: word) returns (word) { let saved = first(seed); { let hidden = first(saved + 1); hidden; } if (predicate(saved)) { let chosen = first(saved + 2); chosen; } else { let unused = bad(saved); unused; } return first(saved + 3); }",
+  "function shadow(seed: word) returns (word) { let saved = first(seed); { let saved = first(4); if (predicate(saved)) { let inside = first(saved + 1); inside; } } return first(saved); }",
+  "function branches(seed: word) returns (word) { let saved = first(seed); if (predicate(saved)) { return first(9); } else { return first(5); } return bad(saved); }",
+  "function initializerFault(seed: word) returns (word) { let saved = first(seed); let failed = bad(saved); return first(99); }",
+  "function conditionFault(seed: word) returns (word) { let saved = first(seed); if (predicate(bad(saved))) { let unreachable = first(99); unreachable; } return first(100); }",
+  "function discardedFault(seed: word) returns (word) { let saved = first(seed); { let retained = first(4); bad(saved); } return first(99); }",
+  "function unitTail(seed: word) { let saved = first(seed); let gap: word; { let hidden = first(saved + 1); hidden; } if (predicate(saved)) { first(saved + 2); } else { bad(saved); } }"
 ]
 
 private def wordValue (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
@@ -1627,22 +1627,22 @@ theorem concrete_named_assignment_reflects [FunctionCalls.FaultTokens faults] {c
 end Static
 
 private def content : String := String.intercalate "\n" [
-  "function key(value: Word) returns (Word) { let copied = value; return copied; }",
-  "function first(value: Word) returns (Word) { let copied = value; return copied; }",
-  "function predicate(value: Word) returns (Bool) { let copied = value; return copied > 0; }",
-  "function bad(value: Word) returns (Word) { let gap: Word; return gap; }",
-  "function nested(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved = first(seed); { let delta = first(saved + 1); raw[key(1)] += first(delta); } if (predicate(saved)) { let delta = first(saved + 2); raw[key(1)] += first(delta); } else { raw[key(bad(saved))] += first(99); } return first(raw[key(1)]); }",
-  "function shadow(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved = first(seed); { let saved = first(4); raw[key(1)] += first(saved); } if (predicate(saved)) { raw[key(1)] += first(2); } else { raw[key(1)] += first(5); } return first(saved); }",
-  "function rhsFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved = first(seed); { let delta = first(4); raw[key(1)] += first(delta); } if (predicate(saved)) { let delta = first(2); raw[key(1)] += bad(delta); } return first(99); }",
-  "function keyFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved = first(seed); { let delta = first(4); raw[key(1)] += first(delta); } if (predicate(saved)) { raw[bad(saved)] += first(99); } return first(100); }",
-  "function earlyReturn(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved = first(seed); if (predicate(saved)) { let delta = first(2); raw[key(1)] += first(delta); return first(raw[key(1)]); } else { return first(6); } return bad(99); }",
-  "function tailFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved = first(seed); { let delta = first(4); raw[key(1)] += first(delta); } if (predicate(saved)) { raw[key(1)] += first(2); } return bad(saved); }",
-  "function unitTail(raw: mapping(Word => Word), seed: Word) { let saved = first(seed); let gap: Word; { let delta = first(4); raw[key(1)] = first(delta); } if (predicate(saved)) { raw[key(1)] += first(2); } }",
-  "function getterFault(table: mapping(Word => mapping(Word => function(Word) returns (Word))), seed: Word, replacement: function(Word) returns (Word)) returns (Word) { { let chosen = first(seed); table[key(chosen)][first(chosen)] = replacement; } return seed; }",
-  "function bareMixed(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: Word; saved = first(seed); { let delta = first(saved + 1); saved += first(delta); raw[key(1)] += first(saved); } if (predicate(saved)) { saved = first(saved + 2); raw[key(1)] += first(saved); } else { saved = first(99); } return first(saved + raw[key(1)]); }",
-  "function bareBranch(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved = first(seed); { let saved: Word; saved = first(4); raw[key(1)] += first(saved); } if (predicate(saved)) { saved += first(2); } else { saved = first(5); } return first(saved); }",
-  "function bareOperandFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: Word; { raw[key(1)] += first(4); saved += first(seed); } return first(99); }",
-  "function bareRhsFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved = first(seed); { saved += first(4); raw[key(1)] += first(saved); } if (predicate(saved)) { saved = bad(saved); } return first(99); }"
+  "function key(value: word) returns (word) { let copied = value; return copied; }",
+  "function first(value: word) returns (word) { let copied = value; return copied; }",
+  "function predicate(value: word) returns (bool) { let copied = value; return copied > 0; }",
+  "function bad(value: word) returns (word) { let gap: word; return gap; }",
+  "function nested(raw: mapping(word => word), seed: word) returns (word) { let saved = first(seed); { let delta = first(saved + 1); raw[key(1)] += first(delta); } if (predicate(saved)) { let delta = first(saved + 2); raw[key(1)] += first(delta); } else { raw[key(bad(saved))] += first(99); } return first(raw[key(1)]); }",
+  "function shadow(raw: mapping(word => word), seed: word) returns (word) { let saved = first(seed); { let saved = first(4); raw[key(1)] += first(saved); } if (predicate(saved)) { raw[key(1)] += first(2); } else { raw[key(1)] += first(5); } return first(saved); }",
+  "function rhsFault(raw: mapping(word => word), seed: word) returns (word) { let saved = first(seed); { let delta = first(4); raw[key(1)] += first(delta); } if (predicate(saved)) { let delta = first(2); raw[key(1)] += bad(delta); } return first(99); }",
+  "function keyFault(raw: mapping(word => word), seed: word) returns (word) { let saved = first(seed); { let delta = first(4); raw[key(1)] += first(delta); } if (predicate(saved)) { raw[bad(saved)] += first(99); } return first(100); }",
+  "function earlyReturn(raw: mapping(word => word), seed: word) returns (word) { let saved = first(seed); if (predicate(saved)) { let delta = first(2); raw[key(1)] += first(delta); return first(raw[key(1)]); } else { return first(6); } return bad(99); }",
+  "function tailFault(raw: mapping(word => word), seed: word) returns (word) { let saved = first(seed); { let delta = first(4); raw[key(1)] += first(delta); } if (predicate(saved)) { raw[key(1)] += first(2); } return bad(saved); }",
+  "function unitTail(raw: mapping(word => word), seed: word) { let saved = first(seed); let gap: word; { let delta = first(4); raw[key(1)] = first(delta); } if (predicate(saved)) { raw[key(1)] += first(2); } }",
+  "function getterFault(table: mapping(word => mapping(word => function(word) returns (word))), seed: word, replacement: function(word) returns (word)) returns (word) { { let chosen = first(seed); table[key(chosen)][first(chosen)] = replacement; } return seed; }",
+  "function bareMixed(raw: mapping(word => word), seed: word) returns (word) { let saved: word; saved = first(seed); { let delta = first(saved + 1); saved += first(delta); raw[key(1)] += first(saved); } if (predicate(saved)) { saved = first(saved + 2); raw[key(1)] += first(saved); } else { saved = first(99); } return first(saved + raw[key(1)]); }",
+  "function bareBranch(raw: mapping(word => word), seed: word) returns (word) { let saved = first(seed); { let saved: word; saved = first(4); raw[key(1)] += first(saved); } if (predicate(saved)) { saved += first(2); } else { saved = first(5); } return first(saved); }",
+  "function bareOperandFault(raw: mapping(word => word), seed: word) returns (word) { let saved: word; { raw[key(1)] += first(4); saved += first(seed); } return first(99); }",
+  "function bareRhsFault(raw: mapping(word => word), seed: word) returns (word) { let saved = first(seed); { saved += first(4); raw[key(1)] += first(saved); } if (predicate(saved)) { saved = bad(saved); } return first(99); }"
 ]
 
 private def wordValue (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
@@ -1926,20 +1926,20 @@ theorem concrete_nested_reflects [FunctionCalls.FaultTokens faults] {context : S
 end Static
 
 private def content : String := String.intercalate "\n" [
-  "function next(value: Word) returns (Word) { return value + 1; }",
-  "function copied(value: Word) returns (Word) { let local = value; return local; }",
-  "function less(value: Word, bound: Word) returns (Bool) { return value < bound; }",
-  "function bad(value: Word) returns (Word) { let gap: Word; return gap; }",
-  "function nested(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (less(index, 4)) { index += copied(1); if (less(index, 2)) { continue; } let inner = 0; while (less(inner, 4)) { inner += next(0); if (less(inner, 2)) { continue; } raw[next(0)] += copied(1); if (less(1, inner)) { break; } } } return copied(index + raw[next(0)]); }",
-  "function outerBreak(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (less(index, 7)) { raw[next(0)] += copied(2); index += next(0); if (less(2, index)) { break; } } return copied(index + raw[next(0)]); }",
-  "function nestedFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (less(index, 7)) { index += next(0); let inner = 0; while (less(inner, 3)) { inner += next(0); raw[next(0)] += copied(1); if (less(1, inner)) { bad(index); } } } return copied(99); }",
-  "function stopOrFail(value: Word) returns (Bool) { if (value < 3) { return true; } let gap: Word; return gap == value; }",
-  "function early(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (less(index, 7)) { index += next(0); let inner = 0; while (less(inner, 4)) { inner += next(0); raw[next(0)] += copied(1); if (less(1, inner)) { return copied(raw[next(0)] + index); } } } return bad(seed); }",
-  "function unitLoop(raw: mapping(Word => Word), seed: Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (less(index, 4)) { index += next(0); if (less(index, 2)) { continue; } { let delta = copied(2); raw[next(0)] += delta; } if (less(2, index)) { break; } } }",
-  "function conditionFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (stopOrFail(index)) { raw[next(0)] += copied(3); index += next(0); } return copied(99); }",
-  "function keyFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (less(index, 7)) { index += next(0); if (less(0, index)) { raw[bad(index)] += copied(99); } } return copied(99); }",
-  "function rhsFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (less(index, 7)) { index += next(0); { let chosen = copied(2); raw[next(0)] += chosen; raw[next(0)] += bad(index); } } return copied(99); }",
-  "function zero(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (less(index, 0)) { while (less(index, 4)) { bad(seed); break; } } return copied(raw[next(0)]); }"
+  "function next(value: word) returns (word) { return value + 1; }",
+  "function copied(value: word) returns (word) { let local = value; return local; }",
+  "function less(value: word, bound: word) returns (bool) { return value < bound; }",
+  "function bad(value: word) returns (word) { let gap: word; return gap; }",
+  "function nested(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (less(index, 4)) { index += copied(1); if (less(index, 2)) { continue; } let inner = 0; while (less(inner, 4)) { inner += next(0); if (less(inner, 2)) { continue; } raw[next(0)] += copied(1); if (less(1, inner)) { break; } } } return copied(index + raw[next(0)]); }",
+  "function outerBreak(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (less(index, 7)) { raw[next(0)] += copied(2); index += next(0); if (less(2, index)) { break; } } return copied(index + raw[next(0)]); }",
+  "function nestedFault(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (less(index, 7)) { index += next(0); let inner = 0; while (less(inner, 3)) { inner += next(0); raw[next(0)] += copied(1); if (less(1, inner)) { bad(index); } } } return copied(99); }",
+  "function stopOrFail(value: word) returns (bool) { if (value < 3) { return true; } let gap: word; return gap == value; }",
+  "function early(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (less(index, 7)) { index += next(0); let inner = 0; while (less(inner, 4)) { inner += next(0); raw[next(0)] += copied(1); if (less(1, inner)) { return copied(raw[next(0)] + index); } } } return bad(seed); }",
+  "function unitLoop(raw: mapping(word => word), seed: word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (less(index, 4)) { index += next(0); if (less(index, 2)) { continue; } { let delta = copied(2); raw[next(0)] += delta; } if (less(2, index)) { break; } } }",
+  "function conditionFault(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (stopOrFail(index)) { raw[next(0)] += copied(3); index += next(0); } return copied(99); }",
+  "function keyFault(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (less(index, 7)) { index += next(0); if (less(0, index)) { raw[bad(index)] += copied(99); } } return copied(99); }",
+  "function rhsFault(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (less(index, 7)) { index += next(0); { let chosen = copied(2); raw[next(0)] += chosen; raw[next(0)] += bad(index); } } return copied(99); }",
+  "function zero(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (less(index, 0)) { while (less(index, 4)) { bad(seed); break; } } return copied(raw[next(0)]); }"
 ]
 
 private def wordValue (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
@@ -2189,15 +2189,15 @@ theorem bind_restore {scope : SourceCoreLocalCell.Scope} {mapping : LocationMap}
 end Static
 
 private def content : String := String.intercalate "\n" [
-  "function key(value: Word) returns (Word) { return value; }",
-  "function first(value: Word) returns (integer) { let copied = wordToInteger(value); return copied; }",
-  "function normal(seed: Word) returns (integer) { let saved = seed; let other = first(saved); let m: mapping(Word => Word); m[key(saved)] = wordFromInteger(integerAdd(first(saved), first(3))); return wordToInteger(m[key(saved)]); }",
-  "function scoped(seed: Word) returns (integer) { let saved = seed; { let hidden = first(saved); hidden; } let m: mapping(Word => Word); m[key(saved)] = wordFromInteger(integerAdd(first(saved), 1)); return wordToInteger(m[key(saved)]); }",
-  "function failing(seed: Word) returns (integer) { let saved = seed; let m: mapping(Word => Word); let gap: Word; m[key(saved)] = wordFromInteger(integerAdd(first(saved), first(gap))); return wordToInteger(m[saved]); }",
-  "function keyFail(seed: Word) returns (integer) { let saved = seed; let m: mapping(Word => Word); let gap: Word; m[key(gap)] = wordFromInteger(first(saved)); return wordToInteger(m[saved]); }",
-  "function rawUpdate(raw: mapping(Word => Word), seed: Word) returns (mapping(Word => Word)) { raw[key(seed)] = key(seed) + 1; return raw; }",
-  "function make(seed: Word) returns (function(Word) returns (Word)) { let saved = seed; return lam(delta: Word) -> Word { let m: mapping(Word => Word); m[key(saved)] = key(saved) + key(delta); return m[key(saved)]; }; }",
-  "function escaped(seed: Word, delta: Word) returns (integer) { let apply = make(seed); return wordToInteger(apply(delta)); }"
+  "function key(value: word) returns (word) { return value; }",
+  "function first(value: word) returns (integer) { let copied = wordToInteger(value); return copied; }",
+  "function normal(seed: word) returns (integer) { let saved = seed; let other = first(saved); let m: mapping(word => word); m[key(saved)] = wordFromInteger(integerAdd(first(saved), first(3))); return wordToInteger(m[key(saved)]); }",
+  "function scoped(seed: word) returns (integer) { let saved = seed; { let hidden = first(saved); hidden; } let m: mapping(word => word); m[key(saved)] = wordFromInteger(integerAdd(first(saved), 1)); return wordToInteger(m[key(saved)]); }",
+  "function failing(seed: word) returns (integer) { let saved = seed; let m: mapping(word => word); let gap: word; m[key(saved)] = wordFromInteger(integerAdd(first(saved), first(gap))); return wordToInteger(m[saved]); }",
+  "function keyFail(seed: word) returns (integer) { let saved = seed; let m: mapping(word => word); let gap: word; m[key(gap)] = wordFromInteger(first(saved)); return wordToInteger(m[saved]); }",
+  "function rawUpdate(raw: mapping(word => word), seed: word) returns (mapping(word => word)) { raw[key(seed)] = key(seed) + 1; return raw; }",
+  "function make(seed: word) returns (function(word) returns (word)) { let saved = seed; return lam(delta: word) -> word { let m: mapping(word => word); m[key(saved)] = key(saved) + key(delta); return m[key(saved)]; }; }",
+  "function escaped(seed: word, delta: word) returns (integer) { let apply = make(seed); return wordToInteger(apply(delta)); }"
 ]
 private def finish (compiled : SourceCoreUnifiedCompilation.Compiled) (name : String)
     (arguments : List SourceTypedRuntime.Value) (fuel : Nat) (initial : SourceTypedRuntime.RuntimeState) :
@@ -2425,17 +2425,17 @@ theorem concrete_body_reflects [FunctionCalls.FaultTokens faults]
 end Static
 
 private def content : String := String.intercalate "\n" [
-  "function next(value: Word) returns (Word) { return value + 1; }",
-  "function copied(value: Word) returns (Word) { let local = value; return local; }",
-  "function less(value: Word, bound: Word) returns (Bool) { return value < bound; }",
-  "function bad(value: Word) returns (Word) { let gap: Word; return gap; }",
-  "function stopOrFail(value: Word) returns (Bool) { if (value < 2) { return true; } let gap: Word; return gap == value; }",
-  "function count(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (less(index, 3)) { { let delta = next(0); raw[next(0)] += copied(delta); } if (less(index, 1)) { index += next(0); } else { index += next(0); } } return copied(index + raw[next(0)]); }",
-  "function conditionFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (stopOrFail(index)) { raw[next(0)] += copied(4); index += next(0); } return copied(99); }",
-  "function bodyFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (less(index, 3)) { raw[next(0)] += copied(4); index += next(0); bad(index); } return copied(99); }",
-  "function early(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (less(index, 3)) { raw[next(0)] += copied(4); return copied(raw[next(0)]); } return bad(99); }",
-  "function zero(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (less(index, 0)) { bad(index); } return copied(raw[next(0)]); }",
-  "function unitLoop(raw: mapping(Word => Word), seed: Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (less(index, 2)) { raw[next(0)] += copied(1); index += next(0); copied(index); } }"
+  "function next(value: word) returns (word) { return value + 1; }",
+  "function copied(value: word) returns (word) { let local = value; return local; }",
+  "function less(value: word, bound: word) returns (bool) { return value < bound; }",
+  "function bad(value: word) returns (word) { let gap: word; return gap; }",
+  "function stopOrFail(value: word) returns (bool) { if (value < 2) { return true; } let gap: word; return gap == value; }",
+  "function count(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (less(index, 3)) { { let delta = next(0); raw[next(0)] += copied(delta); } if (less(index, 1)) { index += next(0); } else { index += next(0); } } return copied(index + raw[next(0)]); }",
+  "function conditionFault(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (stopOrFail(index)) { raw[next(0)] += copied(4); index += next(0); } return copied(99); }",
+  "function bodyFault(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (less(index, 3)) { raw[next(0)] += copied(4); index += next(0); bad(index); } return copied(99); }",
+  "function early(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (less(index, 3)) { raw[next(0)] += copied(4); return copied(raw[next(0)]); } return bad(99); }",
+  "function zero(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (less(index, 0)) { bad(index); } return copied(raw[next(0)]); }",
+  "function unitLoop(raw: mapping(word => word), seed: word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (less(index, 2)) { raw[next(0)] += copied(1); index += next(0); copied(index); } }"
 ]
 
 private def wordValue (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
@@ -2607,17 +2607,17 @@ theorem concrete_whole_reflects [FunctionCalls.FaultTokens faults] {id : Stateme
 end Static
 
 private def content : String := String.intercalate "\n" [
-  "function next(value: Word) returns (Word) { return value + 1; }",
-  "function copied(value: Word) returns (Word) { let local = value; return local; }",
-  "function less(value: Word, bound: Word) returns (Bool) { return value < bound; }",
-  "function bad(value: Word) returns (Word) { let gap: Word; return gap; }",
-  "function stopOrFail(value: Word) returns (Bool) { if (value < 4) { return true; } let gap: Word; return gap == value; }",
-  "function count(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (less(index, 7)) { { let delta = next(0); raw[next(0)] += copied(delta); } if (less(index, 1)) { index += next(0); } else { index += next(0); } } return copied(index + raw[next(0)]); }",
-  "function conditionFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (stopOrFail(index)) { raw[next(0)] += copied(4); index += next(0); } return copied(99); }",
-  "function bodyFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (less(index, 7)) { raw[next(0)] += copied(4); index += next(0); bad(index); } return copied(99); }",
-  "function early(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (less(index, 7)) { raw[next(0)] += copied(4); return copied(raw[next(0)]); } return bad(99); }",
-  "function zero(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (less(index, 0)) { bad(index); } return copied(raw[next(0)]); }",
-  "function unitLoop(raw: mapping(Word => Word), seed: Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (less(index, 5)) { raw[next(0)] += copied(1); index += next(0); copied(index); } }"
+  "function next(value: word) returns (word) { return value + 1; }",
+  "function copied(value: word) returns (word) { let local = value; return local; }",
+  "function less(value: word, bound: word) returns (bool) { return value < bound; }",
+  "function bad(value: word) returns (word) { let gap: word; return gap; }",
+  "function stopOrFail(value: word) returns (bool) { if (value < 4) { return true; } let gap: word; return gap == value; }",
+  "function count(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (less(index, 7)) { { let delta = next(0); raw[next(0)] += copied(delta); } if (less(index, 1)) { index += next(0); } else { index += next(0); } } return copied(index + raw[next(0)]); }",
+  "function conditionFault(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (stopOrFail(index)) { raw[next(0)] += copied(4); index += next(0); } return copied(99); }",
+  "function bodyFault(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (less(index, 7)) { raw[next(0)] += copied(4); index += next(0); bad(index); } return copied(99); }",
+  "function early(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (less(index, 7)) { raw[next(0)] += copied(4); return copied(raw[next(0)]); } return bad(99); }",
+  "function zero(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (less(index, 0)) { bad(index); } return copied(raw[next(0)]); }",
+  "function unitLoop(raw: mapping(word => word), seed: word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (less(index, 5)) { raw[next(0)] += copied(1); index += next(0); copied(index); } }"
 ]
 
 private def wordValue (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
@@ -3328,13 +3328,13 @@ theorem continuing_reflects {id : StatementId} {node : StatementNode}
 end Static
 
 private def content : String := String.intercalate "\n" [
-  "function next(value: Word) returns (Word) { return value + 1; }",
-  "function copied(value: Word) returns (Word) { let local = value; return local; }",
-  "function less(value: Word, bound: Word) returns (Bool) { return value < bound; }",
-  "function bad(value: Word) returns (Word) { let gap: Word; return gap; }",
-  "function nested(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (less(index, 4)) { index += copied(1); if (less(index, 2)) { continue; } let inner = 0; while (less(inner, 4)) { inner += next(0); if (less(inner, 2)) { continue; } raw[next(0)] += copied(1); if (less(1, inner)) { break; } } } return copied(index + raw[next(0)]); }",
-  "function outerBreak(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (less(index, 7)) { raw[next(0)] += copied(2); index += next(0); if (less(2, index)) { break; } } return copied(index + raw[next(0)]); }",
-  "function nestedFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; while (less(index, 7)) { index += next(0); let inner = 0; while (less(inner, 3)) { inner += next(0); raw[next(0)] += copied(1); if (less(1, inner)) { bad(index); } } } return copied(99); }"
+  "function next(value: word) returns (word) { return value + 1; }",
+  "function copied(value: word) returns (word) { let local = value; return local; }",
+  "function less(value: word, bound: word) returns (bool) { return value < bound; }",
+  "function bad(value: word) returns (word) { let gap: word; return gap; }",
+  "function nested(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (less(index, 4)) { index += copied(1); if (less(index, 2)) { continue; } let inner = 0; while (less(inner, 4)) { inner += next(0); if (less(inner, 2)) { continue; } raw[next(0)] += copied(1); if (less(1, inner)) { break; } } } return copied(index + raw[next(0)]); }",
+  "function outerBreak(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (less(index, 7)) { raw[next(0)] += copied(2); index += next(0); if (less(2, index)) { break; } } return copied(index + raw[next(0)]); }",
+  "function nestedFault(raw: mapping(word => word), seed: word) returns (word) { let saved: function(word) returns (word) = lam(value: word) -> word { return seed + value; }; let index = 0; while (less(index, 7)) { index += next(0); let inner = 0; while (less(inner, 3)) { inner += next(0); raw[next(0)] += copied(1); if (less(1, inner)) { bad(index); } } } return copied(99); }"
 ]
 
 private def wordValue (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)

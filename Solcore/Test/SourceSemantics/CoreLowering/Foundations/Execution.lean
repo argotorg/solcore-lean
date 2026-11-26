@@ -320,9 +320,9 @@ open Solcore Frontend SourceInference
 def source : String := String.intercalate "\n" [
   "trait Coerce<From, To> {}",
   "enum Box { Only }",
-  "impl Coerce<Word, Box> {}",
-  "function convert(value: Word) returns (Box) { return value; }",
-  "function identity(value: Word) returns (Word) { return value; }"
+  "impl Coerce<word, Box> {}",
+  "function convert(value: word) returns (Box) { return value; }",
+  "function identity(value: word) returns (word) { return value; }"
 ]
 
 def workspace : Workspace.RawWorkspace := {
@@ -395,8 +395,8 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function identity<T>(value: T) returns (T) { return value; }",
-    "function mappingEcho(value: mapping(Word => Word)) returns (mapping(Word => Word)) { return value; }",
-    "function capture(seed: Word) returns (function(Word) returns (Word)) { let current = seed; return lam(step: Word) { current += step; return current; }; }"
+    "function mappingEcho(value: mapping(word => word)) returns (mapping(word => word)) { return value; }",
+    "function capture(seed: word) returns (function(word) returns (word)) { let current = seed; return lam(step: word) { current += step; return current; }; }"
   ]}] }
 private def options : Options := { specializationBudget := 256, compilationFuel := 1000 }
 private def declaration (program : CheckedProgram) (name : String) : IO Resolved.DeclarationId :=
@@ -428,16 +428,16 @@ private def viewRootWorkspace : Workspace.RawWorkspace := {
     "enum Wrap<t> { Wrapped(t) }",
     "enum Nest { Nested(Box) }",
     "function arrayResult() returns (uint256[]) { return new uint256[](2); }",
-    "function arrayParameter(xs: uint256[]) returns (Word) { return 0; }",
-    "function sliceParameter(s: arraySlice<uint256[]>) returns (Word) { return 0; }",
-    "function memrefParameter(r: memref<uint256>) returns (Word) { return 0; }",
-    "function tupleResult() returns ((uint256[], Word)) { return (new uint256[](2), 1); }",
+    "function arrayParameter(xs: uint256[]) returns (word) { return 0; }",
+    "function sliceParameter(s: arraySlice<uint256[]>) returns (word) { return 0; }",
+    "function memrefParameter(r: memref<uint256>) returns (word) { return 0; }",
+    "function tupleResult() returns ((uint256[], word)) { return (new uint256[](2), 1); }",
     "function fieldResult() returns (Box) { return .Hold(new uint256[](2)); }",
     "function argumentResult() returns (Wrap<uint256[]>) { return .Wrapped(new uint256[](2)); }",
     "function nestedResult() returns (Nest) { return .Nested(.Hold(new uint256[](2))); }",
-    "function functionResult() returns (function(uint256[]) returns (Word)) { return lam(xs: uint256[]) { return 0; }; }",
+    "function functionResult() returns (function(uint256[]) returns (word)) { return lam(xs: uint256[]) { return 0; }; }",
     "function wrapper(n: uint256) returns (uint256) { let a: uint256[] = new uint256[](n); return a.length(); }",
-    "function wordWrap() returns (Wrap<Word>) { return .Wrapped(1); }",
+    "function wordWrap() returns (Wrap<word>) { return .Wrapped(1); }",
     "function grow(n: uint256) returns (uint256[]) { return new uint256[](n); }",
     "function total(xs: uint256[]) returns (uint256) { return xs.length(); }",
     "function viaHandles(n: uint256) returns (uint256) { return total(grow(n)); }"
@@ -613,16 +613,16 @@ private def w (value : Nat) : Core.Word := Core.Word.ofNatModulo value
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function plain(left: Word, right: Word) returns (Word) { match ((left, right)) { case (x, y) { return x; } default { return 99; } } }",
-    "function grouped(left: Word, right: Word) returns (Word) { match ((left, right)) { case ((x, y)) { return x; } default { return 99; } } }",
-    "function deep(left: Word, right: Word) returns (Word) { match ((left, right)) { case ((((x, y)))) { return x; } default { return 99; } } }",
-    "function nested(left: Word, right: Word) returns (Word) { match ((left, (true, right))) { case (((x, (flag, y)))) { return flag ? x + y : 0; } default { return 99; } } }",
-    "function three(left: Word, right: Word) returns (Word) { match ((left, true, right)) { case (((x, flag, y))) { return flag ? x + y : 0; } default { return 99; } } }",
-    "function tripleEffects(left: Word, right: Word) returns (Word) { let count: Word = 0; let next = lam() -> Word { count += 1; return count; }; match ((next(), next(), next())) { case (x, y, z) { return x + y + z + count; } default { return 99; } } }",
-    "function unitValue(value: Unit) returns (Word) { match (value) { case ((())) { return 7; } default { return 99; } } }",
-    "function chooseArm(left: Word, right: Word) returns (Word) { match ((left, right)) { case ((0, y)) { return y; } case (((x, y))) { return x; } default { return 99; } } }",
-    "function effects(left: Word, right: Word) returns (Word) { let count: Word = 0;",
-    " match ((lam() -> (Word, Word) { count += 1; return (left, right); })()) {",
+    "function plain(left: word, right: word) returns (word) { match ((left, right)) { case (x, y) { return x; } default { return 99; } } }",
+    "function grouped(left: word, right: word) returns (word) { match ((left, right)) { case ((x, y)) { return x; } default { return 99; } } }",
+    "function deep(left: word, right: word) returns (word) { match ((left, right)) { case ((((x, y)))) { return x; } default { return 99; } } }",
+    "function nested(left: word, right: word) returns (word) { match ((left, (true, right))) { case (((x, (flag, y)))) { return flag ? x + y : 0; } default { return 99; } } }",
+    "function three(left: word, right: word) returns (word) { match ((left, true, right)) { case (((x, flag, y))) { return flag ? x + y : 0; } default { return 99; } } }",
+    "function tripleEffects(left: word, right: word) returns (word) { let count: word = 0; let next = lam() -> word { count += 1; return count; }; match ((next(), next(), next())) { case (x, y, z) { return x + y + z + count; } default { return 99; } } }",
+    "function unitValue(value: ()) returns (word) { match (value) { case ((())) { return 7; } default { return 99; } } }",
+    "function chooseArm(left: word, right: word) returns (word) { match ((left, right)) { case ((0, y)) { return y; } case (((x, y))) { return x; } default { return 99; } } }",
+    "function effects(left: word, right: word) returns (word) { let count: word = 0;",
+    " match ((lam() -> (word, word) { count += 1; return (left, right); })()) {",
     " case (((x, y))) { count += x; } default { count += 99; } } return count; }"
   ]}]
 }
@@ -717,13 +717,13 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit :=
 private def w (n : Nat) : Core.Word := Core.Word.ofNatModulo n
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "type F = function(Word) returns (Word);",
-    "function maker(value: Word) returns (F) { return lam(delta: Word) -> Word { value = value + delta; return value; }; }",
-    "function zero() returns (function() returns (Word)) { return lam() -> Word { return 7; }; }",
-    "function unused(value: Word) returns (Word) { let ignored = lam(item) { return item; }; return value; }",
-    "function poly(flag: Bool) returns (Word, Bool) { let f = lam(item) { return item; }; return (f(1), f(flag)); }",
-    "function loop(value: Word) returns (F) { let f: F; while (true) { f = lam(delta: Word) -> Word { value = value + delta; return value; }; break; } return f; }",
-    "function nestedPoly(flag: Bool) returns (Word, Word) { let outer = lam(value) { let inner = lam(item) { return item; }; return inner(1); }; let one: Word = 1; return (outer(one), outer(flag)); }"
+    "type F = function(word) returns (word);",
+    "function maker(value: word) returns (F) { return lam(delta: word) -> word { value = value + delta; return value; }; }",
+    "function zero() returns (function() returns (word)) { return lam() -> word { return 7; }; }",
+    "function unused(value: word) returns (word) { let ignored = lam(item) { return item; }; return value; }",
+    "function poly(flag: bool) returns (word, bool) { let f = lam(item) { return item; }; return (f(1), f(flag)); }",
+    "function loop(value: word) returns (F) { let f: F; while (true) { f = lam(delta: word) -> word { value = value + delta; return value; }; break; } return f; }",
+    "function nestedPoly(flag: bool) returns (word, word) { let outer = lam(value) { let inner = lam(item) { return item; }; return inner(1); }; let one: word = 1; return (outer(one), outer(flag)); }"
   ]}] }
 private def key (program : CheckedProgram) (name : String) : IO Key := do
   match program.signatures.functions.filter (·.name == name) with
@@ -1146,11 +1146,11 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Tree<T> { Leaf(T), Pair(Tree<T>, Tree<T>) }",
-    "function leaf(value: Word) returns (Tree<Word>) { return .Leaf(value); }",
-    "function main(flag: Bool, value: Word) returns (Tree<Word>) { return flag ? leaf(value) : .Pair(leaf(value), leaf(value + 1)); }",
-    "function recursive(count: Word, value: Tree<Word>) returns (Tree<Word>) { return count == 0 ? value : recursive(count - 1, Tree.Pair(value, value)); }",
-    "function mappingValue(table: mapping(Word => Word)) returns (mapping(Word => Word)) { table[7] += 3; return table; }",
-    "function proxyValue() returns (@Tree<Word>) { return @Tree<Word>; }"
+    "function leaf(value: word) returns (Tree<word>) { return .Leaf(value); }",
+    "function main(flag: bool, value: word) returns (Tree<word>) { return flag ? leaf(value) : .Pair(leaf(value), leaf(value + 1)); }",
+    "function recursive(count: word, value: Tree<word>) returns (Tree<word>) { return count == 0 ? value : recursive(count - 1, Tree.Pair(value, value)); }",
+    "function mappingValue(table: mapping(word => word)) returns (mapping(word => word)) { table[7] += 3; return table; }",
+    "function proxyValue() returns (@Tree<word>) { return @Tree<word>; }"
   ] }]
 }
 
@@ -1274,7 +1274,7 @@ open Solcore Solcore.Frontend SourceInference
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function local(table: mapping(Word => Word)) returns (mapping(Word => Word)) { let f = lam(item) { return item; }; return f(table); }"}]
+    "function local(table: mapping(word => word)) returns (mapping(word => word)) { let f = lam(item) { return item; }; return f(table); }"}]
 }
 
 example {program : CheckedProgram} {plan : SourceSpecializationWorklist.Plan}
@@ -1364,14 +1364,14 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "api.solc", externalLibraries := [], mainSources := [
     {path := "api.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "import {twice as doubled, recursive} from provider;",
-      "function main() returns (Word) { return 17; }",
-      "function local(value: Word) returns (Word) { return value + 1; }",
-      "function hidden(value: Word) returns (Word) { return value; }",
+      "function main() returns (word) { return 17; }",
+      "function local(value: word) returns (word) { return value + 1; }",
+      "function hidden(value: word) returns (word) { return value; }",
       "export {doubled, local, recursive};"]},
     {path := "provider.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-      "function twice(value: Word) returns (Word) { return value * 2; }",
-      "function recursive(value: Word) returns (Word) { return value == 0 ? 31 : recursive(value - 1); }",
-      "function providerOnly(value: Word) returns (Word) { return value; }",
+      "function twice(value: word) returns (word) { return value * 2; }",
+      "function recursive(value: word) returns (word) { return value == 0 ? 31 : recursive(value - 1); }",
+      "function providerOnly(value: word) returns (word) { return value; }",
       "export {twice, recursive, providerOnly};"]}] }
 
 example {raw : Workspace.RawWorkspace} {fuel : Nat} (entry : CheckedEntry raw fuel) :
@@ -1387,16 +1387,16 @@ def run : IO Unit := do
   let compiled ← get "one ABI Core compilation"
     (SourceCoreCompiler.compileChecked checked.program (roots.map (·.seed)) {specializationBudget := 128, compilationFuel := 1000})
   require (compiled.rootCount == 3 && compiled.roots.map (·.inputTypes) == [[.word], [.word], [.word]]) "ABI roots lost source metadata"
-  let missing ← get "missing main check" (checkEntry (single "function helper() returns (Word) { return 0; }"))
+  let missing ← get "missing main check" (checkEntry (single "function helper() returns (word) { return 0; }"))
   match SourceProgramExecution.resolveSeed missing.program missing.seed with
   | .error (.unknownName moduleId "main") => require (moduleId == missing.moduleId) "missing main lost canonical module"
   | _ => throw (IO.userError "missing main was accepted")
-  let invalid ← get "invalid ABI check" (checkEntry (single "function bad(value: Bool) returns (Word) { return value ? 1 : 0; } export {bad};"))
+  let invalid ← get "invalid ABI check" (checkEntry (single "function bad(value: bool) returns (word) { return value ? 1 : 0; } export {bad};"))
   match discoverStaticWordRoots invalid.program invalid.moduleId with
   | .error (.unsupportedParameters _ "bad" [.bool] [false]) => pure ()
   | _ => throw (IO.userError "unsupported ABI parameter was skipped")
   -- Two exported functions of one name never reach the ABI: the load refuses them (`SC0108`).
-  match checkEntry (single "function same(value: Word) returns (Word) { return value; } function same(value: Word) returns (Word) { return value + 1; } export {same};") with
+  match checkEntry (single "function same(value: word) returns (word) { return value; } function same(value: word) returns (word) { return value + 1; } export {same};") with
   | .error errors =>
       require (errors.any fun
           | .loading (.imports found) => found.any fun
@@ -1404,12 +1404,12 @@ def run : IO Unit := do
               | _ => false
           | _ => false) s!"two functions named same were refused otherwise: {reprStr errors}"
   | .ok _ => throw (IO.userError "two functions named same reached ABI discovery")
-  let collision ← get "selector collision check" (checkEntry (single "function f116643(value: Word) returns (Word) { return value; } function f38491(value: Word) returns (Word) { return value; } export {f38491, f116643};"))
+  let collision ← get "selector collision check" (checkEntry (single "function f116643(value: word) returns (word) { return value; } function f38491(value: word) returns (word) { return value; } export {f38491, f116643};"))
   match discoverStaticWordRoots collision.program collision.moduleId with
   | .error (.selectorCollision "f116643" "f38491" "f116643(uint256)" "f38491(uint256)" selector) =>
       require (selector.toUInt32.toNat == 0x77dbd42e) "selector conflict lost its canonical selector"
   | _ => throw (IO.userError "selector collision diagnostic changed")
-  match checkEntry (single "function bad() returns (Word) { return absent; }") with
+  match checkEntry (single "function bad() returns (word) { return absent; }") with
   | .error _ => pure () | .ok _ => throw (IO.userError "root discovery bypassed source checking")
 
 end Tests.SourceCoreRootDiscovery
@@ -1442,19 +1442,19 @@ private def maximum : Nat := 2 ^ 256 - 1
 private def high : Nat := 2 ^ 255
 
 private def workspace : Workspace.RawWorkspace := workspaceOf [
-  "function literalAmount(x: Word) returns (Word) { return x << 3; }",
-  "function shiftLeft(x: Word, s: Word) returns (Word) { return x << s; }",
-  "function shiftRight(x: Word, s: Word) returns (Word) { return x >> s; }",
-  "function compound(x: Word, s: Word) returns (Word) { let r: Word = x; r <<= s; r >>= 1; return r; }",
-  "function neverReverts(x: Word) returns (Word) { return x << 255; }",
-  "function precedence(a: Word, b: Word) returns (Word) { return a + b << 2 & 0xff; }",
-  "function comparisons(a: Word, b: Word) returns (Bool) { return a > b && a >= b; }",
-  "function ladder(x: Word) returns (Word) { let w0: Word = x << 1 + 1; let w1: Word = x & 7 << 1; let w2: Word = x | 1 << 4; let w3: Word = 0; if (x >> 1 > 3) { w3 = 1; } let w4: Word = x << 2 * 3; let w5: Word = x ^ 1 << 2; return ((((w0 * 7 ^ w1) * 7 ^ w2) * 7 ^ w3) * 7 ^ w4) * 7 ^ w5; }",
-  "function literals() returns (Word) { return 1 << 3 >> 1; }",
-  "function shiftThenLess(a: Word, b: Word) returns (Bool) { return a << 1 < b; }",
-  "function mapped(x: Word, s: Word) returns (Word) { let m: mapping(Bool => Word); m[true] = x; m[true] <<= s; m[true] >>= 1; return m[true]; }",
+  "function literalAmount(x: word) returns (word) { return x << 3; }",
+  "function shiftLeft(x: word, s: word) returns (word) { return x << s; }",
+  "function shiftRight(x: word, s: word) returns (word) { return x >> s; }",
+  "function compound(x: word, s: word) returns (word) { let r: word = x; r <<= s; r >>= 1; return r; }",
+  "function neverReverts(x: word) returns (word) { return x << 255; }",
+  "function precedence(a: word, b: word) returns (word) { return a + b << 2 & 0xff; }",
+  "function comparisons(a: word, b: word) returns (bool) { return a > b && a >= b; }",
+  "function ladder(x: word) returns (word) { let w0: word = x << 1 + 1; let w1: word = x & 7 << 1; let w2: word = x | 1 << 4; let w3: word = 0; if (x >> 1 > 3) { w3 = 1; } let w4: word = x << 2 * 3; let w5: word = x ^ 1 << 2; return ((((w0 * 7 ^ w1) * 7 ^ w2) * 7 ^ w3) * 7 ^ w4) * 7 ^ w5; }",
+  "function literals() returns (word) { return 1 << 3 >> 1; }",
+  "function shiftThenLess(a: word, b: word) returns (bool) { return a << 1 < b; }",
+  "function mapped(x: word, s: word) returns (word) { let m: mapping(bool => word); m[true] = x; m[true] <<= s; m[true] >>= 1; return m[true]; }",
   "enum Box<T> { Box(T) }",
-  "function nested(b: Box<Box<Word>>, x: Word) returns (Word) { return x >> 1; }"
+  "function nested(b: Box<Box<word>>, x: word) returns (word) { return x >> 1; }"
 ]
 
 private def names : List String :=
@@ -1528,13 +1528,13 @@ def run : IO Unit := do
       s!"shift case {names[index]?} {arguments} gave {reprStr completed.value}"
     session := completed.session
   rejected "a shift spelled with separated tokens"
-    ["function bad(a: Word, b: Word) returns (Word) { return a < < b; }"]
+    ["function bad(a: word, b: word) returns (word) { return a < < b; }"]
   rejected "a compound shift spelled with separated tokens"
-    ["function bad(a: Word, b: Word) returns (Word) { a > >= b; return a; }"]
+    ["function bad(a: word, b: word) returns (word) { a > >= b; return a; }"]
   rejected "a shift of a Bool"
-    ["function bad(b: Bool) returns (Bool) { return b << 1; }"]
+    ["function bad(b: bool) returns (bool) { return b << 1; }"]
   rejected "a shift by a Bool"
-    ["function bad(a: Word, b: Bool) returns (Word) { return a >> b; }"]
+    ["function bad(a: word, b: bool) returns (word) { return a >> b; }"]
   IO.println "SOURCE_CORE_SHIFTS_PASS: Word `<<` and `>>` by amounts up to 2^256 - 1, their precedence between `+ -` and `&`, compound `<<=` and `>>=` on locals and mapping elements, nested type arguments closing with `>>`, and separated tokens rejected"
 
 end Tests.SourceCoreShiftExecution
@@ -1813,11 +1813,11 @@ private def workspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc", mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }], externalLibraries := [] }
 
 private def sourceText : String := String.intercalate "\n" [
-  "function arithmetic() returns (Word) { return wordFromInteger((integerLt(1, 2) ? integerMul(integerAdd(3, 4), integerSub(9, 2)) : wordToInteger(17))); }",
-  "function words() returns (Word) { return false ? 7 : 9; }",
-  "function booleans() returns (Bool) { return true ? integerEq((1), (1)) : integerLt(3, 2); }",
-  "function duplicate() returns (Word) { return wordFromInteger(integerAdd(3, 4)); }",
-  "function unused() returns (Word) { return 31; }"
+  "function arithmetic() returns (word) { return wordFromInteger((integerLt(1, 2) ? integerMul(integerAdd(3, 4), integerSub(9, 2)) : wordToInteger(17))); }",
+  "function words() returns (word) { return false ? 7 : 9; }",
+  "function booleans() returns (bool) { return true ? integerEq((1), (1)) : integerLt(3, 2); }",
+  "function duplicate() returns (word) { return wordFromInteger(integerAdd(3, 4)); }",
+  "function unused() returns (word) { return 31; }"
 ]
 
 private def functionNamed (program : CheckedProgram) (name : String) : IO CheckedFunction :=
@@ -1932,28 +1932,28 @@ private def w (value : Nat) : Core.Word := Core.Word.ofNatModulo value
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
+    "trait Mark<T> {}", "impl Mark<word> {}", "impl Mark<bool> {}",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
-    "function markedEffects(comptime seed: Word) returns (comptime<Word>) { let total: Word = seed; let table: mapping(Word => Word); let bump = lam(comptime delta: Word) -> Word { total += delta; table[0] = total; return table[0]; }; return bump(3); }",
-    "function markedEffectsEntry() returns (Word) { return markedEffects(9); }",
-    "function markedClosureClosed() returns (Word) { let f = lam(comptime value: Word) -> Word { return value; }; return f(21); }",
-    "function markedClosureRuntime(value: Word) returns (Word) { let f = lam(comptime item: Word) -> Word { return item; }; return f(value); }",
-    "function markedGlobal(comptime value: Word) returns (Word) { return value; }",
-    "function markedGlobalClosed() returns (Word) { let f = markedGlobal; return f(22); }",
-    "function markedGlobalRuntime(value: Word) returns (Word) { let f = markedGlobal; return f(value); }",
-    "function markedResult(comptime value: Word) returns (comptime<Word>) { return value; }",
-    "function markedResultIndirectBlocked() returns (Word) { let f = markedResult; return f(23); }",
-    "function markedResultIndirectStaged() returns (comptime<Word>) { let f = markedResult; return f(24); }",
-    "function tupleBefore() returns (Word) { let trace: Word = 0; let f = lam(value: (Word, Word)) -> Word { return 7; }; let bump = lam() -> Word { trace += 1; return trace; }; return f(bump(), bump()); }",
-    "function tupleAfter() returns (comptime<Word>) { let trace: Word = 0; let f = lam(value: (Word, Word)) -> Word { return 7; }; let bump = lam() -> Word { trace += 1; return trace; }; return f(bump(), bump()); }",
-    "function tupleAccepted() returns (Word) { let f = lam(value: (Word, Word)) -> Word { return 7; }; return f((1, 2)); }",
-    "function polymorphic(flag: Bool) returns (Word, Bool) { let f = lam(item) { return keep(item); }; return (f(1), f(flag)); }",
-    "function nested(flag: Bool) returns (Word, Word) { let outer = lam(item) { keep(item); let inner = lam(value) { return keep(value); }; return inner(1); }; let thirteen: Word = 13; return (outer(thirteen), outer(flag)); }",
-    "type F = function(Word) returns (Word);",
-    "function maker(seed: Word) returns (F) { let total: Word = seed; let f = lam(item) { keep(item); total += 1; return total; }; return f; }",
-    "function use(f: F, item: Word) returns (Word) { return f(item); }",
-    "function identities() returns (Word, Word) { let table: mapping(F => Word); table[markedGlobal] = 7; table[markedGlobal] = 9; let f = lam(item: Word) -> Word { return item; }; table[f] = 11; table[f] = 13; return (table[markedGlobal], table[f]); }",
-    "function builtinCall(value: integer) returns (Word) { let f = wordFromInteger; return f(value); }"
+    "function markedEffects(comptime seed: word) returns (comptime<word>) { let total: word = seed; let table: mapping(word => word); let bump = lam(comptime delta: word) -> word { total += delta; table[0] = total; return table[0]; }; return bump(3); }",
+    "function markedEffectsEntry() returns (word) { return markedEffects(9); }",
+    "function markedClosureClosed() returns (word) { let f = lam(comptime value: word) -> word { return value; }; return f(21); }",
+    "function markedClosureRuntime(value: word) returns (word) { let f = lam(comptime item: word) -> word { return item; }; return f(value); }",
+    "function markedGlobal(comptime value: word) returns (word) { return value; }",
+    "function markedGlobalClosed() returns (word) { let f = markedGlobal; return f(22); }",
+    "function markedGlobalRuntime(value: word) returns (word) { let f = markedGlobal; return f(value); }",
+    "function markedResult(comptime value: word) returns (comptime<word>) { return value; }",
+    "function markedResultIndirectBlocked() returns (word) { let f = markedResult; return f(23); }",
+    "function markedResultIndirectStaged() returns (comptime<word>) { let f = markedResult; return f(24); }",
+    "function tupleBefore() returns (word) { let trace: word = 0; let f = lam(value: (word, word)) -> word { return 7; }; let bump = lam() -> word { trace += 1; return trace; }; return f(bump(), bump()); }",
+    "function tupleAfter() returns (comptime<word>) { let trace: word = 0; let f = lam(value: (word, word)) -> word { return 7; }; let bump = lam() -> word { trace += 1; return trace; }; return f(bump(), bump()); }",
+    "function tupleAccepted() returns (word) { let f = lam(value: (word, word)) -> word { return 7; }; return f((1, 2)); }",
+    "function polymorphic(flag: bool) returns (word, bool) { let f = lam(item) { return keep(item); }; return (f(1), f(flag)); }",
+    "function nested(flag: bool) returns (word, word) { let outer = lam(item) { keep(item); let inner = lam(value) { return keep(value); }; return inner(1); }; let thirteen: word = 13; return (outer(thirteen), outer(flag)); }",
+    "type F = function(word) returns (word);",
+    "function maker(seed: word) returns (F) { let total: word = seed; let f = lam(item) { keep(item); total += 1; return total; }; return f; }",
+    "function use(f: F, item: word) returns (word) { return f(item); }",
+    "function identities() returns (word, word) { let table: mapping(F => word); table[markedGlobal] = 7; table[markedGlobal] = 9; let f = lam(item: word) -> word { return item; }; table[f] = 11; table[f] = 13; return (table[markedGlobal], table[f]); }",
+    "function builtinCall(value: integer) returns (word) { let f = wordFromInteger; return f(value); }"
   ]}]
 }
 
@@ -2174,15 +2174,15 @@ private def get {α : Type} (message : String) : Except SourceCoreElaboration.Er
   | .error error => throw (IO.userError s!"{message}: {reprStr error}")
 
 private def content : String := String.intercalate "\n" [
-  "function basic() returns (Word) { let x: integer = 42; let y: integer = integerAdd(x, 8); return wordFromInteger(integerMul(y, 2)); }",
-  "function negative() returns (Word) { let x: integer = integerSub(0, 3); return wordFromInteger(x); }",
-  "function chosen() returns (Word) { let x: integer = true ? integerAdd(2, 3) : integerMul(6, 7); return wordFromInteger(x); }",
-  "function reuse() returns (Word) { let x: integer = 3; return wordFromInteger(integerAdd(x, x)); }",
-  "function unused() returns (Word) { let ignored: integer = integerAdd(20, 22); return 7; }",
-  "function shadow() returns (Word) { let x: integer = 3; let x: integer = integerAdd(x, 1); return wordFromInteger(x); }",
-  "function runtime(value: Word) returns (Word) { let x: integer = 2; return value; }",
+  "function basic() returns (word) { let x: integer = 42; let y: integer = integerAdd(x, 8); return wordFromInteger(integerMul(y, 2)); }",
+  "function negative() returns (word) { let x: integer = integerSub(0, 3); return wordFromInteger(x); }",
+  "function chosen() returns (word) { let x: integer = true ? integerAdd(2, 3) : integerMul(6, 7); return wordFromInteger(x); }",
+  "function reuse() returns (word) { let x: integer = 3; return wordFromInteger(integerAdd(x, x)); }",
+  "function unused() returns (word) { let ignored: integer = integerAdd(20, 22); return 7; }",
+  "function shadow() returns (word) { let x: integer = 3; let x: integer = integerAdd(x, 1); return wordFromInteger(x); }",
+  "function runtime(value: word) returns (word) { let x: integer = 2; return value; }",
   "function helper() returns (integer) { return 3; }",
-  "function direct() returns (Word) { let x: integer = helper(); return wordFromInteger(x); }"
+  "function direct() returns (word) { let x: integer = helper(); return wordFromInteger(x); }"
 ]
 
 private def named (program : CheckedProgram) (name : String) : IO CheckedFunction :=
@@ -2366,14 +2366,14 @@ private def get {α : Type} (message : String) : Except SourceCoreElaboration.Er
 private def word (value : Nat) : Core.Value := .word (Core.Word.ofNatModulo value)
 
 private def content : String := String.intercalate "\n" [
-  "function scalar(flag: Bool, value: Word) returns (Word) { let x: integer = integerAdd(20, 22); return flag ? value : wordFromInteger(x); }",
-  "function equal(value: Word) returns (Bool) { let x: integer = 3; let y: integer = integerMul(x, 2); return integerEq(y, 6); }",
-  "function less(flag: Bool) returns (Bool) { let x: integer = integerSub(0, 3); return flag ? integerLt(x, 0) : false; }",
-  "function branches(flag: Bool, value: Word) returns (Word) { if (flag) { let x: integer = 10; return wordFromInteger(x); } else { let y: integer = 99; return value; } }",
-  "function block(value: Word) returns (Word) { { let x: integer = 5; let y: integer = integerAdd(x, x); return (wordFromInteger(y)); } }",
-  "function empty(flag: Bool) returns (Bool) { return flag; }",
-  "function literal() returns (Word) { return 7; }",
-  "function arithmetic() returns (Word) { let x: integer = true ? integerMul(6, 7) : integerSub(0, 1); return wordFromInteger(x); }"
+  "function scalar(flag: bool, value: word) returns (word) { let x: integer = integerAdd(20, 22); return flag ? value : wordFromInteger(x); }",
+  "function equal(value: word) returns (bool) { let x: integer = 3; let y: integer = integerMul(x, 2); return integerEq(y, 6); }",
+  "function less(flag: bool) returns (bool) { let x: integer = integerSub(0, 3); return flag ? integerLt(x, 0) : false; }",
+  "function branches(flag: bool, value: word) returns (word) { if (flag) { let x: integer = 10; return wordFromInteger(x); } else { let y: integer = 99; return value; } }",
+  "function block(value: word) returns (word) { { let x: integer = 5; let y: integer = integerAdd(x, x); return (wordFromInteger(y)); } }",
+  "function empty(flag: bool) returns (bool) { return flag; }",
+  "function literal() returns (word) { return 7; }",
+  "function arithmetic() returns (word) { let x: integer = true ? integerMul(6, 7) : integerSub(0, 1); return wordFromInteger(x); }"
 ]
 
 private def named (program : CheckedProgram) (name : String) : IO CheckedFunction :=
@@ -2796,7 +2796,7 @@ private def expectError (label : String) (function : CheckedFunction)
 
 private def testEndToEnd : IO CheckedFunction := do
   let program ← checkedProgram (String.intercalate "\n" [
-    "function lower(flag: Bool, x: Word) returns (Word, Bool) {",
+    "function lower(flag: bool, x: word) returns (word, bool) {",
     "  return (((flag ? ((x + 1) * 2) : ~x), !(x < 10) || false));",
     "}",
     "function empty() { return; }"
@@ -2825,10 +2825,10 @@ private def testEndToEnd : IO CheckedFunction := do
 
 private def testStatementLowering : IO Unit := do
   let program ← checkedProgram (String.intercalate "\n" [
-    "function statements(flag: Bool, x: Word) returns (Word) {",
+    "function statements(flag: bool, x: word) returns (word) {",
     "  {",
-    "    let base: Word = x + 1;",
-    "    let base: Word = base * 2;",
+    "    let base: word = x + 1;",
+    "    let base: word = base * 2;",
     "    if (flag) {",
     "      return base + 10;",
     "    } else {",
@@ -2857,8 +2857,8 @@ private def testStatementLowering : IO Unit := do
 
 private def testUninitializedLetRejected : IO Unit := do
   let program ← checkedProgram (String.intercalate "\n" [
-    "function uninitialized(x: Word) returns (Word) {",
-    "  let pending: Word;",
+    "function uninitialized(x: word) returns (word) {",
+    "  let pending: word;",
     "  return pending;",
     "}"
   ])
@@ -2993,7 +2993,7 @@ private def expectCoercionPolicyError (label : String)
 
 private def testRequiredBinaryPolicy : IO Unit := do
   let program ← checkedProgram
-    "function required(x: Word) returns (Word) { return x + 1; }"
+    "function required(x: word) returns (word) { return x + 1; }"
   let function ← checkedNamed program "required"
   let (_, expression) ← rootIds function
   let requirement : RequirementId := ⟨101⟩
@@ -3072,7 +3072,7 @@ private def testRequiredBinaryPolicy : IO Unit := do
 
 private def testRequiredUnaryPolicy : IO Unit := do
   let program ← checkedProgram
-    "function required(x: Word) returns (Word) { return ~x; }"
+    "function required(x: word) returns (word) { return ~x; }"
   let function ← checkedNamed program "required"
   let (_, expression) ← rootIds function
   let requirement : RequirementId := ⟨111⟩
@@ -3142,8 +3142,8 @@ private def testRequiredUnaryPolicy : IO Unit := do
 
 private def testCallAwareCompatibility : IO Unit := do
   let program ← checkedProgram (String.intercalate "\n" [
-    "function callee(value: Word) returns (Word) { return value; }",
-    "function caller(value: Word) returns (Word) { return callee(value); }"
+    "function callee(value: word) returns (word) { return value; }",
+    "function caller(value: word) returns (word) { return callee(value); }"
   ])
   let function ← checkedNamed program "caller"
   let onCall : SourceCoreElaboration.CallElaborator
@@ -3175,7 +3175,7 @@ private def testCallAwareCompatibility : IO Unit := do
 
 private def testCoercionPolicy : IO Unit := do
   let program ← checkedProgram
-    "function coerced(x: Word) returns (Word) { return x + 1; }"
+    "function coerced(x: word) returns (word) { return x + 1; }"
   let function ← checkedNamed program "coerced"
   let (_, expression) ← rootIds function
   let root ← match function.typedBody.lookupExpression? expression with
@@ -3288,7 +3288,7 @@ private def testCoercionPolicy : IO Unit := do
 
 private def testMalformedCoercionPolicies : IO Unit := do
   let program ← checkedProgram
-    "function identity(x: Word) returns (Word) { return x; }"
+    "function identity(x: word) returns (word) { return x; }"
   let function ← checkedNamed program "identity"
   let (_, expression) ← rootIds function
   let first : RequirementId := ⟨301⟩
@@ -3526,7 +3526,7 @@ private def testTypeMismatchAndUnconsumedRequirement
 
 private def testLegacyOverflowLiteralRejected : IO Unit := do
   let program ← checkedProgram
-    "function overflow() returns (Word) { return 115792089237316195423570985008687907853269984665640564039457584007913129639936; }"
+    "function overflow() returns (word) { return 115792089237316195423570985008687907853269984665640564039457584007913129639936; }"
   let function ← checkedNamed program "overflow"
   let (_, expression) ← rootIds function
   let source ← match function.typedBody.lookupExpression? expression with
@@ -3608,7 +3608,7 @@ private def checkedLiteralCarrier (spelling : String) (rawValue : Nat) :
     IO (CheckedFunction × ExpressionId × Syntax.CoreLiteralValue ×
       IntegerLiteralResolution) := do
   let program ← checkedProgram
-    ("function literal() returns (Word) { return " ++ spelling ++ "; }")
+    ("function literal() returns (word) { return " ++ spelling ++ "; }")
   let function ← checkedNamed program "literal"
   let (_, expression) ← rootIds function
   let node ← match function.typedBody.lookupExpression? expression with
@@ -3632,7 +3632,7 @@ private def checkedLiteralCarrier (spelling : String) (rawValue : Nat) :
       predicate := resolution.predicate
       evidence := intEvidence .word
     }])
-    "inferred integer carrier lost its exact builtin Int<Word> solution"
+    "inferred integer carrier lost its exact builtin Int<word> solution"
   pure (function, expression, source, resolution)
 
 private def expectIntegerLiteralError (label : String)
@@ -3886,23 +3886,23 @@ private def maximum : Nat := 2 ^ 256 - 1
 private def high : Nat := 2 ^ 255
 
 private def workspace : Workspace.RawWorkspace := workspaceOf [
-  "function wrapAdd(x: Word) returns (Word) { unchecked { return x + 1; } }",
-  "function wrapSub(x: Word) returns (Word) { let r: Word = 0; unchecked { r = r - x; } return r; }",
-  "function wrapMul(x: Word, y: Word) returns (Word) { unchecked { let r: Word = x * y; return r; } }",
-  "function compound(x: Word) returns (Word) { let r: Word = x; unchecked { r += 1; r *= 3; r -= 2; } return r; }",
-  "function named() returns (Word) { let unchecked: Word = 4; unchecked = unchecked + 1; return unchecked; }",
-  "function loop(n: Word) returns (Word) { let total: Word = 0; let i: Word = 0; while (i < n) { unchecked { total = total + i; i = i + 1; } } return total; }",
-  "function lambdaDivision(a: Word, b: Word) returns (Word) { unchecked { let divide = lam(x: Word, y: Word) -> Word { return x / y; }; return divide(a, b); } }",
-  "function helper(a: Word, b: Word) returns (Word) { return a / b; }",
-  "function helperDivision(a: Word, b: Word) returns (Word) { unchecked { return helper(a, b); } }",
-  "function lambdaBlock(x: Word) returns (Word) { unchecked { let next = lam(y: Word) -> Word { unchecked { return y + 1; } }; return next(x) * 2; } }",
-  "function shadowed(x: Word) returns (Word) { let r: Word = x; unchecked { let r: Word = 7; r = r + 1; } return r; }",
-  "function divide(a: Word, b: Word) returns (Word) { unchecked { return a / b; } }",
-  "function remainder(a: Word, b: Word) returns (Word) { unchecked { return a % b; } }",
-  "function divideAssign(a: Word, b: Word) returns (Word) { let r: Word = a; unchecked { r /= b; } return r; }",
-  "function remainderAssign(a: Word, b: Word) returns (Word) { let r: Word = a; unchecked { r %= b; } return r; }",
-  "function tableDivide(a: Word, b: Word) returns (Word) { let table: mapping(Word => Word); table[7] = a; unchecked { table[7] /= b; } return table[7]; }",
-  "function tableRemainder(a: Word, b: Word) returns (Word) { let table: mapping(Word => Word); table[7] = a; unchecked { table[7] %= b; } return table[7]; }"
+  "function wrapAdd(x: word) returns (word) { unchecked { return x + 1; } }",
+  "function wrapSub(x: word) returns (word) { let r: word = 0; unchecked { r = r - x; } return r; }",
+  "function wrapMul(x: word, y: word) returns (word) { unchecked { let r: word = x * y; return r; } }",
+  "function compound(x: word) returns (word) { let r: word = x; unchecked { r += 1; r *= 3; r -= 2; } return r; }",
+  "function named() returns (word) { let unchecked: word = 4; unchecked = unchecked + 1; return unchecked; }",
+  "function loop(n: word) returns (word) { let total: word = 0; let i: word = 0; while (i < n) { unchecked { total = total + i; i = i + 1; } } return total; }",
+  "function lambdaDivision(a: word, b: word) returns (word) { unchecked { let divide = lam(x: word, y: word) -> word { return x / y; }; return divide(a, b); } }",
+  "function helper(a: word, b: word) returns (word) { return a / b; }",
+  "function helperDivision(a: word, b: word) returns (word) { unchecked { return helper(a, b); } }",
+  "function lambdaBlock(x: word) returns (word) { unchecked { let next = lam(y: word) -> word { unchecked { return y + 1; } }; return next(x) * 2; } }",
+  "function shadowed(x: word) returns (word) { let r: word = x; unchecked { let r: word = 7; r = r + 1; } return r; }",
+  "function divide(a: word, b: word) returns (word) { unchecked { return a / b; } }",
+  "function remainder(a: word, b: word) returns (word) { unchecked { return a % b; } }",
+  "function divideAssign(a: word, b: word) returns (word) { let r: word = a; unchecked { r /= b; } return r; }",
+  "function remainderAssign(a: word, b: word) returns (word) { let r: word = a; unchecked { r %= b; } return r; }",
+  "function tableDivide(a: word, b: word) returns (word) { let table: mapping(word => word); table[7] = a; unchecked { table[7] /= b; } return table[7]; }",
+  "function tableRemainder(a: word, b: word) returns (word) { let table: mapping(word => word); table[7] = a; unchecked { table[7] %= b; } return table[7]; }"
 ]
 
 private def names : List String :=
@@ -4004,13 +4004,13 @@ def run : IO Unit := do
   let completed ← execute session (← key 10) [word 8, word 2]
   require (completed.value == word 4) "unchecked division after a panic"
   rejectedWhileLoading "a block in a block" (fun | .nested _ => true | _ => false)
-    ["function bad() returns (Word) { unchecked { unchecked { return 1; } } }"]
+    ["function bad() returns (word) { unchecked { unchecked { return 1; } } }"]
   discard <| get "checked integer arithmetic"
     (checkProgram (workspaceOf ["function good(n: integer) returns (integer) { return n + 1; }"]))
   rejectedByInference "unchecked arithmetic on integer"
     ["function bad(n: integer) returns (integer) { unchecked { return n + 1; } }"]
   rejected "a block as an expression"
-    ["function bad() returns (Word) { let x: Word = unchecked { 1 }; return x; }"]
+    ["function bad() returns (word) { let x: word = unchecked { 1 }; return x; }"]
   IO.println "SOURCE_CORE_UNCHECKED_PASS: unchecked `+`, `-` and `*` wrap on Words with their compound forms, unchecked `/` and `%` panic with 0x12 on a zero divisor (also compound and at a mapping element), `unchecked` stays a name, blocks reach no lambda body or helper, and nested blocks, unchecked `integer` arithmetic and blocks as expressions are rejected"
 
 end Tests.SourceCoreUncheckedExecution
@@ -4131,7 +4131,7 @@ def run : IO Unit := do
   session := completed.session
   let completed ← execute session (← key 14) [word (modulus - 5)]
   require (completed.value == word (modulus - 5)) s!"copy gave {reprStr completed.value}"
-  rejectedByInference "uint256 is not Word" ["function bad(x: uint256) returns (Word) { return x; }"]
+  rejectedByInference "uint256 is not Word" ["function bad(x: uint256) returns (word) { return x; }"]
   rejectedByInference "uint8 is not uint16" ["function bad(x: uint8) returns (uint16) { return x; }"]
   rejectedByInference "int8 is not uint8" ["function bad(x: int8) returns (uint8) { return x; }"]
   rejectedByInference "a literal above uint8's range" ["function bad() returns (uint8) { return 256; }"]
@@ -4220,7 +4220,7 @@ private def workspace : Workspace.RawWorkspace := workspaceOf [
   "function andAssign8u(x: uint8, y: uint8) returns (uint8) { let r: uint8 = x; r &= y; return r; }",
   "function orAssign8s(x: int8, y: int8) returns (int8) { let r: int8 = x; r |= y; return r; }",
   "function xorAssign16u(x: uint16, y: uint16) returns (uint16) { let r: uint16 = x; r ^= y; return r; }",
-  "function tableAdd8u(x: uint8, y: uint8) returns (uint8) { let table: mapping(Word => uint8); table[7] = x; table[7] += y; return table[7]; }",
+  "function tableAdd8u(x: uint8, y: uint8) returns (uint8) { let table: mapping(word => uint8); table[7] = x; table[7] += y; return table[7]; }",
   "function absentAdd8u(y: uint8) returns (uint8) { let r: uint8; r += y; return r; }",
   "function div8u(x: uint8, y: uint8) returns (uint8) { return x / y; }",
   "function mod8u(x: uint8, y: uint8) returns (uint8) { return x % y; }",
@@ -4236,7 +4236,7 @@ private def workspace : Workspace.RawWorkspace := workspaceOf [
   "function modAssign8s(x: int8, y: int8) returns (int8) { let r: int8 = x; r %= y; return r; }",
   "function divAssign256s(x: int256, y: int256) returns (int256) { let r: int256 = x; r /= y; return r; }",
   "function modAssign256u(x: uint256, y: uint256) returns (uint256) { let r: uint256 = x; r %= y; return r; }",
-  "function tableDiv8s(x: int8, y: int8) returns (int8) { let table: mapping(Word => int8); table[7] = x; table[7] /= y; return table[7]; }",
+  "function tableDiv8s(x: int8, y: int8) returns (int8) { let table: mapping(word => int8); table[7] = x; table[7] /= y; return table[7]; }",
   "function lit8u() returns (uint8) { return 255; }",
   "function lit256u() returns (uint256) { return 115792089237316195423570985008687907853269984665640564039457584007913129639935; }",
   "function lit8s() returns (int8) { return 127; }",
@@ -4252,7 +4252,7 @@ private def workspace : Workspace.RawWorkspace := workspaceOf [
   "function deferredDiv8u() returns (uint8) { let a = 6 / 2; let b: uint8 = a; return b; }",
   "function deferredMod8s() returns (int8) { let a = 7 % 4; let b: int8 = a; return b; }",
   "function tableLit8u() returns (uint8) { let table: mapping(uint8 => uint8); table[3] = 200; return table[3]; }",
-  "function tableLit8s(k: Word) returns (int8) { let table: mapping(Word => int8); table[k] = 127; return table[k]; }",
+  "function tableLit8s(k: word) returns (int8) { let table: mapping(word => int8); table[k] = 127; return table[k]; }",
   "function mask16u(x: uint16) returns (uint16) { return x & 255; }",
   "function deferredAdd8u() returns (uint8) { let a = 200 + 100; let b: uint8 = a; return b; }",
   "function negLit8s() returns (int8) { return -128; }",
@@ -4261,22 +4261,22 @@ private def workspace : Workspace.RawWorkspace := workspaceOf [
   "function doubleNeg8s() returns (int8) { return - -5; }",
   "function negLit256s() returns (int256) { return -57896044618658097711785492504343953926634992332820282019728792003956564819968; }",
   "function negZero8u() returns (uint8) { return -0; }",
-  "function negOneWord() returns (Word) { let w: Word = -1; return w; }",
-  "function letNegative() returns (Word) { let k = -1; return k; }",
+  "function negOneWord() returns (word) { let w: word = -1; return w; }",
+  "function letNegative() returns (word) { let k = -1; return k; }",
   "function neg8s(x: int8) returns (int8) { return -x; }",
   "function neg8u(x: uint8) returns (uint8) { return -x; }",
   "function neg256s(x: int256) returns (int256) { return -x; }",
   "function neg256u(x: uint256) returns (uint256) { return -x; }",
-  "function negWord(w: Word) returns (Word) { return -w; }",
+  "function negWord(w: word) returns (word) { return -w; }",
   "function addNegLit8s(x: int8) returns (int8) { return x + -1; }",
   "function mulNegLit256s(x: int256) returns (int256) { return x * -2; }",
   "function compoundNeg8s(x: int8) returns (int8) { let r: int8 = x; r += -5; return r; }",
   "function compoundNeg256s(x: int256) returns (int256) { let r: int256 = x; r -= -1; return r; }",
   "function nestedNeg8s(x: int8) returns (int8) { return - -x; }",
   "function nestedNegGroup8s(x: int8) returns (int8) { return -(-x); }",
-  "function blockNegWord(w: Word) returns (Word) { unchecked { let r: Word = -w; return r; } }",
+  "function blockNegWord(w: word) returns (word) { unchecked { let r: word = -w; return r; } }",
   "function belowNegLit8s(x: int8) returns (bool) { return x < -100; }",
-  "function tableNeg8s() returns (int8) { let table: mapping(Word => int8); table[1] = -128; return table[1]; }"
+  "function tableNeg8s() returns (int8) { let table: mapping(word => int8); table[1] = -128; return table[1]; }"
 ]
 
 private def names : List String :=
@@ -4379,21 +4379,21 @@ private def defaultingWorkspace : Workspace.RawWorkspace := workspaceOf [
   "impl Mark<uint256> {}",
   "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
   "function eqOpen() returns (bool) { return 7 == 7; }",
-  "function addUnused() returns (Word) { let a = 7 + 1; return 3; }",
-  "function idOpen() returns (Word) { return sc_id(7); }",
-  "function shiftUnused() returns (Word) { let s = 1 << 3; return 5; }",
+  "function addUnused() returns (word) { let a = 7 + 1; return 3; }",
+  "function idOpen() returns (word) { return sc_id(7); }",
+  "function shiftUnused() returns (word) { let s = 1 << 3; return 5; }",
   "function shiftOpen() returns (bool) { return (1 << 3) == 8; }",
-  "function matchOpen() returns (Word) { match (7) { case 7 { return 1; } default { return 0; } } }",
-  "function matchOpenMiss() returns (Word) { match (8) { case 7 { return 1; } default { return 0; } } }",
-  "function matchU256(x: uint256) returns (Word) { match (x) { case 0 { return 10; } case 0xff { return 20; } case 115792089237316195423570985008687907853269984665640564039457584007913129639935 { return 30; } default { return 40; } } }",
+  "function matchOpen() returns (word) { match (7) { case 7 { return 1; } default { return 0; } } }",
+  "function matchOpenMiss() returns (word) { match (8) { case 7 { return 1; } default { return 0; } } }",
+  "function matchU256(x: uint256) returns (word) { match (x) { case 0 { return 10; } case 0xff { return 20; } case 115792089237316195423570985008687907853269984665640564039457584007913129639935 { return 30; } default { return 40; } } }",
   "function maxOpen() returns (bool) { return 115792089237316195423570985008687907853269984665640564039457584007913129639935 == 115792089237316195423570985008687907853269984665640564039457584007913129639935; }",
   "function addOpen() returns (bool) { return 7 + 1 == 8; }",
   "function overflowOpen() returns (bool) { return 115792089237316195423570985008687907853269984665640564039457584007913129639935 + 1 == 0; }",
   "function underflowOpen() returns (bool) { return 0 - 1 == 0; }",
-  "function markOpen() returns (Word) { keep(7); return 4; }",
+  "function markOpen() returns (word) { keep(7); return 4; }",
   "function compoundOpen() returns (bool) { let x = 0; x -= 1; return x > 5; }",
   "function rewrittenOpen() returns (bool) { let x = 0; x = x - 1; return x > 5; }",
-  "function compoundWord(w: Word) returns (Word) { let total = 0; total += w; return total; }",
+  "function compoundWord(w: word) returns (word) { let total = 0; total += w; return total; }",
   "function compoundAddOpen() returns (bool) { let x = 0; x += 7; return x == 7; }",
   "function compoundAddMax() returns (bool) { let x = 115792089237316195423570985008687907853269984665640564039457584007913129639935; x += 1; return x == 0; }",
   "function compoundMulOpen() returns (bool) { let x = 57896044618658097711785492504343953926634992332820282019728792003956564819968; x *= 2; return x == 0; }",
@@ -4405,11 +4405,11 @@ private def defaultingWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function deferredCompound8s() returns (int8) { let x = -100; x -= 28; return x; }",
   "function deferredCompound8sUnder() returns (int8) { let x = -100; x -= 29; return x; }",
   "function loopOpen() returns (uint256) { let total = 0; for (let i = 0; i < 4; i += 1) { total += i; } return total; }",
-  "function loopWord(n: Word) returns (Word) { let total = 0; for (let i = 0; i < n; i += 1) { total += 1; } return total; }",
+  "function loopWord(n: word) returns (word) { let total = 0; for (let i = 0; i < n; i += 1) { total += 1; } return total; }",
   "function shiftCompoundOpen() returns (bool) { let x = 1; x <<= 3; return x == 8; }",
   "function uncheckedCompoundOpen() returns (bool) { let x = 0; unchecked { x -= 1; } return x > 5; }",
-  "function lambdaCaptured(w: Word) returns (Word) { let f = lam(acc) { acc += w; return acc; }; return f(5); }",
-  "function lambdaAnnotated() returns (Word) { let f = lam(acc: Word) { acc += 1; return acc; }; return f(41); }",
+  "function lambdaCaptured(w: word) returns (word) { let f = lam(acc) { acc += w; return acc; }; return f(5); }",
+  "function lambdaAnnotated() returns (word) { let f = lam(acc: word) { acc += 1; return acc; }; return f(41); }",
   "function lambdaLiteral() returns (uint256) { let f = lam(acc) { acc += 1; return acc; }; return f(41); }"]
 
 private def defaultingNames : List String := [
@@ -4490,20 +4490,20 @@ def runDefaulting : IO Unit := do
   for index in [19, 20] do
     session ← panics session (← key index) [] SourceCorePanics.divisionByZero s!"{defaultingNames[index]?}"
   -- An open literal that nothing constrains is ambiguous; it never defaults to Word.
-  rejectedAmbiguous "an unused let y = 7" ["function bad() returns (Word) { let y = 7; return 0; }"]
-  rejectedAmbiguous "let y = 7; let z = y" ["function bad() returns (Word) { let y = 7; let z = y; return 0; }"]
+  rejectedAmbiguous "an unused let y = 7" ["function bad() returns (word) { let y = 7; return 0; }"]
+  rejectedAmbiguous "let y = 7; let z = y" ["function bad() returns (word) { let y = 7; let z = y; return 0; }"]
   rejectedAmbiguous "sc_id(7) with an unused result"
-    ["function sc_id<A>(x: A) returns (A) { return x; }", "function bad() returns (Word) { sc_id(7); return 0; }"]
+    ["function sc_id<A>(x: A) returns (A) { return x; }", "function bad() returns (word) { sc_id(7); return 0; }"]
   rejectedAmbiguous "a lambda returning 7, never called"
-    ["function bad() returns (Word) { let f = lam () { return 7; }; return 0; }"]
+    ["function bad() returns (word) { let f = lam () { return 7; }; return 0; }"]
   -- An open negative literal defaults to `uint256` and is out of its range, as upstream's SC0411.
-  rejectedOutOfRange "an open let k = -1" "uint256" (-1) ["function bad() returns (Word) { let k = -1; return 0; }"]
+  rejectedOutOfRange "an open let k = -1" "uint256" (-1) ["function bad() returns (word) { let k = -1; return 0; }"]
   rejectedOutOfRange "2^256 defaulted" "uint256" 115792089237316195423570985008687907853269984665640564039457584007913129639936
     ["function bad() returns (bool) { return 115792089237316195423570985008687907853269984665640564039457584007913129639936 == 0; }"]
   -- The requirement a literal defaults for must be solved at `uint256`: here no implementation does.
-  match checkProgram (workspaceOf ["trait Mark<T> {}", "impl Mark<Word> {}",
+  match checkProgram (workspaceOf ["trait Mark<T> {}", "impl Mark<word> {}",
       "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
-      "function bad() returns (Word) { keep(7); return 0; }"]) with
+      "function bad() returns (word) { keep(7); return 0; }"]) with
   | .error [.noSolution _ predicate] =>
       require (decide (predicate.subject = TypeSystem.Ty.fixed .uint256))
         s!"the unsolved Mark requirement named {reprStr predicate.subject}"
@@ -4512,13 +4512,13 @@ def runDefaulting : IO Unit := do
   -- Numeric patterns stay rejected on the other eleven types.
   for name in ["uint8", "uint16", "uint32", "uint64", "uint128", "int8", "int16", "int32", "int64", "int128", "int256"] do
     rejectedByInference s!"a numeric pattern on {name}"
-      [s!"function bad(x: {name}) returns (Word) \{ match (x) \{ case 1 \{ return 1; } default \{ return 0; } } }"]
+      [s!"function bad(x: {name}) returns (word) \{ match (x) \{ case 1 \{ return 1; } default \{ return 0; } } }"]
   -- A numeric pattern is range-checked at `uint256`, declared or defaulted, as upstream's
   -- `check_integer_literal_pattern_range` does.
   rejectedPatternOutOfRange "a numeric pattern of 2^256 at uint256" 115792089237316195423570985008687907853269984665640564039457584007913129639936
-    ["function bad(x: uint256) returns (Word) { match (x) { case 115792089237316195423570985008687907853269984665640564039457584007913129639936 { return 1; } default { return 0; } } }"]
+    ["function bad(x: uint256) returns (word) { match (x) { case 115792089237316195423570985008687907853269984665640564039457584007913129639936 { return 1; } default { return 0; } } }"]
   rejectedPatternOutOfRange "a defaulted numeric pattern of 2^256" 115792089237316195423570985008687907853269984665640564039457584007913129639936
-    ["function bad() returns (Word) { match (7) { case 115792089237316195423570985008687907853269984665640564039457584007913129639936 { return 1; } default { return 0; } } }"]
+    ["function bad() returns (word) { match (7) { case 115792089237316195423570985008687907853269984665640564039457584007913129639936 { return 1; } default { return 0; } } }"]
   -- Upstream's `crates/uitest/tests/fixtures/solver/poly_int_defaulting`, verbatim, its leading
   -- `pragma solcore;` added by `workspaceOf`. Upstream rejects it in inference as ambiguous (SC0299);
   -- Lean rejects it earlier, at the signature, because a `where` clause cannot name the builtin `Int`.
@@ -4536,7 +4536,7 @@ def runDefaulting : IO Unit := do
   -- Step 7b: finalization checks the open compound target's type: one that becomes `integer`
   -- takes no compound operator.
   match checkProgram (workspaceOf
-      ["function bad() returns (Word) { let x = 0; x += 1; let y: integer = x; return 0; }"]) with
+      ["function bad() returns (word) { let x = 0; x += 1; let y: integer = x; return 0; }"]) with
   | .error [.inference ⟨_, .compoundTargetNotSupported _ operator type⟩] =>
       require (operator == .add && decide (type = TypeSystem.Ty.integer))
         s!"an integer compound target named {reprStr operator} and {reprStr type}"
@@ -4546,20 +4546,20 @@ def runDefaulting : IO Unit := do
   -- the parameter, so its type is still open at finalization, as `acc + step` was rejected
   -- before. Upstream keeps closures monomorphic.
   match checkProgram (workspaceOf
-      ["function bad() returns (Word) { let f = lam(acc, step) { acc += step; return acc; }; return 0; }"]) with
+      ["function bad() returns (word) { let f = lam(acc, step) { acc += step; return acc; }; return 0; }"]) with
   | .error [.inference ⟨_, .compoundTargetNotSupported _ operator (.variable _)⟩] =>
       require (operator == .add) s!"a generalized lambda's compound target named {reprStr operator}"
   | .ok _ => throw (IO.userError "a compound on a generalized lambda parameter was accepted")
   | .error errors => throw (IO.userError s!"a compound on a generalized lambda parameter gave {reprStr errors}")
   -- So are an in-place `~` (step 9a) and a compound shift (step 8d) on such a parameter.
   match checkProgram (workspaceOf
-      ["function bad() returns (Word) { let f = lam(x) { x ~=; return x; }; return 0; }"]) with
+      ["function bad() returns (word) { let f = lam(x) { x ~=; return x; }; return 0; }"]) with
   | .error [.inference ⟨_, .operatorNotSupported name (.variable _)⟩] =>
       require (name == "BitNot") s!"a generalized lambda's in-place ~ named {name}"
   | .ok _ => throw (IO.userError "an in-place ~ on a generalized lambda parameter was accepted")
   | .error errors => throw (IO.userError s!"an in-place ~ on a generalized lambda parameter gave {reprStr errors}")
   match checkProgram (workspaceOf
-      ["function bad() returns (Word) { let f = lam(x) { x <<= 1; return x; }; return 0; }"]) with
+      ["function bad() returns (word) { let f = lam(x) { x <<= 1; return x; }; return 0; }"]) with
   | .error [.inference ⟨_, .compoundTargetNotSupported _ operator (.variable _)⟩] =>
       require (operator == .shiftLeft) s!"a generalized lambda's compound shift named {reprStr operator}"
   | .ok _ => throw (IO.userError "a compound shift on a generalized lambda parameter was accepted")
@@ -4602,14 +4602,14 @@ private def uncheckedWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function uaddAssign256s(x: int256, y: int256) returns (int256) { let r: int256 = x; unchecked { r += y; } return r; }",
   "function usubAssign256u(x: uint256, y: uint256) returns (uint256) { let r: uint256 = x; unchecked { r -= y; } return r; }",
   "function udivAssign256s(x: int256, y: int256) returns (int256) { let r: int256 = x; unchecked { r /= y; } return r; }",
-  "function utableAdd16s(x: int16, y: int16) returns (int16) { let table: mapping(Word => int16); table[3] = x; unchecked { table[3] += y; } return table[3]; }",
+  "function utableAdd16s(x: int16, y: int16) returns (int16) { let table: mapping(word => int16); table[3] = x; unchecked { table[3] += y; } return table[3]; }",
   "function uopenAssign8u() returns (uint8) { let x = 200; unchecked { x += 100; } return x; }",
   "function uabsentAdd8u(y: uint8) returns (uint8) { let r: uint8; unchecked { r += y; } return r; }",
   "function uopenLits8u() returns (uint8) { unchecked { let a = 200 + 100; let b: uint8 = a; return b; } }",
   "function uopenReturn256() returns (uint256) { unchecked { return 1 + 2; } }",
-  "function uopenUnused() returns (Word) { unchecked { let a = 1 + 2; } return 0; }",
+  "function uopenUnused() returns (word) { unchecked { let a = 1 + 2; } return 0; }",
   "function uopenDefaultCompare() returns (bool) { unchecked { let a = 0 - 1; return a > 5; } }",
-  "function uopenWord() returns (Word) { unchecked { let a = 0 - 1; let b: Word = a; return b; } }"]
+  "function uopenWord() returns (word) { unchecked { let a = 0 - 1; let b: word = a; return b; } }"]
 
 private def uncheckedNames : List String := [
   "uadd8u", "usub8u", "umul16u", "uadd256u", "usub256u", "uadd8s", "usub8s", "umul8s", "umul256s", "uadd64s",
@@ -4699,12 +4699,12 @@ def runUnchecked : IO Unit := do
   rejectedByInference "unchecked operands of different fixed-width types"
     ["function bad(x: uint8, y: uint16) returns (uint8) { unchecked { return x + y; } }"]
   rejectedByInference "unchecked + on a fixed-width type and Word"
-    ["function bad(x: uint8, w: Word) returns (uint8) { unchecked { return x + w; } }"]
+    ["function bad(x: uint8, w: word) returns (uint8) { unchecked { return x + w; } }"]
   -- An unchecked compound never takes `integer`, declared or resolved later.
   rejectedByInference "an unchecked += on integer"
     ["function bad(n: integer) returns (integer) { let r: integer = n; unchecked { r += 1; } return r; }"]
   match checkProgram (workspaceOf
-      ["function bad() returns (Word) { let x = 0; unchecked { x += 1; } let y: integer = x; return 0; }"]) with
+      ["function bad() returns (word) { let x = 0; unchecked { x += 1; } let y: integer = x; return 0; }"]) with
   | .error [.inference ⟨_, .compoundTargetNotSupported _ operator type⟩] =>
       require (operator == .uncheckedAdd && decide (type = TypeSystem.Ty.integer))
         s!"an integer unchecked compound target named {reprStr operator} and {reprStr type}"
@@ -4713,7 +4713,7 @@ def runUnchecked : IO Unit := do
   -- An unchecked operator's open literal operands never take `integer`: finalization rejects
   -- one that a later use makes `integer`, with the diagnostic of an `integer` operand.
   match checkProgram (workspaceOf
-      ["function bad() returns (Word) { unchecked { let a = 1 + 2; let b: integer = a; } return 0; }"]) with
+      ["function bad() returns (word) { unchecked { let a = 1 + 2; let b: integer = a; } return 0; }"]) with
   | .error [.inference ⟨_, .operatorNotSupported name type⟩] =>
       require (name == "UncheckedAdd" && decide (type = TypeSystem.Ty.integer))
         s!"an integer unchecked operand named {name} and {reprStr type}"
@@ -4728,12 +4728,12 @@ private def shiftWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function shr8u(x: uint8, s: uint256) returns (uint8) { return x >> s; }",
   "function shl8s(x: int8, s: uint8) returns (int8) { return x << s; }",
   "function shr8s(x: int8, s: uint8) returns (int8) { return x >> s; }",
-  "function shl16u(x: uint16, s: Word) returns (uint16) { return x << s; }",
-  "function shl256s(x: int256, s: Word) returns (int256) { return x << s; }",
+  "function shl16u(x: uint16, s: word) returns (uint16) { return x << s; }",
+  "function shl256s(x: int256, s: word) returns (int256) { return x << s; }",
   "function shr256s(x: int256, s: uint16) returns (int256) { return x >> s; }",
   "function shl256u(x: uint256, s: uint8) returns (uint256) { return x << s; }",
   "function shr256u(x: uint256, s: uint256) returns (uint256) { return x >> s; }",
-  "function shrWordBy8u(w: Word, s: uint8) returns (Word) { return w >> s; }",
+  "function shrWordBy8u(w: word, s: uint8) returns (word) { return w >> s; }",
   "function litAmount8u(x: uint8) returns (uint8) { return x << 3; }",
   "function litAmount8s(x: int8) returns (int8) { return x >> 1; }",
   "function litPast8u(x: uint8) returns (uint8) { return x << 300; }",
@@ -4742,7 +4742,7 @@ private def shiftWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function litBoth8u() returns (uint8) { return 1 << 7; }",
   "function openDefault() returns (bool) { let a = 1 << 255; return a > 5; }",
   "function openPast() returns (bool) { let a = 1 << 256; return a == 0; }",
-  "function openWord() returns (Word) { let a = 1 << 3; let b: Word = a; return b; }",
+  "function openWord() returns (word) { let a = 1 << 3; let b: word = a; return b; }",
   "function precedence8u(x: uint8) returns (uint8) { return x + 1 << 2; }",
   "function mask8u(x: uint8) returns (uint8) { return x & 0xF << 4; }",
   "function ushl8u(x: uint8, s: uint8) returns (uint8) { unchecked { return x << s; } }",
@@ -4834,11 +4834,11 @@ def runShifts : IO Unit := do
   rejectedShift "a signed amount" "shl" (.fixed ⟨true, .w8⟩)
     ["function bad(x: uint8, s: int8) returns (uint8) { return x << s; }"]
   rejectedShift "an int256 amount on Word" "shr" (.fixed ⟨true, .w256⟩)
-    ["function bad(w: Word, s: int256) returns (Word) { return w >> s; }"]
+    ["function bad(w: word, s: int256) returns (word) { return w >> s; }"]
   rejectedShift "an integer amount" "shr" .integer
     ["function bad(x: uint8, n: integer) returns (uint8) { return x >> n; }"]
   rejectedShift "a Bool amount" "shl" .bool
-    ["function bad(x: uint8, b: Bool) returns (uint8) { return x << b; }"]
+    ["function bad(x: uint8, b: bool) returns (uint8) { return x << b; }"]
   rejectedShift "an integer value" "shl" .integer
     ["function bad(n: integer) returns (integer) { return n << 1; }"]
   -- A negative literal amount defaults to `uint256` and is out of its range, as upstream's.
@@ -4847,7 +4847,7 @@ def runShifts : IO Unit := do
   -- A lambda parameter that only a shift's value types: local generalization quantifies it, so its
   -- type is still open at finalization, as for step 7b's compound targets.
   match checkProgram (workspaceOf
-      ["function bad() returns (Word) { let f = lam(x) { return x << 1; }; return 0; }"]) with
+      ["function bad() returns (word) { let f = lam(x) { return x << 1; }; return 0; }"]) with
   | .error [.inference ⟨_, .operatorNotSupported name (.variable _)⟩] =>
       require (name == "shl") s!"a generalized lambda's shift named {name}"
   | .ok _ => throw (IO.userError "a shift of a generalized lambda parameter was accepted")
@@ -4862,18 +4862,18 @@ private def compoundShiftWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function cshr8u(x: uint8, s: uint256) returns (uint8) { let r: uint8 = x; r >>= s; return r; }",
   "function cshl8s(x: int8, s: uint8) returns (int8) { let r: int8 = x; r <<= s; return r; }",
   "function cshr8s(x: int8, s: uint8) returns (int8) { let r: int8 = x; r >>= s; return r; }",
-  "function cshlWord(w: Word, s: Word) returns (Word) { let r: Word = w; r <<= s; return r; }",
-  "function cshrWord(w: Word, s: uint8) returns (Word) { let r: Word = w; r >>= s; return r; }",
+  "function cshlWord(w: word, s: word) returns (word) { let r: word = w; r <<= s; return r; }",
+  "function cshrWord(w: word, s: uint8) returns (word) { let r: word = w; r >>= s; return r; }",
   "function clit8u(x: uint8) returns (uint8) { let r: uint8 = x; r <<= 3; return r; }",
   "function clitPast8u(x: uint8) returns (uint8) { let r: uint8 = x; r <<= 300; return r; }",
-  "function cmapped8u(x: uint8, s: uint256) returns (uint8) { let m: mapping(Bool => uint8); m[true] = x; m[true] <<= s; return m[true]; }",
+  "function cmapped8u(x: uint8, s: uint256) returns (uint8) { let m: mapping(bool => uint8); m[true] = x; m[true] <<= s; return m[true]; }",
   "function copen8u() returns (uint8) { let x = 1; x <<= 7; return x; }",
   "function copenPast8u() returns (uint8) { let x = 1; x <<= 8; return x; }",
   "function copenDefault() returns (bool) { let x = 1; x <<= 255; return x > 5; }",
-  "function copenWord() returns (Word) { let x = 1; x <<= 3; let w: Word = x; return w; }",
+  "function copenWord() returns (word) { let x = 1; x <<= 3; let w: word = x; return w; }",
   "function cunchecked8u(x: uint8, s: uint8) returns (uint8) { let r: uint8 = x; unchecked { r <<= s; } return r; }",
-  "function cforPost8u(x: uint8) returns (uint8) { let r: uint8 = x; for (let i: Word = 0; i < 2; r <<= 1) { i += 1; } return r; }",
-  "function cforBody(w: Word, s: uint8) returns (Word) { let r: Word = w; for (let i: Word = 0; i < 2; i += 1) { r >>= s; } return r; }"]
+  "function cforPost8u(x: uint8) returns (uint8) { let r: uint8 = x; for (let i: word = 0; i < 2; r <<= 1) { i += 1; } return r; }",
+  "function cforBody(w: word, s: uint8) returns (word) { let r: word = w; for (let i: word = 0; i < 2; i += 1) { r >>= s; } return r; }"]
 
 private def compoundShiftNames : List String := [
   "cshl8u", "cshr8u", "cshl8s", "cshr8s", "cshlWord", "cshrWord", "clit8u", "clitPast8u", "cmapped8u",
@@ -4925,9 +4925,9 @@ def runCompoundShifts : IO Unit := do
   rejectedShift "a signed <<= amount" "shl" (.fixed ⟨true, .w8⟩)
     ["function bad(x: uint8, s: int8) returns (uint8) { let r: uint8 = x; r <<= s; return r; }"]
   rejectedShift "an integer >>= amount" "shr" .integer
-    ["function bad(w: Word, n: integer) returns (Word) { let r: Word = w; r >>= n; return r; }"]
+    ["function bad(w: word, n: integer) returns (word) { let r: word = w; r >>= n; return r; }"]
   rejectedShift "a Bool <<= amount" "shl" .bool
-    ["function bad(x: uint8, b: Bool) returns (uint8) { let r: uint8 = x; r <<= b; return r; }"]
+    ["function bad(x: uint8, b: bool) returns (uint8) { let r: uint8 = x; r <<= b; return r; }"]
   rejectedShift "an open amount made int8" "shl" (.fixed ⟨true, .w8⟩)
     ["function bad(x: uint8) returns (uint8) { let r: uint8 = x; let n = 1; r <<= n; let m: int8 = n; return r; }"]
   -- The target is the shift's value: an `integer` or `Bool` target is rejected, and so is an open
@@ -4935,9 +4935,9 @@ def runCompoundShifts : IO Unit := do
   rejectedByInference "<<= on integer"
     ["function bad(n: integer) returns (integer) { let r: integer = n; r <<= 1; return r; }"]
   rejectedByInference ">>= on Bool"
-    ["function bad(b: Bool) returns (Bool) { let r: Bool = b; r >>= 1; return r; }"]
+    ["function bad(b: bool) returns (bool) { let r: bool = b; r >>= 1; return r; }"]
   match checkProgram (workspaceOf
-      ["function bad() returns (Word) { let x = 1; x <<= 2; let y: integer = x; return 0; }"]) with
+      ["function bad() returns (word) { let x = 1; x <<= 2; let y: integer = x; return 0; }"]) with
   | .error [.inference ⟨_, .compoundTargetNotSupported _ operator type⟩] =>
       require (operator == .shiftLeft && decide (type = TypeSystem.Ty.integer))
         s!"an integer <<= target named {reprStr operator} and {reprStr type}"
@@ -4956,25 +4956,25 @@ private def bitNotWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function not64s(x: int64) returns (int64) { let r: int64 = x; r ~=; return r; }",
   "function not128s(x: int128) returns (int128) { let r: int128 = x; r ~=; return r; }",
   "function not256s(x: int256) returns (int256) { let r: int256 = x; r ~=; return r; }",
-  "function notWord(w: Word) returns (Word) { let r: Word = w; r ~=; return r; }",
-  "function notMapped8s(x: int8) returns (int8) { let m: mapping(Bool => int8); m[true] = x; m[true] ~=; return m[true]; }",
+  "function notWord(w: word) returns (word) { let r: word = w; r ~=; return r; }",
+  "function notMapped8s(x: int8) returns (int8) { let m: mapping(bool => int8); m[true] = x; m[true] ~=; return m[true]; }",
   "function notOpenDefault() returns (bool) { let x = 0; x ~=; return x > 5; }",
   "function notOpenLater8s() returns (int8) { let x = 5; x ~=; let y: int8 = x; return y; }",
   "function notOpenReturn256s() returns (int256) { let x = 0; x ~=; return x; }",
-  "function notOpenWord() returns (Word) { let x = 1; x ~=; let w: Word = x; return w; }",
+  "function notOpenWord() returns (word) { let x = 1; x ~=; let w: word = x; return w; }",
   "function notTwice8s(x: int8) returns (int8) { let r: int8 = x; r ~=; r ~=; return r; }",
-  "function notForPost8s(x: int8) returns (int8) { let r: int8 = x; for (let i: Word = 0; i < 1; r ~=) { i += 1; } return r; }",
-  "function notForBody256u(x: uint256) returns (uint256) { let r: uint256 = x; for (let i: Word = 0; i < 3; i += 1) { r ~=; } return r; }",
+  "function notForPost8s(x: int8) returns (int8) { let r: int8 = x; for (let i: word = 0; i < 1; r ~=) { i += 1; } return r; }",
+  "function notForBody256u(x: uint256) returns (uint256) { let r: uint256 = x; for (let i: word = 0; i < 3; i += 1) { r ~=; } return r; }",
   "function not8u(x: uint8) returns (uint8) { let r: uint8 = x; r ~=; return r; }",
   "function not16u(x: uint16) returns (uint16) { let r: uint16 = x; r ~=; return r; }",
   "function not32u(x: uint32) returns (uint32) { let r: uint32 = x; r ~=; return r; }",
   "function not64u(x: uint64) returns (uint64) { let r: uint64 = x; r ~=; return r; }",
   "function not128u(x: uint128) returns (uint128) { let r: uint128 = x; r ~=; return r; }",
-  "function notMapped8u(x: uint8) returns (uint8) { let m: mapping(Bool => uint8); m[true] = x; m[true] ~=; return m[true]; }",
+  "function notMapped8u(x: uint8) returns (uint8) { let m: mapping(bool => uint8); m[true] = x; m[true] ~=; return m[true]; }",
   "function notOpenLater8u() returns (uint8) { let x = 5; x ~=; let y: uint8 = x; return y; }",
   "function notTwice16u(x: uint16) returns (uint16) { let r: uint16 = x; r ~=; r ~=; return r; }",
   "function notUnchecked8u(x: uint8) returns (uint8) { let r: uint8 = x; unchecked { r ~=; } return r; }",
-  "function notForPost8u(x: uint8) returns (uint8) { let r: uint8 = x; for (let i: Word = 0; i < 1; r ~=) { i += 1; } return r; }",
+  "function notForPost8u(x: uint8) returns (uint8) { let r: uint8 = x; for (let i: word = 0; i < 1; r ~=) { i += 1; } return r; }",
   "function notSum8u(x: uint8) returns (uint8) { let r: uint8 = x; r ~=; return r + x; }"]
 
 private def bitNotNames : List String := [
@@ -5046,33 +5046,33 @@ def runBitNotAssignments : IO Unit := do
   rejectedByInference "~= on integer"
     ["function bad(n: integer) returns (integer) { let r: integer = n; r ~=; return r; }"]
   rejectedByInference "~= on Bool"
-    ["function bad(b: Bool) returns (Bool) { let r: Bool = b; r ~=; return r; }"]
+    ["function bad(b: bool) returns (bool) { let r: bool = b; r ~=; return r; }"]
   rejectedBitNot "an open ~= target made integer" .integer
-    ["function bad() returns (Word) { let x = 1; x ~=; let y: integer = x; return 0; }"]
+    ["function bad() returns (word) { let x = 1; x ~=; let y: integer = x; return 0; }"]
   IO.println "SOURCE_CORE_FIXED_BIT_NOT_ASSIGNMENTS_PASS: in-place ~ on the twelve fixed-width types and Word, keeping the low N bits on uint8 … uint128 and as Word's ~ elsewhere, sign-extended on the signed types, on locals, int8 and uint8 mapping elements, in an unchecked block and in a for loop's header and body, with canonical results, open targets defaulted to uint256 or typed by a later use, the return or a Word, integer and Bool targets and an open target made integer rejected"
 
 /-- Step 9b's first part: `uint256(w)`, `uintN(w)` and `intN(w)`, a word as a
 value of one of the twelve types. -/
 private def conversionWorkspace : Workspace.RawWorkspace := workspaceOf [
-  "function toU8(w: Word) returns (uint8) { return uint8(w); }",
-  "function toU16(w: Word) returns (uint16) { return uint16(w); }",
-  "function toU32(w: Word) returns (uint32) { return uint32(w); }",
-  "function toU64(w: Word) returns (uint64) { return uint64(w); }",
-  "function toU128(w: Word) returns (uint128) { return uint128(w); }",
-  "function toU256(w: Word) returns (uint256) { return uint256(w); }",
-  "function toI8(w: Word) returns (int8) { return int8(w); }",
-  "function toI16(w: Word) returns (int16) { return int16(w); }",
-  "function toI32(w: Word) returns (int32) { return int32(w); }",
-  "function toI64(w: Word) returns (int64) { return int64(w); }",
-  "function toI128(w: Word) returns (int128) { return int128(w); }",
-  "function toI256(w: Word) returns (int256) { return int256(w); }",
+  "function toU8(w: word) returns (uint8) { return uint8(w); }",
+  "function toU16(w: word) returns (uint16) { return uint16(w); }",
+  "function toU32(w: word) returns (uint32) { return uint32(w); }",
+  "function toU64(w: word) returns (uint64) { return uint64(w); }",
+  "function toU128(w: word) returns (uint128) { return uint128(w); }",
+  "function toU256(w: word) returns (uint256) { return uint256(w); }",
+  "function toI8(w: word) returns (int8) { return int8(w); }",
+  "function toI16(w: word) returns (int16) { return int16(w); }",
+  "function toI32(w: word) returns (int32) { return int32(w); }",
+  "function toI64(w: word) returns (int64) { return int64(w); }",
+  "function toI128(w: word) returns (int128) { return int128(w); }",
+  "function toI256(w: word) returns (int256) { return int256(w); }",
   "function literalU8() returns (uint8) { return uint8(255); }",
   "function literalI8() returns (int8) { return int8(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff); }",
   "function dirtyU8() returns (uint8) { return uint8(256); }",
   "function dirtyI8() returns (int8) { return int8(128); }",
-  "function openTarget(w: Word) returns (uint16) { let x = uint16(w); return x; }",
-  "function checkedAfter(w: Word) returns (uint8) { let x: uint8 = uint8(w); return x + 1; }",
-  "function bothBranches(w: Word, flag: Bool) returns (int16) { if (flag) { return int16(w); } else { return int16(0); } }"]
+  "function openTarget(w: word) returns (uint16) { let x = uint16(w); return x; }",
+  "function checkedAfter(w: word) returns (uint8) { let x: uint8 = uint8(w); return x + 1; }",
+  "function bothBranches(w: word, flag: bool) returns (int16) { if (flag) { return int16(w); } else { return int16(0); } }"]
 
 private def conversionNames : List String := [
   "toU8", "toU16", "toU32", "toU64", "toU128", "toU256", "toI8", "toI16", "toI32", "toI64", "toI128",
@@ -5157,27 +5157,27 @@ def runConversions : IO Unit := do
   rejectedByInference "uint8 of a uint16"
     ["function bad(x: uint16) returns (uint8) { return uint8(x); }"]
   rejectedByInference "uint8 to the wrong type"
-    ["function bad(w: Word) returns (uint16) { return uint8(w); }"]
+    ["function bad(w: word) returns (uint16) { return uint8(w); }"]
   IO.println "SOURCE_CORE_FIXED_CONVERSIONS_PASS: uint256(w), uintN(w) and intN(w) through the public API, canonical words at each of the twelve types kept, uint256 and int256 never failing, literal words as arguments, an open local and checked + after a conversion, every other word reverting with DirtyHigherBitsForInteger() and upstream's revert data 0x6cc54a63, a non-Word argument and a wrong result type rejected"
 
 /-- Step 9b's second part: `Typedef.abs` and `Typedef.rep`, chosen by the type
 known at the call: the expected type for `abs` and the argument's type for
 `rep`. -/
 private def typedefWorkspace : Workspace.RawWorkspace := workspaceOf [
-  "function absU8(w: Word) returns (uint8) { let x: uint8 = Typedef.abs(w); return x; }",
-  "function absI16(w: Word) returns (int16) { return Typedef.abs(w); }",
-  "function absU256(w: Word) returns (uint256) { return Typedef.abs(w); }",
-  "function absI256(w: Word) returns (int256) { return Typedef.abs(w); }",
-  "function absWord(w: Word) returns (Word) { let v: Word = Typedef.abs(w); return v; }",
-  "function absAssigned(w: Word) returns (uint16) { let x: uint16 = 0; x = Typedef.abs(w); return x; }",
+  "function absU8(w: word) returns (uint8) { let x: uint8 = Typedef.abs(w); return x; }",
+  "function absI16(w: word) returns (int16) { return Typedef.abs(w); }",
+  "function absU256(w: word) returns (uint256) { return Typedef.abs(w); }",
+  "function absI256(w: word) returns (int256) { return Typedef.abs(w); }",
+  "function absWord(w: word) returns (word) { let v: word = Typedef.abs(w); return v; }",
+  "function absAssigned(w: word) returns (uint16) { let x: uint16 = 0; x = Typedef.abs(w); return x; }",
   "function absLiteral() returns (uint8) { return Typedef.abs(255); }",
   "function dirtyLiteral() returns (int8) { return Typedef.abs(128); }",
-  "function repU8(x: uint8) returns (Word) { return Typedef.rep(x); }",
-  "function repI8(x: int8) returns (Word) { let w: Word = Typedef.rep(x); return w; }",
-  "function repU256(x: uint256) returns (Word) { return Typedef.rep(x); }",
-  "function repWord(w: Word) returns (Word) { return Typedef.rep(w); }",
-  "function repOpen(x: int64) returns (Word) { let w = Typedef.rep(x); return w; }",
-  "function repSum(a: uint8, b: uint8) returns (Word) { return Typedef.rep(a) + Typedef.rep(b); }",
+  "function repU8(x: uint8) returns (word) { return Typedef.rep(x); }",
+  "function repI8(x: int8) returns (word) { let w: word = Typedef.rep(x); return w; }",
+  "function repU256(x: uint256) returns (word) { return Typedef.rep(x); }",
+  "function repWord(w: word) returns (word) { return Typedef.rep(w); }",
+  "function repOpen(x: int64) returns (word) { let w = Typedef.rep(x); return w; }",
+  "function repSum(a: uint8, b: uint8) returns (word) { return Typedef.rep(a) + Typedef.rep(b); }",
   "function roundTrip(x: int32) returns (int32) { return Typedef.abs(Typedef.rep(x)); }",
   "function narrowed(x: uint256) returns (uint8) { return Typedef.abs(Typedef.rep(x)); }"]
 
@@ -5239,42 +5239,42 @@ def runTypedef : IO Unit := do
   let _ := session
   -- A type that is not known at the call waits for nothing: it is rejected.
   rejectedTypedef "Typedef.abs into an open local" openType
-    ["function bad(w: Word) returns (uint8) { let a = Typedef.abs(w); let b: uint8 = a; return b; }"]
+    ["function bad(w: word) returns (uint8) { let a = Typedef.abs(w); let b: uint8 = a; return b; }"]
   rejectedTypedef "Typedef.abs as an argument" openType
     ["function take(x: uint8) returns (uint8) { return x; }",
-     "function bad(w: Word) returns (uint8) { return take(Typedef.abs(w)); }"]
+     "function bad(w: word) returns (uint8) { return take(Typedef.abs(w)); }"]
   rejectedTypedef "Typedef.rep of an open local" openType
-    ["function bad() returns (Word) { let a = 5; return Typedef.rep(a); }"]
+    ["function bad() returns (word) { let a = 5; return Typedef.rep(a); }"]
   rejectedTypedef "Typedef.rep of a literal" openType
-    ["function bad() returns (Word) { return Typedef.rep(5); }"]
+    ["function bad() returns (word) { return Typedef.rep(5); }"]
   -- Any other type is rejected.
   rejectedTypedef "Typedef.abs at Bool" (· == TypeSystem.Ty.bool)
-    ["function bad(w: Word) returns (Bool) { return Typedef.abs(w); }"]
+    ["function bad(w: word) returns (bool) { return Typedef.abs(w); }"]
   rejectedTypedef "Typedef.rep of a Bool" (· == TypeSystem.Ty.bool)
-    ["function bad(b: Bool) returns (Word) { return Typedef.rep(b); }"]
+    ["function bad(b: bool) returns (word) { return Typedef.rep(b); }"]
   rejectedTypedef "Typedef.rep of an integer" (· == TypeSystem.Ty.integer)
-    ["function bad() returns (Word) { let i: integer = 1; return Typedef.rep(i); }"]
+    ["function bad() returns (word) { let i: integer = 1; return Typedef.rep(i); }"]
   -- `abs` takes a `Word`, one argument, and the two names are the only ones.
   rejectedByInference "Typedef.abs of a uint8"
     ["function bad(x: uint8) returns (uint16) { return Typedef.abs(x); }"]
   rejectedByInference "Typedef.abs of two words"
-    ["function bad(w: Word) returns (uint8) { return Typedef.abs(w, w); }"]
+    ["function bad(w: word) returns (uint8) { return Typedef.abs(w, w); }"]
   rejectedByInference "another Typedef name"
-    ["function bad(w: Word) returns (Word) { return Typedef.other(w); }"]
+    ["function bad(w: word) returns (word) { return Typedef.other(w); }"]
   rejectedByInference "Typedef.abs as a value"
-    ["function bad() returns (Word) { let f = Typedef.abs; return 0; }"]
+    ["function bad() returns (word) { let f = Typedef.abs; return 0; }"]
   IO.println "SOURCE_CORE_TYPEDEF_PASS: Typedef.abs and Typedef.rep through the public API, chosen by the type known at the call, abs at the twelve types checking the word as uintN(w) and intN(w) do and at Word the word itself, rep giving a value's word, an abs or rep whose type is open at the call rejected naming Typedef, as are Bool and integer, a non-Word abs argument, two arguments, another name and Typedef.abs as a value"
 
 /-- Step 9b's third part: `case uint256(p)`, which a `uint256` value's word is
 matched with, as upstream's `enum uint256 { uint256(word) }` gives it. -/
 private def uint256PatternWorkspace : Workspace.RawWorkspace := workspaceOf [
-  "function unwrap(x: uint256) returns (Word) { match (x) { case uint256(w) { return w; } } }",
+  "function unwrap(x: uint256) returns (word) { match (x) { case uint256(w) { return w; } } }",
   "function plusOne(x: uint256) returns (uint256) { match (x) { case uint256(w) { return uint256(w + 1); } } }",
-  "function isZero(x: uint256) returns (Bool) { match (x) { case uint256(0) { return true; } case _ { return false; } } }",
-  "function ignored(x: uint256) returns (Word) { match (x) { case uint256(_) { return 7; } } }",
-  "function grouped(x: uint256) returns (Word) { match (x) { case uint256((w)) { return w; } } }",
-  "function pair(x: uint256, y: uint256) returns (Word) { match (x, y) { case (uint256(a), uint256(b)) { return a + b; } } }",
-  "function opened() returns (Word) { let x = 5; match (x) { case uint256(w) { return w; } } }"]
+  "function isZero(x: uint256) returns (bool) { match (x) { case uint256(0) { return true; } case _ { return false; } } }",
+  "function ignored(x: uint256) returns (word) { match (x) { case uint256(_) { return 7; } } }",
+  "function grouped(x: uint256) returns (word) { match (x) { case uint256((w)) { return w; } } }",
+  "function pair(x: uint256, y: uint256) returns (word) { match (x, y) { case (uint256(a), uint256(b)) { return a + b; } } }",
+  "function opened() returns (word) { let x = 5; match (x) { case uint256(w) { return w; } } }"]
 
 private def uint256PatternNames : List String :=
   ["unwrap", "plusOne", "isZero", "ignored", "grouped", "pair", "opened"]
@@ -5308,29 +5308,29 @@ def runUint256Patterns : IO Unit := do
   let _ := session
   -- Upstream rejects a constructor pattern at the other eleven types and `uint256(w)` at another type.
   rejectedByInference "uint8(w) at uint8"
-    ["function bad(x: uint8) returns (Word) { match (x) { case uint8(w) { return w; } } }"]
+    ["function bad(x: uint8) returns (word) { match (x) { case uint8(w) { return w; } } }"]
   rejectedByInference "int256(w) at int256"
-    ["function bad(x: int256) returns (Word) { match (x) { case int256(w) { return w; } } }"]
+    ["function bad(x: int256) returns (word) { match (x) { case int256(w) { return w; } } }"]
   rejectedByInference "uint256(w) at Word"
-    ["function bad(x: Word) returns (Word) { match (x) { case uint256(w) { return w; } } }"]
+    ["function bad(x: word) returns (word) { match (x) { case uint256(w) { return w; } } }"]
   rejectedByInference "uint256(w) at uint8"
-    ["function bad(x: uint8) returns (Word) { match (x) { case uint256(w) { return w; } } }"]
+    ["function bad(x: uint8) returns (word) { match (x) { case uint256(w) { return w; } } }"]
   rejectedByInference "uint256 with two patterns"
-    ["function bad(x: uint256) returns (Word) { match (x) { case uint256(a, b) { return a; } } }"]
+    ["function bad(x: uint256) returns (word) { match (x) { case uint256(a, b) { return a; } } }"]
   IO.println "SOURCE_CORE_UINT256_PATTERNS_PASS: case uint256(p) through the public API, every uint256 value matching uint256(w) with w its word, a literal, a wildcard and a group inside, two inside a tuple, an open scrutinee taking uint256, and uint8(w) and int256(w), uint256(w) at Word and uint8, and two patterns inside rejected"
 
 /-- The boolean literal pattern: `true` and `false` in a pattern name the booleans, as they do
 in an expression, as upstream reads them. `flag` and `pair` are the match probes `m4` and `m8`
 with a catch-all after them, as `m4c` and `m8c` measure them on upstream's driver. -/
 private def boolPatternWorkspace : Workspace.RawWorkspace := workspaceOf [
-  "enum Pair<a> { Pair(Bool, a) }",
-  "function flag(a: Bool) returns (Word) { match (a) { case true { return 1; } case false { return 2; } case _ { return 3; } } }",
-  "function pair(p: Pair<Word>) returns (Word) { match (p) { case Pair.Pair(true, x) { return 1; } case Pair.Pair(false, x) { return 2; } case _ { return 3; } } }",
-  "function pairTrue() returns (Word) { return pair(Pair.Pair(true, 5)); }",
-  "function pairFalse() returns (Word) { return pair(Pair.Pair(false, 5)); }",
-  "function both(a: Bool, b: Bool) returns (Word) { match (a, b) { case (true, true) { return 1; } case (false, y) { return 2; } case (_, _) { return 3; } } }",
-  "function grouped(a: Bool) returns (Word) { match (a) { case (false) { return 4; } case _ { return 5; } } }",
-  "function bound() returns (Word) { let x = false; match (x) { case false { return 6; } case _ { return 7; } } }"]
+  "enum Pair<a> { Pair(bool, a) }",
+  "function flag(a: bool) returns (word) { match (a) { case true { return 1; } case false { return 2; } case _ { return 3; } } }",
+  "function pair(p: Pair<word>) returns (word) { match (p) { case Pair.Pair(true, x) { return 1; } case Pair.Pair(false, x) { return 2; } case _ { return 3; } } }",
+  "function pairTrue() returns (word) { return pair(Pair.Pair(true, 5)); }",
+  "function pairFalse() returns (word) { return pair(Pair.Pair(false, 5)); }",
+  "function both(a: bool, b: bool) returns (word) { match (a, b) { case (true, true) { return 1; } case (false, y) { return 2; } case (_, _) { return 3; } } }",
+  "function grouped(a: bool) returns (word) { match (a) { case (false) { return 4; } case _ { return 5; } } }",
+  "function bound() returns (word) { let x = false; match (x) { case false { return 6; } case _ { return 7; } } }"]
 
 private def boolPatternNames : List String :=
   ["flag", "pairTrue", "pairFalse", "both", "grouped", "bound"]
@@ -5365,12 +5365,12 @@ def runBoolPatterns : IO Unit := do
   let _ := session
   -- Upstream refuses these two (`SC0302`).
   rejectedByInference "m9, a payload's false missing"
-    ["enum Pair<a> { Pair(Bool, a) }",
-      "function pair(p: Pair<Word>) returns (Word) { match (p) { case Pair.Pair(true, x) { return x; } } }"]
+    ["enum Pair<a> { Pair(bool, a) }",
+      "function pair(p: Pair<word>) returns (word) { match (p) { case Pair.Pair(true, x) { return x; } } }"]
   rejectedByInference "tuple_nested_nonexhaustive"
-    ["function nested(p: ((), (Bool, Word))) returns (Word) { match (p) { case ((), (true, x)) { return x; } } }"]
+    ["function nested(p: ((), (bool, word))) returns (word) { match (p) { case ((), (true, x)) { return x; } } }"]
   rejectedByInference "true at Word"
-    ["function bad(x: Word) returns (Word) { match (x) { case true { return 1; } case _ { return 0; } } }"]
+    ["function bad(x: word) returns (word) { match (x) { case true { return 1; } case _ { return 0; } } }"]
   IO.println "SOURCE_CORE_BOOL_PATTERNS_PASS: case true and case false through the public API, each arm for its own boolean in a bool match and in a payload as the m4c and m8c probes give upstream's 2, a repeated true in a tuple binding nothing, a group and a let-bound scrutinee taking bool; m9 and tuple_nested_nonexhaustive refused as upstream refuses them, and true at Word rejected"
 
 /-- Upstream's reading of a bare name in a pattern, after `true` and `false`: a constructor that
@@ -5381,13 +5381,13 @@ private def bareNameWorkspace : Workspace.RawWorkspace := workspaceOf [
   "enum m { m, k }",
   "enum thing { thing }",
   "enum colour { red, blue }",
-  "function pickM(x: m) returns (Word) { match (x) { case m { return 1; } case m.k { return 2; } } }",
-  "function pickThing(t: thing) returns (Word) { match (t) { case thing { return 7; } } }",
-  "function colourBinder(c: colour) returns (Word) { match (c) { case colour { return 3; } } }",
-  "function first() returns (Word) { return pickM(m.m); }",
-  "function second() returns (Word) { return pickM(m.k); }",
-  "function only() returns (Word) { return pickThing(thing.thing); }",
-  "function blue() returns (Word) { return colourBinder(colour.blue); }"]
+  "function pickM(x: m) returns (word) { match (x) { case m { return 1; } case m.k { return 2; } } }",
+  "function pickThing(t: thing) returns (word) { match (t) { case thing { return 7; } } }",
+  "function colourBinder(c: colour) returns (word) { match (c) { case colour { return 3; } } }",
+  "function first() returns (word) { return pickM(m.m); }",
+  "function second() returns (word) { return pickM(m.k); }",
+  "function only() returns (word) { return pickThing(thing.thing); }",
+  "function blue() returns (word) { return colourBinder(colour.blue); }"]
 
 private def bareNameNames : List String := ["first", "second", "only", "blue"]
 
@@ -5410,7 +5410,7 @@ private def refusedWith (label : String) (workspace : Workspace.RawWorkspace)
 private def flagLibrary : String := "export { flag(*) };\nenum flag { on, off }"
 
 private def pickFlag (type : String) (qualified : String) : String :=
-  s!"function pick(f: {type}) returns (Word) \{ match (f) \{ case off \{ return 1; } case {qualified} \{ return 2; } } }"
+  s!"function pick(f: {type}) returns (word) \{ match (f) \{ case off \{ return 1; } case {qualified} \{ return 2; } } }"
 
 /-- The bare-name rule through the public API: same-name constructors run as their constructors,
 `case m` beside `case m.k` covering `m`; a type's name with no constructor of that name, and a
@@ -5437,22 +5437,22 @@ def runBareNamePatterns : IO Unit := do
   let _ := session
   -- An opaque import's constructors are not visible, so `off` binds.
   match checkProgram (libraryWorkspace
-      "import { flag, makeOn } from lib;\nfunction pick(f: flag) returns (Word) { match (f) { case off { return 1; } } }"
+      "import { flag, makeOn } from lib;\nfunction pick(f: flag) returns (word) { match (f) { case off { return 1; } } }"
       "export { flag, makeOn };\nenum flag { on, off }\nfunction makeOn() returns (flag) { return flag.on; }") with
   | .ok _ => pure ()
   | .error errors => throw (IO.userError s!"an opaque import's constructor spelling gave {reprStr errors}")
   -- Upstream's `nameres/unqualified_ctor_pattern`, refused at `off`.
   refusedWith "unqualified_ctor_pattern" (workspaceOf ["enum flag { off, on }",
-    "function pick(f: flag) returns (Word) { match (f) { case off { return 0; } case on { return 1; } } }",
-    "function main() returns (Word) { return pick(flag.on); }"]) (.unqualifiedConstructorPattern "off")
+    "function pick(f: flag) returns (word) { match (f) { case off { return 0; } case on { return 1; } } }",
+    "function main() returns (word) { return pick(flag.on); }"]) (.unqualifiedConstructorPattern "off")
   refusedWith "a binder spelled like an unrelated type's constructor" (workspaceOf ["enum flag { on, off }",
-    "function f(x: Word) returns (Word) { match (x) { case on { return 1; } } }"])
+    "function f(x: word) returns (word) { match (x) { case on { return 1; } } }"])
     (.unqualifiedConstructorPattern "on")
   refusedWith "a nested binder spelled like another type's constructor" (workspaceOf ["enum flag { on, off }",
-    "enum Box { Box(Word) }", "function f(b: Box) returns (Word) { match (b) { case Box.Box(off) { return off; } } }"])
+    "enum Box { Box(word) }", "function f(b: Box) returns (word) { match (b) { case Box.Box(off) { return off; } } }"])
     (.unqualifiedConstructorPattern "off")
   refusedWith "a binder spelled like a constructor beside a parameter of that name" (workspaceOf ["enum flag { on, off }",
-    "function pick(off: Word, f: flag) returns (Word) { match (f) { case off { return 1; } case flag.on { return 2; } } }"])
+    "function pick(off: word, f: flag) returns (word) { match (f) { case off { return 1; } case flag.on { return 2; } } }"])
     (.unqualifiedConstructorPattern "off")
   refusedWith "a selected import's constructor" (libraryWorkspace
     ("import { flag } from lib;\n" ++ pickFlag "flag" "flag.on") flagLibrary) (.unqualifiedConstructorPattern "off")
@@ -5462,39 +5462,39 @@ def runBareNamePatterns : IO Unit := do
     ("import lib;\n" ++ pickFlag "lib.flag" "lib.flag.on") flagLibrary) (.unqualifiedConstructorPattern "off")
   -- A same-name constructor with a payload, written bare, is that constructor, short of its argument.
   rejectedByInference "a bare same-name constructor with a payload"
-    ["enum box { box(Word) }", "function f(b: box) returns (Word) { match (b) { case box { return 1; } } }"]
+    ["enum box { box(word) }", "function f(b: box) returns (word) { match (b) { case box { return 1; } } }"]
   IO.println "SOURCE_CORE_BARE_NAME_PATTERNS_PASS: a bare name in a pattern as upstream reads it through the public API, same-name constructors m and thing running as their constructors with case m beside case m.k covering m, a type name with no constructor of that name and an opaque import's constructor binding, and a visible constructor's spelling refused as upstream's SC0106 refuses it, upstream's unqualified_ctor_pattern, at an unrelated scrutinee, nested, beside a parameter of that name and through a selected, wildcard and plain import, and a bare same-name constructor with a payload refused for its argument"
 
 private def constructorNamesWorkspace : Workspace.RawWorkspace := workspaceOf [
-  "enum Option { None, Some(Word) }",
-  "enum Box { Box(Word) }",
-  "enum E { inl(Word), other }",
+  "enum Option { None, Some(word) }",
+  "enum Box { Box(word) }",
+  "enum E { inl(word), other }",
   "enum thing { thing }",
   "enum Flag { Flag }",
   "enum Tag<a> { Tag }",
   "enum Cell<a> { Cell(a) }",
-  "enum Holder { Holder(thing, Word) }",
+  "enum Holder { Holder(thing, word) }",
   "enum tag { tag }",
-  "function unbox(b: Box) returns (Word) { match (b) { case Box(w) { return w; } } }",
-  "function getE(e: E) returns (Word) { match (e) { case inl(x) { return x; } case E.other { return 0; } } }",
-  "function getOption(o: Option) returns (Word) { match (o) { case .None { return 0; } case .Some(v) { return v; } } }",
-  "function pickThing(t: thing) returns (Word) { match (t) { case thing.thing { return 7; } } }",
-  "function pickFlag(f: Flag) returns (Word) { match (f) { case Flag { return 8; } } }",
-  "function tagged(t: Tag<Word>, c: Cell<Word>) returns (Word) { match (c) { case Cell.Cell(v) { return v; } } }",
-  "function count(h: Holder) returns (Word) { match (h) { case Holder.Holder(t, w) { return w; } } }",
+  "function unbox(b: Box) returns (word) { match (b) { case Box(w) { return w; } } }",
+  "function getE(e: E) returns (word) { match (e) { case inl(x) { return x; } case E.other { return 0; } } }",
+  "function getOption(o: Option) returns (word) { match (o) { case .None { return 0; } case .Some(v) { return v; } } }",
+  "function pickThing(t: thing) returns (word) { match (t) { case thing.thing { return 7; } } }",
+  "function pickFlag(f: Flag) returns (word) { match (f) { case Flag { return 8; } } }",
+  "function tagged(t: Tag<word>, c: Cell<word>) returns (word) { match (c) { case Cell.Cell(v) { return v; } } }",
+  "function count(h: Holder) returns (word) { match (h) { case Holder.Holder(t, w) { return w; } } }",
   "function make() returns (thing) { return thing; }",
-  "function tag() returns (Word) { return 3; }",
-  "function boxed(w: Word) returns (Word) { return unbox(Box(w)); }",
-  "function inlined(w: Word) returns (Word) { return getE(E.inl(w)); }",
-  "function optional(w: Word) returns (Word) { return getOption(Option.Some(w)); }",
-  "function bare() returns (Word) { return pickThing(thing); }",
-  "function made() returns (Word) { return pickThing(make()); }",
-  "function capital() returns (Word) { return pickFlag(Flag); }",
-  "function generic(w: Word) returns (Word) { return tagged(Tag, Cell(w)); }",
-  "function held(w: Word) returns (Word) { return count(Holder(thing, w)); }",
-  "function shadowed() returns (Word) { let thing: Word = 5; return thing; }",
-  "function parameter(thing: Word) returns (Word) { return thing; }",
-  "function viaFunction() returns (Word) { let f = tag; return f(); }"]
+  "function tag() returns (word) { return 3; }",
+  "function boxed(w: word) returns (word) { return unbox(Box(w)); }",
+  "function inlined(w: word) returns (word) { return getE(E.inl(w)); }",
+  "function optional(w: word) returns (word) { return getOption(Option.Some(w)); }",
+  "function bare() returns (word) { return pickThing(thing); }",
+  "function made() returns (word) { return pickThing(make()); }",
+  "function capital() returns (word) { return pickFlag(Flag); }",
+  "function generic(w: word) returns (word) { return tagged(Tag, Cell(w)); }",
+  "function held(w: word) returns (word) { return count(Holder(thing, w)); }",
+  "function shadowed() returns (word) { let thing: word = 5; return thing; }",
+  "function parameter(thing: word) returns (word) { return thing; }",
+  "function viaFunction() returns (word) { let f = tag; return f(); }"]
 
 private def constructorNamesNames : List String :=
   ["boxed", "inlined", "optional", "bare", "made", "capital", "generic", "held", "shadowed", "parameter",
@@ -5503,7 +5503,7 @@ private def constructorNamesNames : List String :=
 private def thingLibrary : String := "export { thing(*) };\nenum thing { thing }"
 
 private def pickThingIn (type : String) : String :=
-  s!"function pick(t: {type}) returns (Word) \{ match (t) \{ case _ \{ return 7; } } }\nfunction main() returns (Word) \{ return pick(thing); }"
+  s!"function pick(t: {type}) returns (word) \{ match (t) \{ case _ \{ return 7; } } }\nfunction main() returns (word) \{ return pick(thing); }"
 
 /-- Constructor names as upstream reads them, through the public API. In a pattern, an unqualified
 head that shares its type's name is that type's constructor, a head spelled like one of upstream's
@@ -5540,37 +5540,37 @@ def runConstructorNames : IO Unit := do
     | .ok _ => pure ()
     | .error errors => throw (IO.userError s!"a bare constructor through {label} gave {reprStr errors}")
   -- Unqualified heads upstream refuses with `SC0106`.
-  refusedWith "an unqualified head" (workspaceOf ["enum Option { None, Some(Word) }",
-    "function get(o: Option) returns (Word) { match (o) { case None { return 0; } case Option.Some(v) { return v; } } }"])
+  refusedWith "an unqualified head" (workspaceOf ["enum Option { None, Some(word) }",
+    "function get(o: Option) returns (word) { match (o) { case None { return 0; } case Option.Some(v) { return v; } } }"])
     (.unqualifiedConstructorPattern "None")
-  refusedWith "an unqualified head with a payload" (workspaceOf ["enum Option { None, Some(Word) }",
-    "function get(o: Option) returns (Word) { match (o) { case Some(v) { return v; } case Option.None { return 0; } } }"])
+  refusedWith "an unqualified head with a payload" (workspaceOf ["enum Option { None, Some(word) }",
+    "function get(o: Option) returns (word) { match (o) { case Some(v) { return v; } case Option.None { return 0; } } }"])
     (.unqualifiedConstructorPattern "Some")
   refusedWith "an unqualified head through a selected import" (libraryWorkspace
-    "import { Option } from lib;\nfunction get(o: Option) returns (Word) { match (o) { case Some(v) { return v; } case Option.None { return 0; } } }"
-    "export { Option(*) };\nenum Option { None, Some(Word) }") (.unqualifiedConstructorPattern "Some")
+    "import { Option } from lib;\nfunction get(o: Option) returns (word) { match (o) { case Some(v) { return v; } case Option.None { return 0; } } }"
+    "export { Option(*) };\nenum Option { None, Some(word) }") (.unqualifiedConstructorPattern "Some")
   refusedWith "an unqualified head through a plain import" (libraryWorkspace
-    "import lib;\nfunction get(o: lib.Option) returns (Word) { match (o) { case None { return 0; } case lib.Option.Some(v) { return v; } } }"
-    "export { Option(*) };\nenum Option { None, Some(Word) }") (.unqualifiedConstructorPattern "None")
+    "import lib;\nfunction get(o: lib.Option) returns (word) { match (o) { case None { return 0; } case lib.Option.Some(v) { return v; } } }"
+    "export { Option(*) };\nenum Option { None, Some(word) }") (.unqualifiedConstructorPattern "None")
   -- A same-name head is that type's constructor, so it does not match a scrutinee of another type.
   rejectedByInference "a same-name head at another type"
-    ["enum Box { Box(Word) }", "enum Wrapper { Box(Word), Empty }",
-      "function f(w: Wrapper) returns (Word) { match (w) { case Box(v) { return v; } case Wrapper.Empty { return 0; } } }"]
+    ["enum Box { Box(word) }", "enum Wrapper { Box(word), Empty }",
+      "function f(w: Wrapper) returns (word) { match (w) { case Box(v) { return v; } case Wrapper.Empty { return 0; } } }"]
   -- Bare names upstream does not read as constructors stay unknown.
   refusedWith "a bare constructor of another name" (workspaceOf ["enum flag { on, off }",
-    "function main() returns (Word) { let f: flag = on; return 1; }"]) (.unknownVariable "on")
-  refusedWith "a bare capitalized constructor of another name" (workspaceOf ["enum Option { None, Some(Word) }",
-    "function main() returns (Word) { let o: Option = None; return 1; }"]) (.unknownVariable "None")
+    "function main() returns (word) { let f: flag = on; return 1; }"]) (.unknownVariable "on")
+  refusedWith "a bare capitalized constructor of another name" (workspaceOf ["enum Option { None, Some(word) }",
+    "function main() returns (word) { let o: Option = None; return 1; }"]) (.unknownVariable "None")
   refusedWith "a bare same-name constructor through a plain import" (libraryWorkspace
-    "import lib;\nfunction main() returns (Word) { let t: lib.thing = thing; return 1; }" thingLibrary)
+    "import lib;\nfunction main() returns (word) { let t: lib.thing = thing; return 1; }" thingLibrary)
     (.unknownVariable "thing")
   refusedWith "a bare same-name constructor through an opaque import" (libraryWorkspace
-    "import { thing, make } from lib;\nfunction main() returns (Word) { let t: thing = thing; return 1; }"
+    "import { thing, make } from lib;\nfunction main() returns (word) { let t: thing = thing; return 1; }"
     "export { thing, make };\nenum thing { thing }\nfunction make() returns (thing) { return thing.thing; }")
     (.unknownVariable "thing")
   -- A same-name constructor with a payload, written bare, is that constructor, short of its payload.
   rejectedByInference "a bare same-name constructor with a payload"
-    ["enum Box { Box(Word) }", "function main() returns (Word) { let make = Box; return 1; }"]
+    ["enum Box { Box(word) }", "function main() returns (word) { let make = Box; return 1; }"]
   IO.println "SOURCE_CORE_CONSTRUCTOR_NAMES_PASS: constructor names as upstream reads them through the public API, an unqualified same-name head running as its type's constructor, a head spelled like upstream's builtin inl left to the scrutinee's type and leading dots unchanged, any other unqualified head refused as upstream's SC0106 refuses it, in the module and through a selected and a plain import, a same-name head refused at another type, and a bare same-name constructor running as that constructor with no payload, as a value, an argument, a payload and a generic, through a selected and a wildcard import, under a local, a parameter and a function of that name, and unknown through a plain or an opaque import, for another constructor's name or with a payload"
 
 /-- Upstream's coverage, as `MatchExhaustive.covered` states it: the arms cover the scrutinee's
@@ -5579,29 +5579,29 @@ same-name constructor, `both` the boolean matrix of `c3`, `firstOf` the parenthe
 `c4`, `unwrap` the payload split of `c5`, `wordOrFlag` a `uint256(w)` beside a boolean, and `just`
 a generic payload at `Bool`. -/
 private def coverageWorkspace : Workspace.RawWorkspace := workspaceOf [
-  "enum Pair<a> { Pair(Bool, a) }",
+  "enum Pair<a> { Pair(bool, a) }",
   "enum thing { thing }",
-  "enum Holder { Holder(thing, Word) }",
-  "enum Opt { None, Some(Word) }",
+  "enum Holder { Holder(thing, word) }",
+  "enum Opt { None, Some(word) }",
   "enum Wrap { Wrap(Opt) }",
   "enum Maybe<a> { Nothing, Just(a) }",
-  "function flag(a: Bool) returns (Word) { match (a) { case true { return 1; } case false { return 2; } } }",
-  "function pair(p: Pair<Word>) returns (Word) { match (p) { case Pair.Pair(true, x) { return x; } case Pair.Pair(false, x) { return 9; } } }",
-  "function held(h: Holder) returns (Word) { match (h) { case Holder.Holder(thing.thing, w) { return w; } } }",
-  "function both(a: Bool, b: Bool) returns (Word) { match (a, b) { case (true, true) { return 1; } case (true, false) { return 2; } case (false, _) { return 3; } } }",
-  "function firstOf(p: (Word, Word)) returns (Word) { match (p) { case ((head, _)) { return head; } } }",
-  "function unwrap(w: Wrap) returns (Word) { match (w) { case Wrap.Wrap(Opt.None) { return 0; } case Wrap.Wrap(Opt.Some(v)) { return v; } } }",
-  "function wordOrFlag(x: uint256, b: Bool) returns (Word) { match (x, b) { case (uint256(w), true) { return w; } case (_, false) { return 5; } } }",
-  "function just(m: Maybe<Bool>) returns (Word) { match (m) { case Maybe.Just(true) { return 1; } case Maybe.Just(false) { return 2; } case Maybe.Nothing { return 3; } } }",
-  "function pairTrue() returns (Word) { return pair(Pair.Pair(true, 6)); }",
-  "function pairFalse() returns (Word) { return pair(Pair.Pair(false, 6)); }",
-  "function heldTwo() returns (Word) { return held(Holder.Holder(thing.thing, 2)); }",
-  "function firstPair() returns (Word) { return firstOf((7, 8)); }",
-  "function unwrapNone() returns (Word) { return unwrap(Wrap.Wrap(Opt.None)); }",
-  "function unwrapSome() returns (Word) { return unwrap(Wrap.Wrap(Opt.Some(4))); }",
-  "function justTrue() returns (Word) { return just(Maybe.Just(true)); }",
-  "function justFalse() returns (Word) { return just(Maybe.Just(false)); }",
-  "function nothing() returns (Word) { let m: Maybe<Bool> = Maybe.Nothing; return just(m); }"]
+  "function flag(a: bool) returns (word) { match (a) { case true { return 1; } case false { return 2; } } }",
+  "function pair(p: Pair<word>) returns (word) { match (p) { case Pair.Pair(true, x) { return x; } case Pair.Pair(false, x) { return 9; } } }",
+  "function held(h: Holder) returns (word) { match (h) { case Holder.Holder(thing.thing, w) { return w; } } }",
+  "function both(a: bool, b: bool) returns (word) { match (a, b) { case (true, true) { return 1; } case (true, false) { return 2; } case (false, _) { return 3; } } }",
+  "function firstOf(p: (word, word)) returns (word) { match (p) { case ((head, _)) { return head; } } }",
+  "function unwrap(w: Wrap) returns (word) { match (w) { case Wrap.Wrap(Opt.None) { return 0; } case Wrap.Wrap(Opt.Some(v)) { return v; } } }",
+  "function wordOrFlag(x: uint256, b: bool) returns (word) { match (x, b) { case (uint256(w), true) { return w; } case (_, false) { return 5; } } }",
+  "function just(m: Maybe<bool>) returns (word) { match (m) { case Maybe.Just(true) { return 1; } case Maybe.Just(false) { return 2; } case Maybe.Nothing { return 3; } } }",
+  "function pairTrue() returns (word) { return pair(Pair.Pair(true, 6)); }",
+  "function pairFalse() returns (word) { return pair(Pair.Pair(false, 6)); }",
+  "function heldTwo() returns (word) { return held(Holder.Holder(thing.thing, 2)); }",
+  "function firstPair() returns (word) { return firstOf((7, 8)); }",
+  "function unwrapNone() returns (word) { return unwrap(Wrap.Wrap(Opt.None)); }",
+  "function unwrapSome() returns (word) { return unwrap(Wrap.Wrap(Opt.Some(4))); }",
+  "function justTrue() returns (word) { return just(Maybe.Just(true)); }",
+  "function justFalse() returns (word) { return just(Maybe.Just(false)); }",
+  "function nothing() returns (word) { let m: Maybe<bool> = Maybe.Nothing; return just(m); }"]
 
 private def coverageNames : List String :=
   ["flag", "both", "wordOrFlag", "pairTrue", "pairFalse", "heldTwo", "firstPair", "unwrapNone",
@@ -5649,28 +5649,28 @@ def runMatchCoverage : IO Unit := do
   let _ := session
   -- A column with a hidden constructor, covered through the other column (`h6`).
   match checkProgram (libraryWorkspace
-      "import { flag, makeOff } from lib;\nfunction pick(f: flag, b: Bool) returns (Word) { match (f, b) { case (flag.on, _) { return 1; } case (_, true) { return 2; } case (_, false) { return 3; } } }"
+      "import { flag, makeOff } from lib;\nfunction pick(f: flag, b: bool) returns (word) { match (f, b) { case (flag.on, _) { return 1; } case (_, true) { return 2; } case (_, false) { return 3; } } }"
       partialFlagLibrary) with
   | .ok _ => pure ()
   | .error errors => throw (IO.userError s!"a hidden column covered through another gave {reprStr errors}")
   -- Upstream refuses these (`SC0302`).
   refusedNonExhaustive "a boolean pair missing (false, true)" (workspaceOf [
-    "function pick(a: Bool, b: Bool) returns (Word) { match (a, b) { case (true, true) { return 1; } case (true, false) { return 2; } case (false, false) { return 3; } } }"])
-  refusedNonExhaustive "a payload's Some missing" (workspaceOf ["enum Opt { None, Some(Word) }",
+    "function pick(a: bool, b: bool) returns (word) { match (a, b) { case (true, true) { return 1; } case (true, false) { return 2; } case (false, false) { return 3; } } }"])
+  refusedNonExhaustive "a payload's Some missing" (workspaceOf ["enum Opt { None, Some(word) }",
     "enum Wrap { Wrap(Opt) }",
-    "function get(w: Wrap) returns (Word) { match (w) { case Wrap.Wrap(Opt.None) { return 0; } } }"])
+    "function get(w: Wrap) returns (word) { match (w) { case Wrap.Wrap(Opt.None) { return 0; } } }"])
   refusedNonExhaustive "word literals with no catch-all" (workspaceOf [
-    "function f(w: Word) returns (Word) { match (w) { case 0 { return 1; } case 1 { return 2; } } }"])
+    "function f(w: word) returns (word) { match (w) { case 0 { return 1; } case 1 { return 2; } } }"])
   refusedNonExhaustive "a generic payload's false missing" (workspaceOf ["enum Maybe<a> { Nothing, Just(a) }",
-    "function f(m: Maybe<Bool>) returns (Word) { match (m) { case Maybe.Just(true) { return 1; } case Maybe.Nothing { return 3; } } }"])
+    "function f(m: Maybe<bool>) returns (word) { match (m) { case Maybe.Just(true) { return 1; } case Maybe.Nothing { return 3; } } }"])
   refusedNonExhaustive "a uint256 beside a boolean missing (_, false)" (workspaceOf [
-    "function f(x: uint256, b: Bool) returns (Word) { match (x, b) { case (uint256(w), true) { return w; } } }"])
+    "function f(x: uint256, b: bool) returns (word) { match (x, b) { case (uint256(w), true) { return w; } } }"])
   -- Upstream refuses these for the hidden constructor (`SC0223`).
   refusedNonExhaustive "a hidden constructor's type, its visible one only" (libraryWorkspace
-    "import { flag, makeOff } from lib;\nfunction pick(f: flag) returns (Word) { match (f) { case flag.on { return 1; } } }"
+    "import { flag, makeOff } from lib;\nfunction pick(f: flag) returns (word) { match (f) { case flag.on { return 1; } } }"
     partialFlagLibrary)
   refusedNonExhaustive "a hidden column with no catch-all" (libraryWorkspace
-    "import { flag, makeOff } from lib;\nfunction pick(f: flag, b: Bool) returns (Word) { match (f, b) { case (flag.on, _) { return 1; } } }"
+    "import { flag, makeOff } from lib;\nfunction pick(f: flag, b: bool) returns (word) { match (f, b) { case (flag.on, _) { return 1; } } }"
     partialFlagLibrary)
   IO.println "SOURCE_CORE_MATCH_COVERAGE_PASS: upstream's coverage through the public API, matches that only their arms together cover running each arm, a bool match and a payload's boolean split (m4, m8), a nested same-name constructor (x19), a boolean matrix, a parenthesized tuple, a payload split over its constructors, a uint256 word beside a boolean and a generic payload at Bool, a hidden column covered through another accepted, and refused as upstream refuses them: a missing boolean pair, a payload's missing constructor, word literals, a generic payload's missing false, a uint256 column's missing boolean, and a hidden constructor's type with no catch-all at its column"
 
@@ -5680,21 +5680,21 @@ the qualified constructor stays the constructor, as does a same-name constructor
 of its name. -/
 private def callLookupWorkspace : Workspace.RawWorkspace := workspaceOf [
   "enum thing { thing }",
-  "enum Box { Box(Word) }",
+  "enum Box { Box(word) }",
   "enum Cell<a> { Cell(a) }",
-  "enum Only { Only(Word) }",
-  "enum primAddWord { primAddWord(Word, Word) }",
-  "function thing() returns (Word) { return 3; }",
-  "function Box(w: Word) returns (Word) { return 7; }",
-  "function Cell(x: Word) returns (Word) { return 9; }",
-  "function unbox(b: Box) returns (Word) { match (b) { case Box.Box(v) { return v; } } }",
-  "function unonly(o: Only) returns (Word) { match (o) { case Only(v) { return v; } } }",
-  "function nullary() returns (Word) { return thing(); }",
-  "function payload(w: Word) returns (Word) { return Box(w); }",
-  "function generic(w: Word) returns (Word) { return Cell(w); }",
-  "function qualified(w: Word) returns (Word) { return unbox(Box.Box(w)); }",
-  "function constructed(w: Word) returns (Word) { return unonly(Only(w)); }",
-  "function builtin(a: Word, b: Word) returns (Word) { return primAddWord(a, b); }"]
+  "enum Only { Only(word) }",
+  "enum primAddWord { primAddWord(word, word) }",
+  "function thing() returns (word) { return 3; }",
+  "function Box(w: word) returns (word) { return 7; }",
+  "function Cell(x: word) returns (word) { return 9; }",
+  "function unbox(b: Box) returns (word) { match (b) { case Box.Box(v) { return v; } } }",
+  "function unonly(o: Only) returns (word) { match (o) { case Only(v) { return v; } } }",
+  "function nullary() returns (word) { return thing(); }",
+  "function payload(w: word) returns (word) { return Box(w); }",
+  "function generic(w: word) returns (word) { return Cell(w); }",
+  "function qualified(w: word) returns (word) { return unbox(Box.Box(w)); }",
+  "function constructed(w: word) returns (word) { return unonly(Only(w)); }",
+  "function builtin(a: word, b: word) returns (word) { return primAddWord(a, b); }"]
 
 private def callLookupNames : List String :=
   ["nullary", "payload", "generic", "qualified", "constructed", "builtin"]
@@ -5714,7 +5714,7 @@ private def refusedAsFunctionCall (label : String) (workspace : Workspace.RawWor
   | .error errors => throw (IO.userError s!"{label} gave {reprStr errors}")
 
 private def boxFunctionLibrary : String :=
-  "export { Box };\nfunction Box(w: Word) returns (Word) { return 7; }"
+  "export { Box };\nfunction Box(w: word) returns (word) { return 7; }"
 
 /-- The call rule through the public API: a declared function, local or imported, or a builtin
 takes an unqualified call before a constructor that shares its type's name, as a bare name in an
@@ -5743,39 +5743,39 @@ def runCallLookup : IO Unit := do
   -- The function imported and the constructor local, the other way round, and both imported.
   for (label, main, library) in [
       ("an imported function",
-        "import { Box } from lib;\nenum Box { Box(Word) }\nfunction main() returns (Word) { let w: Word = 5; return Box(w); }",
+        "import { Box } from lib;\nenum Box { Box(word) }\nfunction main() returns (word) { let w: word = 5; return Box(w); }",
         boxFunctionLibrary),
       ("an imported constructor",
-        "import { Box } from lib;\nfunction Box(w: Word) returns (Word) { return 7; }\nfunction main() returns (Word) { let w: Word = 5; return Box(w); }",
-        "export { Box(*) };\nenum Box { Box(Word) }"),
+        "import { Box } from lib;\nfunction Box(w: word) returns (word) { return 7; }\nfunction main() returns (word) { let w: word = 5; return Box(w); }",
+        "export { Box(*) };\nenum Box { Box(word) }"),
       ("both through a wildcard import",
-        "import * from lib;\nfunction main() returns (Word) { let w: Word = 5; return Box(w); }",
-        "export { Box(*), Box };\nenum Box { Box(Word) }\nfunction Box(w: Word) returns (Word) { return 7; }")] do
+        "import * from lib;\nfunction main() returns (word) { let w: word = 5; return Box(w); }",
+        "export { Box(*), Box };\nenum Box { Box(word) }\nfunction Box(w: word) returns (word) { return 7; }")] do
     match checkProgram (libraryWorkspace main library) with
     | .ok _ => pure ()
     | .error errors => throw (IO.userError s!"a function beside a constructor, {label}, gave {reprStr errors}")
   -- A function that does not take the arguments refuses the call (`SC0203`, `SC0201`).
-  refusedAsFunctionCall "a function of no argument called with one" (workspaceOf ["enum Box { Box(Word) }",
-    "function Box() returns (Word) { return 7; }",
-    "function main() returns (Word) { let w: Word = 5; return Box(w); }"]) "Box"
-  refusedAsFunctionCall "a function of a Bool called with a Word" (workspaceOf ["enum Box { Box(Word) }",
-    "function Box(b: Bool) returns (Word) { return 7; }",
-    "function main() returns (Word) { let w: Word = 5; return Box(w); }"]) "Box"
+  refusedAsFunctionCall "a function of no argument called with one" (workspaceOf ["enum Box { Box(word) }",
+    "function Box() returns (word) { return 7; }",
+    "function main() returns (word) { let w: word = 5; return Box(w); }"]) "Box"
+  refusedAsFunctionCall "a function of a Bool called with a Word" (workspaceOf ["enum Box { Box(word) }",
+    "function Box(b: bool) returns (word) { return 7; }",
+    "function main() returns (word) { let w: word = 5; return Box(w); }"]) "Box"
   IO.println "SOURCE_CORE_CALL_LOOKUP_PASS: a call of a name that a declared function or a builtin takes through the public API, the function called before a constructor that shares its type's name with no payload, with a payload and generic, the builtin primAddWord before a same-name constructor, the qualified constructor and a same-name constructor with no function of its name still constructors, an imported function before a local constructor, a local function before an imported one and both through a wildcard import, and a function that does not take the arguments refusing the call as upstream's SC0203 and SC0201 do"
 
 /-- `.true` and `.false` where an expected `bool` reaches them, as upstream reads a leading dot at
 a builtin type: a condition, a loop's condition, an annotated `let`, a result, an assignment, a
 conditional's condition and `()` after the name. -/
 private def leadingDotBooleanWorkspace : Workspace.RawWorkspace := workspaceOf [
-  "function pick(b: Bool) returns (Word) { if (b) { return 1; } return 2; }",
-  "function yes() returns (Bool) { return .true; }",
-  "function condition() returns (Word) { if (.true) { return 1; } return 2; }",
-  "function loops() returns (Word) { let n: Word = 4; while (.false) { n = 1; } for (let i: Word = 0; .false; i = 1) { n = 2; } return n; }",
-  "function annotated() returns (Word) { let b: Bool = .false; return pick(b); }",
-  "function returned() returns (Word) { return pick(yes()); }",
-  "function assigned() returns (Word) { let b: Bool = true; b = .false; return pick(b); }",
-  "function chosen() returns (Word) { return .true ? 1 : 2; }",
-  "function called() returns (Word) { let b: Bool = .true(); return pick(b); }"]
+  "function pick(b: bool) returns (word) { if (b) { return 1; } return 2; }",
+  "function yes() returns (bool) { return .true; }",
+  "function condition() returns (word) { if (.true) { return 1; } return 2; }",
+  "function loops() returns (word) { let n: word = 4; while (.false) { n = 1; } for (let i: word = 0; .false; i = 1) { n = 2; } return n; }",
+  "function annotated() returns (word) { let b: bool = .false; return pick(b); }",
+  "function returned() returns (word) { return pick(yes()); }",
+  "function assigned() returns (word) { let b: bool = true; b = .false; return pick(b); }",
+  "function chosen() returns (word) { return .true ? 1 : 2; }",
+  "function called() returns (word) { let b: bool = .true(); return pick(b); }"]
 
 private def leadingDotBooleanNames : List String :=
   ["condition", "loops", "annotated", "returned", "assigned", "chosen", "called"]
@@ -5817,18 +5817,18 @@ def runLeadingDotBooleans : IO Unit := do
     session := completed.session
   let _ := session
   refusedLeadingDotBoolean "no expected type"
-    ["function bad() returns (Word) { let b = .true; return 1; }"]
+    ["function bad() returns (word) { let b = .true; return 1; }"]
   refusedLeadingDotBoolean "an expected Word"
-    ["function bad() returns (Word) { let w: Word = .true; return 1; }"]
+    ["function bad() returns (word) { let w: word = .true; return 1; }"]
   refusedLeadingDotBoolean "a generic parameter"
     ["function h<T>(x: T) returns (T) { return x; }",
-      "function bad() returns (Word) { h(.true); return 1; }"]
+      "function bad() returns (word) { h(.true); return 1; }"]
   refusedLeadingDotBoolean "an operand of =="
-    ["function bad(x: Bool) returns (Word) { if (.true == x) { return 1; } return 2; }"]
+    ["function bad(x: bool) returns (word) { if (.true == x) { return 1; } return 2; }"]
   refusedLeadingDotBoolean "an operand of !"
-    ["function bad() returns (Word) { if (!.false) { return 1; } return 2; }"]
+    ["function bad() returns (word) { if (!.false) { return 1; } return 2; }"]
   refusedLeadingDotBoolean "with an argument"
-    ["function bad() returns (Word) { let b: Bool = .true(1); return 1; }"]
+    ["function bad() returns (word) { let b: bool = .true(1); return 1; }"]
   IO.println "SOURCE_CORE_LEADING_DOT_BOOLEANS_PASS: .true and .false through the public API, the booleans where an expected bool reaches them (a condition, a loop's condition, an annotated let, a result, an assignment, a conditional's condition and () after the name), and refused with no expected type, at Word, at a generic parameter, as an operand of == or ! and with an argument, as upstream refuses them (SC0224)"
 
 /-- The number of overlaps that checking reports for a program at the signatures (`SC0218`),
@@ -5856,22 +5856,22 @@ def runOverlappingImplementations : IO Unit := do
   let trait := "trait C<A> {}"
   let list := "enum List<A> { Nil, Cons(A, List<A>) }"
   let pair := "enum Pair<A, B> { Pair(A, B) }"
-  expectOverlaps "one head twice" 1 (workspaceOf [trait, "impl C<Word> {}", "impl C<Word> {}"])
+  expectOverlaps "one head twice" 1 (workspaceOf [trait, "impl C<word> {}", "impl C<word> {}"])
   expectOverlaps "a generic head beside a closed one" 1
-    (workspaceOf [trait, "impl<A> C<A> {}", "impl C<Word> {}"])
+    (workspaceOf [trait, "impl<A> C<A> {}", "impl C<word> {}"])
   expectOverlaps "a list beside one of its instances" 1
-    (workspaceOf [trait, list, "impl<A> C<List<A>> {}", "impl C<List<Word>> {}"])
+    (workspaceOf [trait, list, "impl<A> C<List<A>> {}", "impl C<List<word>> {}"])
   expectOverlaps "two pair shapes" 1
     (workspaceOf [trait, pair, "impl<A, B> C<Pair<A, B>> {}", "impl<A> C<Pair<A, A>> {}"])
   expectOverlaps "a generic tuple beside a closed one" 1
-    (workspaceOf [trait, "impl<A, B> C<(A, B)> {}", "impl C<(Word, Bool)> {}"])
+    (workspaceOf [trait, "impl<A, B> C<(A, B)> {}", "impl C<(word, bool)> {}"])
   expectOverlaps "an alias beside its type" 1
-    (workspaceOf [trait, "type W = Word;", "impl C<W> {}", "impl C<Word> {}"])
+    (workspaceOf [trait, "type W = word;", "impl C<W> {}", "impl C<word> {}"])
   expectOverlaps "heads whose conditions differ" 1
     (workspaceOf [trait, list, "trait D<A> {}", "impl<A> C<List<A>> where A: D {}",
-      "impl C<List<Word>> {}"])
+      "impl C<List<word>> {}"])
   expectOverlaps "two later heads beside a generic one" 2
-    (workspaceOf [trait, "impl<A> C<A> {}", "impl C<Word> {}", "impl C<Bool> {}"])
+    (workspaceOf [trait, "impl<A> C<A> {}", "impl C<word> {}", "impl C<bool> {}"])
   expectOverlaps "one subject with two other arguments" 1
     (workspaceOf ["trait Conv<A, B> {}", "enum A { Only }", "enum B { Only }", "enum Dead { Only }",
       "impl Conv<A, B> {}", "impl Conv<A, Dead> {}"])
@@ -5883,11 +5883,11 @@ def runOverlappingImplementations : IO Unit := do
       "export { C, T };\ntrait C<A> {}\nenum T { Only }\nimpl C<T> {}")
   -- Accepted: distinct heads, the occurs check, a default beside an ordinary head, and Lean's
   -- `Coerce` from one source to two targets.
-  expectOverlaps "two closed heads" 0 (workspaceOf [trait, "impl C<Word> {}", "impl C<Bool> {}"])
+  expectOverlaps "two closed heads" 0 (workspaceOf [trait, "impl C<word> {}", "impl C<bool> {}"])
   expectOverlaps "heads that the occurs check keeps apart" 0
     (workspaceOf [trait, list, pair, "impl<A> C<Pair<A, A>> {}", "impl<B> C<Pair<B, List<B>>> {}"])
   expectOverlaps "a default beside an ordinary head" 0
-    (workspaceOf [trait, "default impl<A> C<A> {}", "impl C<Word> {}"])
+    (workspaceOf [trait, "default impl<A> C<A> {}", "impl C<word> {}"])
   expectOverlaps "one source coerced to two targets" 0
     (workspaceOf ["trait Coerce<From, To> {}", "enum A { Only }", "enum B { Only }",
       "enum Dead { Only }", "impl Coerce<A, B> {}", "impl Coerce<A, Dead> {}"])
@@ -5896,8 +5896,8 @@ def runOverlappingImplementations : IO Unit := do
 /-- A block that ends in a `return`, with statements after it, and a `return` last in its branch:
 both accepted, as upstream accepts them, and the block returns early. -/
 private def nonFinalReturnWorkspace : Workspace.RawWorkspace := workspaceOf [
-  "function blockEarly() returns (Word) { let x: Word = 0; { return 1; } x = 2; return x; }",
-  "function lastInBranch() returns (Word) { if (true) { return 1; } return 2; }"]
+  "function blockEarly() returns (word) { let x: word = 0; { return 1; } x = 2; return x; }",
+  "function lastInBranch() returns (word) { if (true) { return 1; } return 2; }"]
 
 private def nonFinalReturnNames : List String := ["blockEarly", "lastInBranch"]
 
@@ -5933,28 +5933,28 @@ def runNonFinalReturns : IO Unit := do
     session := completed.session
   let _ := session
   refusedNonFinalReturn "two returns"
-    ["function bad() returns (Word) { return 1; return 2; }"]
+    ["function bad() returns (word) { return 1; return 2; }"]
   refusedNonFinalReturn "a let after a return"
-    ["function bad() returns (Word) { return 1; let x: Word = 2; }"]
+    ["function bad() returns (word) { return 1; let x: word = 2; }"]
   refusedNonFinalReturn "a block"
-    ["function bad() returns (Word) { let x: Word = 0; { return 1; x = 2; } return x; }"]
+    ["function bad() returns (word) { let x: word = 0; { return 1; x = 2; } return x; }"]
   refusedNonFinalReturn "an if body"
-    ["function bad(flag: Bool) returns (Word) { let x: Word = 0; if (flag) { return 1; x = 2; } return x; }"]
+    ["function bad(flag: bool) returns (word) { let x: word = 0; if (flag) { return 1; x = 2; } return x; }"]
   refusedNonFinalReturn "an else body"
-    ["function bad(flag: Bool) returns (Word) { let x: Word = 0; if (flag) { x = 1; } else { return 2; x = 3; } return x; }"]
+    ["function bad(flag: bool) returns (word) { let x: word = 0; if (flag) { x = 1; } else { return 2; x = 3; } return x; }"]
   refusedNonFinalReturn "a match arm"
-    ["function bad(b: Bool) returns (Word) { match (b) { case true { return 1; b = false; } case false { return 2; } } }"]
+    ["function bad(b: bool) returns (word) { match (b) { case true { return 1; b = false; } case false { return 2; } } }"]
   refusedNonFinalReturn "a while body"
-    ["function bad(flag: Bool) returns (Word) { let x: Word = 0; while (flag) { return 1; x = 2; } return x; }"]
+    ["function bad(flag: bool) returns (word) { let x: word = 0; while (flag) { return 1; x = 2; } return x; }"]
   refusedNonFinalReturn "a for body"
-    ["function bad() returns (Word) { let x: Word = 0; for (let i: Word = 0; false; i = 1) { return 1; x = 2; } return x; }"]
+    ["function bad() returns (word) { let x: word = 0; for (let i: word = 0; false; i = 1) { return 1; x = 2; } return x; }"]
   refusedNonFinalReturn "a lambda"
-    ["function bad() returns (Word) { let f = lam (x: Word) -> Word { return x; return 2; }; return f(1); }"]
+    ["function bad() returns (word) { let f = lam (x: word) -> word { return x; return 2; }; return f(1); }"]
   refusedNonFinalReturn "a unit return"
-    ["function bad() { return; let x: Word = 1; }"]
+    ["function bad() { return; let x: word = 1; }"]
   refusedNonFinalReturn "a function nothing calls"
-    ["function dead() returns (Word) { return 1; return 2; }",
-      "function main() returns (Word) { return 5; }"]
+    ["function dead() returns (word) { return 1; return 2; }",
+      "function main() returns (word) { return 5; }"]
   refusedNonFinalReturn "an implementation method"
     ["trait Add<T> { function add(left: T, right: T) returns (T); }", "enum Box { Only }",
       "impl Add<Box> { function add(left: Box, right: Box) returns (Box) { return left; return right; } }"]
@@ -5984,68 +5984,68 @@ fixed from the one given, ordinary implementation or default whose head subject 
 closed subject, before a literal defaults and after, for every trait but Lean's own `Coerce`. -/
 def runWeakArguments : IO Unit := do
   let phantom := "trait Phantom<T, R> {}"
-  let aword := "enum AWord { AWord(Word) }"
-  let run := "function run<T, R>(x: T) returns (Word) where T: Phantom<R> { return 7; }"
-  let main := "function main() returns (Word) { let value: AWord = AWord(0); return run(value); }"
-  let outer := ["function outer<T, R>(x: T) returns (Word) where T: Phantom<R> { return run(x); }",
-    "function main() returns (Word) { let value: AWord = AWord(0); return outer(value); }"]
-  let boxMain := "function main() returns (Word) { let value: Box<Word> = Box(1); return run(value); }"
-  mainRunsTo "the one impl" [phantom, aword, "impl Phantom<AWord, Word> {}", run, main] (word 7)
+  let aword := "enum AWord { AWord(word) }"
+  let run := "function run<T, R>(x: T) returns (word) where T: Phantom<R> { return 7; }"
+  let main := "function main() returns (word) { let value: AWord = AWord(0); return run(value); }"
+  let outer := ["function outer<T, R>(x: T) returns (word) where T: Phantom<R> { return run(x); }",
+    "function main() returns (word) { let value: AWord = AWord(0); return outer(value); }"]
+  let boxMain := "function main() returns (word) { let value: Box<word> = Box(1); return run(value); }"
+  mainRunsTo "the one impl" [phantom, aword, "impl Phantom<AWord, word> {}", run, main] (word 7)
   mainRunsTo "a requirement on the fixed argument" [phantom, "trait Size<T> {}", aword,
-    "impl Size<Word> {}", "impl Phantom<AWord, Word> {}",
-    "function run<T, R>(x: T) returns (Word) where T: Phantom<R>, R: Size { return 7; }", main]
+    "impl Size<word> {}", "impl Phantom<AWord, word> {}",
+    "function run<T, R>(x: T) returns (word) where T: Phantom<R>, R: Size { return 7; }", main]
     (word 7)
-  mainRunsTo "a given" ([phantom, aword, "impl Phantom<AWord, Word> {}", run] ++ outer) (word 7)
+  mainRunsTo "a given" ([phantom, aword, "impl Phantom<AWord, word> {}", run] ++ outer) (word 7)
   mainRunsTo "a generic impl" [phantom, "enum Box<A> { Box(A) }",
     "impl<A> Phantom<Box<A>, A> {}", run, boxMain] (word 7)
-  mainRunsTo "a chain" [phantom, "trait Second<T, R> {}", aword, "enum BWord { BWord(Word) }",
-    "impl Phantom<AWord, BWord> {}", "impl Second<BWord, Word> {}",
-    "function chain<T, R, S>(x: T) returns (Word) where T: Phantom<R>, R: Second<S> { return 7; }",
-    "function main() returns (Word) { let value: AWord = AWord(0); return chain(value); }"]
+  mainRunsTo "a chain" [phantom, "trait Second<T, R> {}", aword, "enum BWord { BWord(word) }",
+    "impl Phantom<AWord, BWord> {}", "impl Second<BWord, word> {}",
+    "function chain<T, R, S>(x: T) returns (word) where T: Phantom<R>, R: Second<S> { return 7; }",
+    "function main() returns (word) { let value: AWord = AWord(0); return chain(value); }"]
     (word 7)
   mainRunsTo "a given beside a generic impl"
-    ([phantom, aword, "impl<A> Phantom<A, Word> {}", run] ++ outer) (word 7)
-  mainRunsTo "a default alone" [phantom, aword, "default impl<A> Phantom<A, Word> {}", run, main]
+    ([phantom, aword, "impl<A> Phantom<A, word> {}", run] ++ outer) (word 7)
+  mainRunsTo "a default alone" [phantom, aword, "default impl<A> Phantom<A, word> {}", run, main]
     (word 7)
   mainRunsTo "a default beside an ordinary impl" [phantom, aword,
-    "default impl<A> Phantom<A, Bool> {}", "impl Phantom<AWord, Word> {}", run, main] (word 7)
+    "default impl<A> Phantom<A, bool> {}", "impl Phantom<AWord, word> {}", run, main] (word 7)
   mainRunsTo "a partly open argument" [phantom, aword, "enum Box<A> { Box(A) }",
-    "impl Phantom<AWord, Box<Word>> {}",
-    "function run<T, R>(x: T) returns (Word) where T: Phantom<Box<R>> { return 7; }", main]
+    "impl Phantom<AWord, Box<word>> {}",
+    "function run<T, R>(x: T) returns (word) where T: Phantom<Box<R>> { return 7; }", main]
     (word 7)
-  mainRunsTo "two weak arguments" ["trait Two<T, A, B> {}", aword, "impl Two<AWord, Word, Bool> {}",
-    "function run<T, A, B>(x: T) returns (Word) where T: Two<A, B> { return 7; }", main] (word 7)
+  mainRunsTo "two weak arguments" ["trait Two<T, A, B> {}", aword, "impl Two<AWord, word, bool> {}",
+    "function run<T, A, B>(x: T) returns (word) where T: Two<A, B> { return 7; }", main] (word 7)
   mainRunsTo "a generic impl with a condition" [phantom, "trait Ready<T> {}",
-    "enum Box<A> { Box(A) }", "impl Ready<Word> {}", "impl<A> Phantom<Box<A>, A> where A: Ready {}",
+    "enum Box<A> { Box(A) }", "impl Ready<word> {}", "impl<A> Phantom<Box<A>, A> where A: Ready {}",
     run, boxMain] (word 7)
   -- Before a literal defaults: the sum stays at `Word` (`wa24`); the call is in a branch that
   -- never runs, so `make`'s recursion never runs either.
-  mainRunsTo "before a literal defaults" [phantom, aword, "impl Phantom<AWord, Word> {}",
+  mainRunsTo "before a literal defaults" [phantom, aword, "impl Phantom<AWord, word> {}",
     "function make<T, R>(x: T) returns (R) where T: Phantom<R> { return make(x); }",
-    "function main() returns (Word) { let value: AWord = AWord(0); if (false) { let y = make(value) + 1; } return 5; }"]
+    "function main() returns (word) { let value: AWord = AWord(0); if (false) { let y = make(value) + 1; } return 5; }"]
     (word 5)
   -- After a literal defaults: `1` is a `uint256`, whose impl then fixes `R` (`wa26`).
-  mainRunsTo "after a literal defaults" [phantom, "impl Phantom<uint256, Bool> {}", run,
-    "function main() returns (Word) { return run(1); }"] (word 7)
+  mainRunsTo "after a literal defaults" [phantom, "impl Phantom<uint256, bool> {}", run,
+    "function main() returns (word) { return run(1); }"] (word 7)
   -- Refused as before.
-  weakRefused "no impl at the subject" [phantom, aword, "enum BWord { BWord(Word) }",
-    "impl Phantom<BWord, Word> {}", run, main]
+  weakRefused "no impl at the subject" [phantom, aword, "enum BWord { BWord(word) }",
+    "impl Phantom<BWord, word> {}", run, main]
   weakRefused "Lean's Coerce" ["trait Coerce<From, To> {}", "enum A { A }", "enum B { B }",
     "impl Coerce<A, B> {}",
-    "function conv<T, R>(x: T) returns (Word) where T: Coerce<R> { return 7; }",
-    "function main() returns (Word) { let value: A = A.A; return conv(value); }"]
-  weakRefused "an argument fixed otherwise" [phantom, aword, "impl Phantom<AWord, Word> {}",
-    "function both<T, R>(x: T, y: R) returns (Word) where T: Phantom<R> { return 7; }",
-    "function main() returns (Word) { let value: AWord = AWord(0); return both(value, true); }"]
-  weakRefused "two requirements that disagree" [phantom, aword, "enum BWord { BWord(Word) }",
-    "impl Phantom<AWord, Word> {}", "impl Phantom<BWord, Bool> {}",
-    "function both<T, U, R>(x: T, y: U) returns (Word) where T: Phantom<R>, U: Phantom<R> { return 7; }",
-    "function main() returns (Word) { return both(AWord(0), BWord(1)); }"]
-  weakRefused "an annotation that disagrees" [phantom, aword, "impl Phantom<AWord, Word> {}",
+    "function conv<T, R>(x: T) returns (word) where T: Coerce<R> { return 7; }",
+    "function main() returns (word) { let value: A = A.A; return conv(value); }"]
+  weakRefused "an argument fixed otherwise" [phantom, aword, "impl Phantom<AWord, word> {}",
+    "function both<T, R>(x: T, y: R) returns (word) where T: Phantom<R> { return 7; }",
+    "function main() returns (word) { let value: AWord = AWord(0); return both(value, true); }"]
+  weakRefused "two requirements that disagree" [phantom, aword, "enum BWord { BWord(word) }",
+    "impl Phantom<AWord, word> {}", "impl Phantom<BWord, bool> {}",
+    "function both<T, U, R>(x: T, y: U) returns (word) where T: Phantom<R>, U: Phantom<R> { return 7; }",
+    "function main() returns (word) { return both(AWord(0), BWord(1)); }"]
+  weakRefused "an annotation that disagrees" [phantom, aword, "impl Phantom<AWord, word> {}",
     "function make<T, R>(x: T) returns (R) where T: Phantom<R> { return make(x); }",
-    "function main() returns (Word) { let value: AWord = AWord(0); if (false) { let y: Bool = make(value); } return 5; }"]
-  weakRefused "a literal subject at another type" [phantom, "impl Phantom<Word, Bool> {}", run,
-    "function main() returns (Word) { return run(1); }"]
+    "function main() returns (word) { let value: AWord = AWord(0); if (false) { let y: bool = make(value); } return 5; }"]
+  weakRefused "a literal subject at another type" [phantom, "impl Phantom<word, bool> {}", run,
+    "function main() returns (word) { return run(1); }"]
   IO.println "SOURCE_CORE_WEAK_ARGUMENTS_PASS: upstream's weak trait arguments through the public API, an open argument fixed from the one impl, a given, a generic impl, a default alone and a default beside an ordinary impl, through a requirement on it, a chain, a partly open argument, two arguments and a condition, before a literal defaults and after, and refused as before with no impl, at Lean's own Coerce, with the argument fixed otherwise, with two requirements or an annotation that disagree and at a literal subject of another type"
 
 /-- Upstream's one result type through the public API: an implementation method of a program's
@@ -6055,15 +6055,15 @@ profile takes one result, so the converse, one tuple for two results, is the sig
 (`testImplMethodResultTuples`). -/
 def runTupleResults : IO Unit := do
   let add := "trait Add<T> { function add(x: T, y: T) returns (T); }"
-  let pairs := ["function main() returns (Word) {",
-    "  let p: (Word, Word) = (1, 2); let q: (Word, Word) = (3, 4);",
+  let pairs := ["function main() returns (word) {",
+    "  let p: (word, word) = (1, 2); let q: (word, word) = (3, 4);",
     "  match (p + q) { case (u, v) { return u; } }", "}"]
-  let pairAdd (results : String) : List String := [add, "impl Add<(Word, Word)> {",
-    s!"  function add(x: (Word, Word), y: (Word, Word)) returns {results} \{",
+  let pairAdd (results : String) : List String := [add, "impl Add<(word, word)> {",
+    s!"  function add(x: (word, word), y: (word, word)) returns {results} \{",
     "    match (x) { case (a, b) { match (y) { case (c, d) { return (b, c); } } } }", "  }", "}"]
     ++ pairs
-  mainRunsTo "two results for a pair" (pairAdd "(Word, Word)") (word 2)
-  mainRunsTo "one tuple for a pair" (pairAdd "((Word, Word))") (word 2)
+  mainRunsTo "two results for a pair" (pairAdd "(word, word)") (word 2)
+  mainRunsTo "one tuple for a pair" (pairAdd "((word, word))") (word 2)
   mainRunsTo "a generic pair" ([add,
     "impl<A, B> Add<(A, B)> { function add(x: (A, B), y: (A, B)) returns (A, B) { return y; } }"]
     ++ pairs) (word 3)
@@ -6115,7 +6115,7 @@ private def fixtureWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function divisionByZero(a: uint256, b: uint256) returns (uint256) { unchecked { return a / b; } }",
   "function literalAmount(x: uint256) returns (uint256) { return x << 3; }",
   "function narrowAmount(x: uint256, s: uint256) returns (uint256) { let k: uint8 = Typedef.abs(Typedef.rep(s)); return x >> k; }",
-  "function wordShift(x: uint256, s: uint256) returns (uint256) { let w: Word = Typedef.rep(x); return uint256(w << Typedef.rep(s)); }",
+  "function wordShift(x: uint256, s: uint256) returns (uint256) { let w: word = Typedef.rep(x); return uint256(w << Typedef.rep(s)); }",
   "function compound(x: uint256, s: uint256) returns (uint256) { let r: uint256 = x; r <<= s; r >>= 1; return r; }",
   "function neverReverts(x: uint256) returns (uint256) { return x << 255; }",
   "function insideUnchecked(x: uint256, s: uint256) returns (uint256) { unchecked { return x << s; } }",
@@ -6128,8 +6128,8 @@ private def fixtureWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function divSigned() returns (uint256) { let m20: int256 = 0 - 20; let three: int256 = 3; return uint256(Typedef.rep(m20 / three)); }",
   "function implicitSuccess() returns (bool) { let value = 6; value *= 7; return value == 42; }",
   "function negateSigned(value: int256) returns (int256) { return -value; }",
-  "function negateWord(value: Word) returns (Word) { return -value; }",
-  "function runtimePatterns(choice: uint256) returns (uint256, uint256) { let value = 0; if (choice == 1) { value = 1; } if (choice == 2) { value = 2; } let inferred: Word; match (value) { case 0 { inferred = 10; } case 1 { inferred = 20; } case _ { inferred = 30; } } let typed: Word; match (choice) { case 0 { typed = 10; } case 1 { typed = 20; } case _ { typed = 30; } } return (uint256(inferred), uint256(typed)); }",
+  "function negateWord(value: word) returns (word) { return -value; }",
+  "function runtimePatterns(choice: uint256) returns (uint256, uint256) { let value = 0; if (choice == 1) { value = 1; } if (choice == 2) { value = 2; } let inferred: word; match (value) { case 0 { inferred = 10; } case 1 { inferred = 20; } case _ { inferred = 30; } } let typed: word; match (choice) { case 0 { typed = 10; } case 1 { typed = 20; } case _ { typed = 30; } } return (uint256(inferred), uint256(typed)); }",
   "function implicitAdd(fail: bool) returns (bool) { let x = 41; if (fail) { x = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff; } let result = x + 1; return result == 42; }",
   "function implicitSub(fail: bool) returns (bool) { let x = 1; if (fail) { x = 0; } let result = x - 1; return result == 0; }",
   "function implicitMul(fail: bool) returns (bool) { let x = 21; if (fail) { x = 0x8000000000000000000000000000000000000000000000000000000000000000; } let result = x * 2; return result == 42; }",
@@ -6137,7 +6137,7 @@ private def fixtureWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function implicitMod(fail: bool) returns (bool) { let divisor = 5; if (fail) { divisor = 0; } let result = 42 % divisor; return result == 2; }",
   "function implicitNeg(fail: bool) returns (bool) { let x = 0; if (fail) { x = 1; } let result = -x; return result == 0; }",
   "function implicitCompound(failure: uint256) returns (bool) { let x = 6; if (failure == 1) { x = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff; } x += 1; if (failure == 2) { x = 0; } x -= 1; if (failure == 3) { x = 0x8000000000000000000000000000000000000000000000000000000000000000; } x *= 7; let divisor = 1; if (failure == 4) { divisor = 0; } x /= divisor; if (failure == 5) { divisor = 0; } x %= divisor; return x == 0; }",
-  "function explicitWord(raw: uint256) returns (uint256, uint256, uint256) { let x: Word = Typedef.rep(raw); return (uint256(x + 1), uint256(x - 1), uint256(-x)); }",
+  "function explicitWord(raw: uint256) returns (uint256, uint256, uint256) { let x: word = Typedef.rep(raw); return (uint256(x + 1), uint256(x - 1), uint256(-x)); }",
   "function negUnsigned(x: uint256) returns (uint256) { return -x; }",
   "function negI8(raw: uint256) returns (uint256) { let x: int8 = Typedef.abs(Typedef.rep(raw)); return uint256(Typedef.rep(-x)); }",
   "function negI16(raw: uint256) returns (uint256) { let x: int16 = Typedef.abs(Typedef.rep(raw)); return uint256(Typedef.rep(-x)); }",
@@ -6926,10 +6926,10 @@ def run : IO Unit := do
   -- `-e` reads as `0 - e`: a declared type has no builtin `Int` for the `0`, so it is rejected
   -- even with `Sub`. In a block `-x` is unchecked, which wraps on the twelve types (`runUnchecked`).
   rejectedByInference "unary minus on a declared type"
-    ["enum Token { Token(Word) }", "trait Sub<T> {", "  function sub(left: T, right: T) returns (T);", "}",
+    ["enum Token { Token(word) }", "trait Sub<T> {", "  function sub(left: T, right: T) returns (T);", "}",
      "impl Sub<Token> {", "  function sub(left: Token, right: Token) returns (Token) {", "    return left;", "  }", "}",
      "function bad(t: Token) returns (Token) { return -t; }"]
-  rejectedByInference "unary minus on Bool" ["function bad(b: Bool) returns (Bool) { return -b; }"]
+  rejectedByInference "unary minus on Bool" ["function bad(b: bool) returns (bool) { return -b; }"]
   IO.println "SOURCE_CORE_FIXED_OPERATORS_PASS: == != & | ^ < > <= >= ~ and checked + - * / % on signed and unsigned fixed-width types, signed orderings comparing negative words, ~ keeping the low bits on narrower unsigned types, checked arithmetic and checked += -= *= /= %= panicking with 0x11 outside the range (MIN / -1 among them, MIN % -1 not), / % /= %= panicking with 0x12 on a zero divisor and rounding toward zero, an absent += operand failing with its own diagnostic, &= |= ^= as Word's, with canonical results, and mixed operand types, literals at their range edges and as operands, deferred operators and mapping elements, one past each range rejected naming the type, negated literals folded through groups and repeated with their range checked by sign, -x as checked 0 - x panicking for MIN and nonzero unsigned values and wrapping on Word, negated-literal operands and compound forms, unary minus rejected on declared types and Bool"
   runDefaulting
   runUnchecked
@@ -6987,25 +6987,25 @@ private def handle : Value → IO Handle
   | _ => throw (IO.userError "public function did not export an owned handle")
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function make(seed: Word) returns (function(Word) returns (Word)) { return lam(step: Word) { seed += step; return seed; }; }",
-    "function use(f: function(Word) returns (Word), step: Word) returns (Word) { return f(step); }",
-    "function recurse(n: Word) returns (Word) { return n == 0 ? 31 : recurse(n - 1); }",
-    "function local(flag: Bool) returns (Word, Bool) { let id = lam(value) { return value; }; return (id(7), id(flag)); }",
-    "function mappingEcho(value: mapping(Word => Word)) returns (mapping(Word => Word)) { return value; }",
-    "function spin() returns (Word) { while (true) {} return 0; }",
-    "function main() returns (Word) { return 55; }",
-    "function uninitialized() returns (Word) { let absent: Word; return absent; }",
-    "function marked(comptime value: Word) returns (Word) { return value; }",
-    "function builtinUse(f: function(Word) returns (integer)) returns (integer) { return f(9); }",
-    "function namedUse(f: function(Word) returns (Word)) returns (Word) { return f(4); }",
-    "function mixedUse(first: function(Word) returns (Word), step: Word, table: mapping(Word => Word), convert: function(Word) returns (integer), again: function(Word) returns (Word)) returns (integer) { return convert(first(step) + step + table[step] + again(step + 1)); }",
-    "enum NestedFunctions { Hold(function(Word) returns (Word), function(Word) returns (integer)) }",
-    "function nestedUse(bundle: (NestedFunctions, (mapping(Word => (function(Word) returns (Word), Word)), function(Word) returns (integer)))) returns (integer) { match (bundle) { case (.Hold(first, convert), (table, last)) { match (table[3]) { case (again, bonus) { return integerAdd(convert(first(3) + bonus + again(4)), last(2)); } default { return 999; } } } default { return 998; } } }",
-    "function closureNestedUse(bundle: (NestedFunctions, (mapping(Word => (function(Word) returns (Word), function(Word) returns (Word))), function(Word) returns (integer)))) returns (integer) { match (bundle) { case (.Hold(first, convert), (table, last)) { match (table[3]) { case (again, namedFunction) { return integerAdd(convert(first(2) + again(6)), last(namedFunction(0))); } default { return 997; } } } default { return 996; } } }",
-    "function distinctClosureUse(bundle: (function(Word) returns (Word), mapping(Word => (function(Word) returns (Word), function(Word) returns (Word))))) returns (Word) { match (bundle) { case (first, table) { match (table[3]) { case (again, other) { return first(2) + again(6) + other(7); } default { return 995; } } } default { return 994; } } }",
-    "function integratedHistoryUse(bundle: (NestedFunctions, (mapping(Word => (function(Word) returns (Word), function(Word) returns (Word))), function(Word) returns (Word)))) returns (integer) { match (bundle) { case (.Hold(first, convert), (table, namedFunction)) { match (table[3]) { case (again, other) { return convert(first(2) + again(6) + other(7) + namedFunction(3)); } default { return 993; } } } default { return 992; } } }",
-    "function makePair(firstSeed: Word, secondSeed: Word) returns (function(Word) returns (Word), function(Word) returns (Word)) { return (lam(step: Word) { firstSeed += step; return firstSeed; }, lam(step: Word) { secondSeed += step; return secondSeed; }); }",
-    "function touchThenFail(f: function(Word) returns (Word), step: Word) returns (Word) { f(step); let absent: Word; return absent; }",
+    "function make(seed: word) returns (function(word) returns (word)) { return lam(step: word) { seed += step; return seed; }; }",
+    "function use(f: function(word) returns (word), step: word) returns (word) { return f(step); }",
+    "function recurse(n: word) returns (word) { return n == 0 ? 31 : recurse(n - 1); }",
+    "function local(flag: bool) returns (word, bool) { let id = lam(value) { return value; }; return (id(7), id(flag)); }",
+    "function mappingEcho(value: mapping(word => word)) returns (mapping(word => word)) { return value; }",
+    "function spin() returns (word) { while (true) {} return 0; }",
+    "function main() returns (word) { return 55; }",
+    "function uninitialized() returns (word) { let absent: word; return absent; }",
+    "function marked(comptime value: word) returns (word) { return value; }",
+    "function builtinUse(f: function(word) returns (integer)) returns (integer) { return f(9); }",
+    "function namedUse(f: function(word) returns (word)) returns (word) { return f(4); }",
+    "function mixedUse(first: function(word) returns (word), step: word, table: mapping(word => word), convert: function(word) returns (integer), again: function(word) returns (word)) returns (integer) { return convert(first(step) + step + table[step] + again(step + 1)); }",
+    "enum NestedFunctions { Hold(function(word) returns (word), function(word) returns (integer)) }",
+    "function nestedUse(bundle: (NestedFunctions, (mapping(word => (function(word) returns (word), word)), function(word) returns (integer)))) returns (integer) { match (bundle) { case (.Hold(first, convert), (table, last)) { match (table[3]) { case (again, bonus) { return integerAdd(convert(first(3) + bonus + again(4)), last(2)); } default { return 999; } } } default { return 998; } } }",
+    "function closureNestedUse(bundle: (NestedFunctions, (mapping(word => (function(word) returns (word), function(word) returns (word))), function(word) returns (integer)))) returns (integer) { match (bundle) { case (.Hold(first, convert), (table, last)) { match (table[3]) { case (again, namedFunction) { return integerAdd(convert(first(2) + again(6)), last(namedFunction(0))); } default { return 997; } } } default { return 996; } } }",
+    "function distinctClosureUse(bundle: (function(word) returns (word), mapping(word => (function(word) returns (word), function(word) returns (word))))) returns (word) { match (bundle) { case (first, table) { match (table[3]) { case (again, other) { return first(2) + again(6) + other(7); } default { return 995; } } } default { return 994; } } }",
+    "function integratedHistoryUse(bundle: (NestedFunctions, (mapping(word => (function(word) returns (word), function(word) returns (word))), function(word) returns (word)))) returns (integer) { match (bundle) { case (.Hold(first, convert), (table, namedFunction)) { match (table[3]) { case (again, other) { return convert(first(2) + again(6) + other(7) + namedFunction(3)); } default { return 993; } } } default { return 992; } } }",
+    "function makePair(firstSeed: word, secondSeed: word) returns (function(word) returns (word), function(word) returns (word)) { return (lam(step: word) { firstSeed += step; return firstSeed; }, lam(step: word) { secondSeed += step; return secondSeed; }); }",
+    "function touchThenFail(f: function(word) returns (word), step: word) returns (word) { f(step); let absent: word; return absent; }",
     "export {recurse};"
   ]}] }
 private def seed (program : CheckedProgram) (name : String) : IO Seed :=
@@ -7049,13 +7049,13 @@ wrappers and inline Yul: a closure keeps the values captured at its creation,
 and each call starts again from them. -/
 private def captureWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function issue120First() returns (Word) { let x: Word = 40; let f = lam(step: Word) { return x + step; }; x = 99; return f(2); }",
-    "function issue120Second() returns (Word) { let x: Word = 41; let f = lam() { x = 42; return x; }; let result: Word = f(); return result + x; }",
-    "function repeated() returns (Word) { let x: Word = 0; let f = lam() { x = x + 1; return x; }; let a: Word = f(); let b: Word = f(); return a * 10 + b + x * 100; }",
-    "function loopCarried(count: Word) returns (Word) { let i: Word = 0; let acc: Word = 0; while (i < count) { let f = lam() { let w: Word = i * 10; i = i + 100; return w + acc; }; acc = f(); i = i + 1; } return acc + i * 1000; }",
-    "function branch(flag: Bool, value: Word) returns (Word) { let x: Word = value; if (flag) { let first = lam() { let result: Word; result = x; return result; }; x = x + 7; let second = lam() { let result: Word; result = x; return result; }; return first() + second(); } return 0; }",
-    "function loop(count: Word, value: Word) returns (Word) { let x: Word = value; let total: Word = 0; for (let i: Word = 0; i < count; i = i + 1) { let first = lam() { let result: Word; result = x; return result; }; x = x + 7; let second = lam() { let result: Word; result = x; return result; }; total = first() + second(); } return total; }",
-    "function nested(flag: Bool, count: Word, value: Word) returns (Word) { let x: Word = value; let total: Word = 0; if (flag) { for (let i: Word = 0; i < count; i = i + 1) { let first = lam() { let result: Word; result = x; return result; }; x = x + 7; { let second = lam() { let result: Word; result = x; return result; }; x = x + 7; if (flag) { let third = lam() { let result: Word; result = x; return result; }; total = first() + second() + third(); } } } } return total; }"
+    "function issue120First() returns (word) { let x: word = 40; let f = lam(step: word) { return x + step; }; x = 99; return f(2); }",
+    "function issue120Second() returns (word) { let x: word = 41; let f = lam() { x = 42; return x; }; let result: word = f(); return result + x; }",
+    "function repeated() returns (word) { let x: word = 0; let f = lam() { x = x + 1; return x; }; let a: word = f(); let b: word = f(); return a * 10 + b + x * 100; }",
+    "function loopCarried(count: word) returns (word) { let i: word = 0; let acc: word = 0; while (i < count) { let f = lam() { let w: word = i * 10; i = i + 100; return w + acc; }; acc = f(); i = i + 1; } return acc + i * 1000; }",
+    "function branch(flag: bool, value: word) returns (word) { let x: word = value; if (flag) { let first = lam() { let result: word; result = x; return result; }; x = x + 7; let second = lam() { let result: word; result = x; return result; }; return first() + second(); } return 0; }",
+    "function loop(count: word, value: word) returns (word) { let x: word = value; let total: word = 0; for (let i: word = 0; i < count; i = i + 1) { let first = lam() { let result: word; result = x; return result; }; x = x + 7; let second = lam() { let result: word; result = x; return result; }; total = first() + second(); } return total; }",
+    "function nested(flag: bool, count: word, value: word) returns (word) { let x: word = value; let total: word = 0; if (flag) { for (let i: word = 0; i < count; i = i + 1) { let first = lam() { let result: word; result = x; return result; }; x = x + 7; { let second = lam() { let result: word; result = x; return result; }; x = x + 7; if (flag) { let third = lam() { let result: word; result = x; return result; }; total = first() + second() + third(); } } } } return total; }"
   ]}] }
 
 private def runCaptures : IO Unit := do
@@ -8133,15 +8133,15 @@ private def defaultForTypeParameterWorkspace : Workspace.RawWorkspace := {
     "impl BitNot<Coin> { function bnot(value: Coin) returns (Coin) { match (value) { case Coin.Head { return Coin.Tail; } case Coin.Tail { return Coin.Head; } } } }",
     "enum Plain { Head, Tail }",
     "enum Box<A> { Wrap(A) }",
-    "function coin(value: Coin) returns (Word) { match (value) { case Coin.Head { return 1; } case Coin.Tail { return 2; } } }",
-    "function plain(value: Plain) returns (Word) { match (value) { case Plain.Head { return 1; } case Plain.Tail { return 2; } } }",
+    "function coin(value: Coin) returns (word) { match (value) { case Coin.Head { return 1; } case Coin.Tail { return 2; } } }",
+    "function plain(value: Plain) returns (word) { match (value) { case Plain.Head { return 1; } case Plain.Tail { return 2; } } }",
     "function flip<T>(x: T) returns (T) where T: BitNot { return ~x; }",
-    "function second<T>(x: T) returns ((Word, T)) { return ~(3, x); }",
+    "function second<T>(x: T) returns ((word, T)) { return ~(3, x); }",
     "function boxed<T>(x: Box<T>) returns (Box<T>) { return ~x; }",
-    "function viaCoin() returns (Word) { return coin(flip(Coin.Head)); }",
-    "function viaPlain() returns (Word) { return plain(flip(Plain.Head)); }",
-    "function viaSecond() returns (Word) { match (second(Coin.Head)) { case (w, c) { return w * 10 + coin(c); } } }",
-    "function viaBoxed() returns (Word) { match (boxed(Box.Wrap(Coin.Head))) { case Box.Wrap(c) { return coin(c); } } }"] }]
+    "function viaCoin() returns (word) { return coin(flip(Coin.Head)); }",
+    "function viaPlain() returns (word) { return plain(flip(Plain.Head)); }",
+    "function viaSecond() returns (word) { match (second(Coin.Head)) { case (w, c) { return w * 10 + coin(c); } } }",
+    "function viaBoxed() returns (word) { match (boxed(Box.Wrap(Coin.Head))) { case Box.Wrap(c) { return coin(c); } } }"] }]
 }
 
 private def givenBelowAnImplementationWorkspace : Workspace.RawWorkspace := {
@@ -8161,13 +8161,13 @@ private def givenBelowAnImplementationWorkspace : Workspace.RawWorkspace := {
     "impl<A> Add<Box<A>> where A: BitNot { function add(left: Box<A>, right: Box<A>) returns (Box<A>) { match (left) { case Box.Wrap(x) { return Box.Wrap(~x); } } } }",
     "default impl<T> Sub<T> { function sub(left: T, right: T) returns (T) { return right; } }",
     "impl<T> Sub<T> where T: BitNot { function sub(left: T, right: T) returns (T) { return ~left; } }",
-    "function coin(value: Coin) returns (Word) { match (value) { case Coin.Head { return 1; } case Coin.Tail { return 2; } } }",
-    "function plain(value: Plain) returns (Word) { match (value) { case Plain.Head { return 1; } case Plain.Tail { return 2; } } }",
+    "function coin(value: Coin) returns (word) { match (value) { case Coin.Head { return 1; } case Coin.Tail { return 2; } } }",
+    "function plain(value: Plain) returns (word) { match (value) { case Plain.Head { return 1; } case Plain.Tail { return 2; } } }",
     "function twice<T>(x: Box<T>) returns (Box<T>) where T: BitNot { return x + x; }",
     "function differ<T>(x: T, y: T) returns (T) where T: BitNot { return x - y; }",
-    "function boxedCoin() returns (Word) { match (twice(Box.Wrap(Coin.Head))) { case Box.Wrap(c) { return coin(c); } } }",
-    "function boxedPlain() returns (Word) { match (twice(Box.Wrap(Plain.Head))) { case Box.Wrap(p) { return plain(p); } } }",
-    "function differCoin() returns (Word) { return coin(differ(Coin.Head, Coin.Tail)); }"] }]
+    "function boxedCoin() returns (word) { match (twice(Box.Wrap(Coin.Head))) { case Box.Wrap(c) { return coin(c); } } }",
+    "function boxedPlain() returns (word) { match (twice(Box.Wrap(Plain.Head))) { case Box.Wrap(p) { return plain(p); } } }",
+    "function differCoin() returns (word) { return coin(differ(Coin.Head, Coin.Tail)); }"] }]
 }
 
 private def runGivenBelowAnImplementation : IO Unit := do
@@ -8203,13 +8203,13 @@ private def superclassesOfGivensWorkspace : Workspace.RawWorkspace := {
     "impl Sub<Coin> where Coin: BitNot { function sub(left: Coin, right: Coin) returns (Coin) { return left; } }",
     "impl Sub<Plain> where Plain: BitNot { function sub(left: Plain, right: Plain) returns (Plain) { return left; } }",
     "impl<A> Mul<Box<A>> where A: Sub { function mul(left: Box<A>, right: Box<A>) returns (Box<A>) { match (left) { case Box.Wrap(x) { return Box.Wrap(~x); } } } }",
-    "function coin(value: Coin) returns (Word) { match (value) { case Coin.Head { return 1; } case Coin.Tail { return 2; } } }",
-    "function plain(value: Plain) returns (Word) { match (value) { case Plain.Head { return 1; } case Plain.Tail { return 2; } } }",
+    "function coin(value: Coin) returns (word) { match (value) { case Coin.Head { return 1; } case Coin.Tail { return 2; } } }",
+    "function plain(value: Plain) returns (word) { match (value) { case Plain.Head { return 1; } case Plain.Tail { return 2; } } }",
     "function viaSub<T>(x: T) returns (T) where T: Sub { return ~x; }",
-    "function viaCoin() returns (Word) { return coin(viaSub(Coin.Head)); }",
-    "function viaPlain() returns (Word) { return plain(viaSub(Plain.Head)); }",
-    "function boxedCoin() returns (Word) { match (Box.Wrap(Coin.Head) * Box.Wrap(Coin.Tail)) { case Box.Wrap(c) { return coin(c); } } }",
-    "function boxedPlain() returns (Word) { match (Box.Wrap(Plain.Head) * Box.Wrap(Plain.Tail)) { case Box.Wrap(p) { return plain(p); } } }"] }]
+    "function viaCoin() returns (word) { return coin(viaSub(Coin.Head)); }",
+    "function viaPlain() returns (word) { return plain(viaSub(Plain.Head)); }",
+    "function boxedCoin() returns (word) { match (Box.Wrap(Coin.Head) * Box.Wrap(Coin.Tail)) { case Box.Wrap(c) { return coin(c); } } }",
+    "function boxedPlain() returns (word) { match (Box.Wrap(Plain.Head) * Box.Wrap(Plain.Tail)) { case Box.Wrap(p) { return plain(p); } } }"] }]
 }
 
 private def runSuperclassesOfGivens : IO Unit := do
@@ -8240,13 +8240,13 @@ private def impliedSuperclassesWorkspace : Workspace.RawWorkspace := {
     "enum Plain { Head, Tail }",
     "impl Sub<Coin> { function sub(left: Coin, right: Coin) returns (Coin) { return ~left; } }",
     "impl Sub<Plain> { function sub(left: Plain, right: Plain) returns (Plain) { return ~left; } }",
-    "function coin(value: Coin) returns (Word) { match (value) { case Coin.Head { return 1; } case Coin.Tail { return 2; } } }",
-    "function plain(value: Plain) returns (Word) { match (value) { case Plain.Head { return 1; } case Plain.Tail { return 2; } } }",
+    "function coin(value: Coin) returns (word) { match (value) { case Coin.Head { return 1; } case Coin.Tail { return 2; } } }",
+    "function plain(value: Plain) returns (word) { match (value) { case Plain.Head { return 1; } case Plain.Tail { return 2; } } }",
     "function viaSub<T>(x: T) returns (T) where T: Sub { return ~x; }",
-    "function viaCoin() returns (Word) { return coin(viaSub(Coin.Head)); }",
-    "function viaPlain() returns (Word) { return plain(viaSub(Plain.Head)); }",
-    "function subCoin() returns (Word) { return coin(Coin.Head - Coin.Tail); }",
-    "function subPlain() returns (Word) { return plain(Plain.Head - Plain.Tail); }"] }]
+    "function viaCoin() returns (word) { return coin(viaSub(Coin.Head)); }",
+    "function viaPlain() returns (word) { return plain(viaSub(Plain.Head)); }",
+    "function subCoin() returns (word) { return coin(Coin.Head - Coin.Tail); }",
+    "function subPlain() returns (word) { return plain(Plain.Head - Plain.Tail); }"] }]
 }
 
 private def runImpliedSuperclasses : IO Unit := do
@@ -8314,13 +8314,13 @@ private def methodPredicateSuperclassesWorkspace : Workspace.RawWorkspace := {
     "impl Mod<Coin> { function mod(left: Coin, right: Coin) returns (Coin) { return left; } }",
     "impl<A> Mul<A> { function mul(left: A, right: A) returns (A) where A: Sub { return ~left; } }",
     "impl<A> Div<A> { function div(left: A, right: A) returns (A) where A: Mod { return ~left; } }",
-    "function coin(value: Coin) returns (Word) { match (value) { case Coin.Head { return 1; } case Coin.Tail { return 2; } } }",
-    "function plain(value: Plain) returns (Word) { match (value) { case Plain.Head { return 1; } case Plain.Tail { return 2; } } }",
+    "function coin(value: Coin) returns (word) { match (value) { case Coin.Head { return 1; } case Coin.Tail { return 2; } } }",
+    "function plain(value: Plain) returns (word) { match (value) { case Plain.Head { return 1; } case Plain.Tail { return 2; } } }",
     "function viaTwoGivens<U>(x: U, y: U) returns (U) where U: Sub, U: Add { return x * y; }",
-    "function coinMethod() returns (Word) { return coin(Coin.Head * Coin.Tail); }",
-    "function plainMethod() returns (Word) { return plain(Plain.Head * Plain.Tail); }",
-    "function twoGivens() returns (Word) { return coin(viaTwoGivens(Coin.Head, Coin.Tail)); }",
-    "function twoLevels() returns (Word) { return coin(Coin.Head / Coin.Tail); }"] }]
+    "function coinMethod() returns (word) { return coin(Coin.Head * Coin.Tail); }",
+    "function plainMethod() returns (word) { return plain(Plain.Head * Plain.Tail); }",
+    "function twoGivens() returns (word) { return coin(viaTwoGivens(Coin.Head, Coin.Tail)); }",
+    "function twoLevels() returns (word) { return coin(Coin.Head / Coin.Tail); }"] }]
 }
 
 private def runMethodPredicateSuperclasses : IO Unit := do

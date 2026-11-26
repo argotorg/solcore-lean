@@ -36,8 +36,8 @@ private def workspace : Workspace.RawWorkspace := {
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "enum Pair<A, B> { Pair(A, B) }",
-    "enum Tree { Leaf(Word), Branch(Tree, Tree) }",
-    "function main() returns (Word) { return 7; }"
+    "enum Tree { Leaf(word), Branch(Tree, Tree) }",
+    "function main() returns (word) { return 7; }"
   ] }] }
 
 private def checked : IO CheckedProgram :=
@@ -174,23 +174,23 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
+    "trait Mark<T> {}", "impl Mark<word> {}", "impl Mark<bool> {}",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
-    "function marked(comptime item: Word) returns (Word) { return item; }",
-    "function namedFault(value: Word) returns (Word) { let f = marked; return f(value); }",
-    "function lambdaFault(value: Word) returns (Word) {",
-    " let f = lam(comptime item: Word) -> Word { return item; }; return f(value); }",
-    "function tupleParameter() returns (Word) {",
-    " let f = lam(value: (Word, Word)) -> Word { return 7; }; return f(1, 2); }",
-    "function effectfulTuple() returns (comptime<Word>) {",
-    " let trace: Word = 0; let f = lam(value: (Word, Word)) -> Word { return 7; };",
-    " let bump = lam() -> Word { trace += 1; return trace; }; return f(bump(), bump()); }",
-    "function polymorphic(flag: Bool) returns (Word, Bool) {",
+    "function marked(comptime item: word) returns (word) { return item; }",
+    "function namedFault(value: word) returns (word) { let f = marked; return f(value); }",
+    "function lambdaFault(value: word) returns (word) {",
+    " let f = lam(comptime item: word) -> word { return item; }; return f(value); }",
+    "function tupleParameter() returns (word) {",
+    " let f = lam(value: (word, word)) -> word { return 7; }; return f(1, 2); }",
+    "function effectfulTuple() returns (comptime<word>) {",
+    " let trace: word = 0; let f = lam(value: (word, word)) -> word { return 7; };",
+    " let bump = lam() -> word { trace += 1; return trace; }; return f(bump(), bump()); }",
+    "function polymorphic(flag: bool) returns (word, bool) {",
     " let f = lam(item) { return item; }; return (f(1), f(flag)); }",
-    "function nested(flag: Bool) returns (Word, Word) {",
+    "function nested(flag: bool) returns (word, word) {",
     " let outer = lam(value) { keep(value); let inner = lam(item) { return keep(item); }; return inner(1); };",
-    " let one: Word = 1; return (outer(one), outer(flag)); }",
-    "function builtin(value: Word) returns (integer) { let op = wordToInteger; return op(value); }"
+    " let one: word = 1; return (outer(one), outer(flag)); }",
+    "function builtin(value: word) returns (integer) { let op = wordToInteger; return op(value); }"
   ] }] }
 
 private def key (program : CheckedProgram) (name : String) : IO Key :=
@@ -365,27 +365,27 @@ private def word (value : Nat) : Core.Word := Core.Word.ofNatModulo value
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function markedEffects(comptime seed: Word) returns (comptime<Word>) {",
-    " let total: Word = seed; let table: mapping(Word => Word);",
-    " let bump = lam(comptime delta: Word) -> Word { total += delta; table[0] = total; return table[0]; };",
+    "function markedEffects(comptime seed: word) returns (comptime<word>) {",
+    " let total: word = seed; let table: mapping(word => word);",
+    " let bump = lam(comptime delta: word) -> word { total += delta; table[0] = total; return table[0]; };",
     " return bump(3); }",
-    "function markedClosureClosed() returns (Word) {",
-    " let f = lam(comptime value: Word) -> Word { return value; }; return f(21); }",
-    "function markedClosureRuntime(value: Word) returns (Word) {",
-    " let f = lam(comptime item: Word) -> Word { return item; }; return f(value); }",
-    "function markedGlobal(comptime value: Word) returns (Word) { return value; }",
-    "function markedGlobalClosed() returns (Word) { let f = markedGlobal; return f(22); }",
-    "function markedGlobalRuntime(value: Word) returns (Word) { let f = markedGlobal; return f(value); }",
-    "function markedResult(comptime value: Word) returns (comptime<Word>) { return value; }",
-    "function markedResultIndirectBlocked() returns (Word) { let f = markedResult; return f(23); }",
-    "function markedResultIndirectStaged() returns (comptime<Word>) { let f = markedResult; return f(24); }",
-    "function many(flag: Bool, value: Word) returns (Word) {",
-    " let f = lam(comptime staged: Word, flag: Bool, comptime other: Word) -> Word { return staged; };",
+    "function markedClosureClosed() returns (word) {",
+    " let f = lam(comptime value: word) -> word { return value; }; return f(21); }",
+    "function markedClosureRuntime(value: word) returns (word) {",
+    " let f = lam(comptime item: word) -> word { return item; }; return f(value); }",
+    "function markedGlobal(comptime value: word) returns (word) { return value; }",
+    "function markedGlobalClosed() returns (word) { let f = markedGlobal; return f(22); }",
+    "function markedGlobalRuntime(value: word) returns (word) { let f = markedGlobal; return f(value); }",
+    "function markedResult(comptime value: word) returns (comptime<word>) { return value; }",
+    "function markedResultIndirectBlocked() returns (word) { let f = markedResult; return f(23); }",
+    "function markedResultIndirectStaged() returns (comptime<word>) { let f = markedResult; return f(24); }",
+    "function many(flag: bool, value: word) returns (word) {",
+    " let f = lam(comptime staged: word, flag: bool, comptime other: word) -> word { return staged; };",
     " return f(1, flag, value); }",
-    "function polymorphic(flag: Bool) returns (Word, Bool) {",
+    "function polymorphic(flag: bool) returns (word, bool) {",
     " let f = lam(item) { return item; }; return (f(1), f(flag)); }",
-    "function tupleParameter() returns (Word) {",
-    " let f = lam(value: (Word, Word)) -> Word { return 7; }; return f(1, 2); }"
+    "function tupleParameter() returns (word) {",
+    " let f = lam(value: (word, word)) -> word { return 7; }; return f(1, 2); }"
   ] }] }
 
 private def key (program : CheckedProgram) (name : String) : IO Key :=

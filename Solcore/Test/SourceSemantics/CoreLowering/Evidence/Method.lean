@@ -343,11 +343,11 @@ def observeVia (function : CheckedFunction) (signature : ProgramFunctionSignatur
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait BitNot<T> { function bnot(value: T) returns (T); }",
-    "impl BitNot<Word> { function bnot(value: Word) returns (Word) { return value; } }",
-    "impl BitNot<Bool> { function bnot(value: Bool) returns (Bool) { return value; } }",
+    "impl BitNot<word> { function bnot(value: word) returns (word) { return value; } }",
+    "impl BitNot<bool> { function bnot(value: bool) returns (bool) { return value; } }",
     "function via<T>(value: T) returns (T) where T: BitNot { return ~value; }",
-    "function wordRoot(value: Word) returns (Word) { return via(value); }",
-    "function boolRoot(value: Bool) returns (Bool) { return via(value); }"]}] }
+    "function wordRoot(value: word) returns (word) { return via(value); }",
+    "function boolRoot(value: bool) returns (bool) { return via(value); }"]}] }
 
 /-- Every implementation body is checked at its genuine method signature.
 The resulting independent body typing applies to any matching checker output. -/

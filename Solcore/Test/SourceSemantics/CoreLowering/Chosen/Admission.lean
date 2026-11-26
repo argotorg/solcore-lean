@@ -38,7 +38,7 @@ open CallableIndexedNamedGeneration
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function accepted() returns (Word) { let f = lam(value: (Word, Word)) -> Word { return 7; }; return f((1, 2)); }"}] }
+    "function accepted() returns (word) { let f = lam(value: (word, word)) -> word { return 7; }; return f((1, 2)); }"}] }
 
 def effectiveDiagnostics (compiled : SourceCoreUnifiedCompilation.Compiled)
     (diagnostics : SourceCoreCompatibleDataPlaceFaultSites.Program (.initial compiled.compatible.checked)) :

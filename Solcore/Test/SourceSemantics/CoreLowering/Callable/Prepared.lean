@@ -568,14 +568,14 @@ private def content := String.intercalate "\n" [
   "trait Add<T> where T: Marker { function add(left: T, right: T) returns (T) where T: Witness; }",
   "trait BitNot<T> where T: Marker { function bnot(value: T) returns (T) where T: Witness; }",
   "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
-  "impl<B, A> Add<(A, B)> where (A, B): Marker { function add(left: (A, B), right: (A, B)) returns ((A, B)) where (A, B): Witness { let unused: Word = 11; return right; } }",
-  "impl<B, A> BitNot<(A, B)> where (A, B): Marker { function bnot(value: (A, B)) returns ((A, B)) where (A, B): Witness { let unused: Word = 13; return value; } }",
-  "impl<B, A> Coerce<(A, B), Word> { function coerce(value: (A, B)) returns (Word) { return 19; } }",
+  "impl<B, A> Add<(A, B)> where (A, B): Marker { function add(left: (A, B), right: (A, B)) returns ((A, B)) where (A, B): Witness { let unused: word = 11; return right; } }",
+  "impl<B, A> BitNot<(A, B)> where (A, B): Marker { function bnot(value: (A, B)) returns ((A, B)) where (A, B): Witness { let unused: word = 13; return value; } }",
+  "impl<B, A> Coerce<(A, B), word> { function coerce(value: (A, B)) returns (word) { return 19; } }",
   "function via<T>(left: T, right: T) returns (T) where T: Add, T: Marker, T: Witness, T: Marker { return left + right; }",
-  "function binary(a: Word, b: Bool) returns ((Word, Bool)) { let left: (Word, Bool) = (a, b); let right: (Word, Bool) = (7, false); return via(left, right); }",
-  "function unary(a: Word, b: Bool) returns ((Word, Bool)) { let value: (Word, Bool) = (a, b); return ~value; }",
-  "function coerced(a: Word, b: Bool) returns (Word) { let value: (Word, Bool) = (a, b); return value + value; }",
-  "function firstFault() returns ((Word, Bool)) { let left: (Word, Bool); let right: (Word, Bool) = (7, false); return left + right; }",
+  "function binary(a: word, b: bool) returns ((word, bool)) { let left: (word, bool) = (a, b); let right: (word, bool) = (7, false); return via(left, right); }",
+  "function unary(a: word, b: bool) returns ((word, bool)) { let value: (word, bool) = (a, b); return ~value; }",
+  "function coerced(a: word, b: bool) returns (word) { let value: (word, bool) = (a, b); return value + value; }",
+  "function firstFault() returns ((word, bool)) { let left: (word, bool); let right: (word, bool) = (7, false); return left + right; }",
   "pragma no-patterson-condition;"
 ]
 
@@ -1740,18 +1740,18 @@ end Boundaries
 
 private def content (mode : Nat) : String := String.intercalate "\n" [
   "trait Marker<T> {}", "trait Witness<T> {}",
-  "impl Marker<(Word, Bool)> {}", "impl Witness<(Word, Bool)> {}",
-  "impl Marker<Bool> {}", "impl Witness<Bool> {}",
+  "impl Marker<(word, bool)> {}", "impl Witness<(word, bool)> {}",
+  "impl Marker<bool> {}", "impl Witness<bool> {}",
   "trait Add<T> where T: Marker { function add(left: T, right: T) returns (T) where T: Witness; }",
   "trait Coerce<From, To> where From: Marker { function coerce(value: From) returns (To) where From: Witness; }",
-  "impl Add<(Word, Bool)> where (Word, Bool): Marker { function add(left: (Word, Bool), right: (Word, Bool)) returns ((Word, Bool)) where (Word, Bool): Witness { let rawEffect: Word = 101; return right; } }",
-  "impl Coerce<(Word, Bool), Bool> where (Word, Bool): Marker { function coerce(value: (Word, Bool)) returns (Bool) where (Word, Bool): Witness { let firstEffect: Word = 103; " ++
-    (if mode == 1 then "let firstGap: Bool; return firstGap;" else "return true;") ++ " } }",
-  "impl Coerce<Bool, Word> where Bool: Marker { function coerce(value: Bool) returns (Word) where Bool: Witness { let secondEffect: Word = 107; " ++
-    (if mode == 2 then "let secondGap: Word; return secondGap;" else "return 19;") ++ " } }",
-  "function root(a: Word, b: Bool) returns (Word) { " ++
-    (if mode == 3 then "let rawGap: (Word, Bool);" else "let rawGap: (Word, Bool) = (a, b);") ++
-    " let right: (Word, Bool) = (7, false); return rawGap + right; }",
+  "impl Add<(word, bool)> where (word, bool): Marker { function add(left: (word, bool), right: (word, bool)) returns ((word, bool)) where (word, bool): Witness { let rawEffect: word = 101; return right; } }",
+  "impl Coerce<(word, bool), bool> where (word, bool): Marker { function coerce(value: (word, bool)) returns (bool) where (word, bool): Witness { let firstEffect: word = 103; " ++
+    (if mode == 1 then "let firstGap: bool; return firstGap;" else "return true;") ++ " } }",
+  "impl Coerce<bool, word> where bool: Marker { function coerce(value: bool) returns (word) where bool: Witness { let secondEffect: word = 107; " ++
+    (if mode == 2 then "let secondGap: word; return secondGap;" else "return 19;") ++ " } }",
+  "function root(a: word, b: bool) returns (word) { " ++
+    (if mode == 3 then "let rawGap: (word, bool);" else "let rawGap: (word, bool) = (a, b);") ++
+    " let right: (word, bool) = (7, false); return rawGap + right; }",
   "pragma no-patterson-condition;"
 ]
 

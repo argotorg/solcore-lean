@@ -921,14 +921,14 @@ def observeImplementation (program : CheckedProgram) (implementation : ProgramIm
 
 def content : String := String.intercalate "\n" [
   "trait BitNot<T> { function bnot(value: T) returns (T); }",
-  "impl BitNot<Word> { function bnot(value: Word) returns (Word) { let saved = value; let flag = true; while (flag) { saved = value; flag = false; } return saved; } }",
-  "impl BitNot<Bool> { function bnot(value: Bool) returns (Bool) { let saved = value; let flag = true; while (flag) { saved = value; flag = false; } return saved; } }",
-  "function relay<T>(value: T, next: T, flag: Bool) returns (T) where T: BitNot { let current = ~value; while (flag) { current = ~next; flag = false; } return ~current; }",
-  "function make<T>(value: T, next: T, flag: Bool) returns (function() returns (T)) where T: BitNot { return lam() -> T { return relay(value, next, flag); }; }",
-  "function wordRoot(value: Word, next: Word, flag: Bool) returns (function() returns (Word)) { return make(value, next, flag); }",
-  "function boolRoot(value: Bool, next: Bool, flag: Bool) returns (function() returns (Bool)) { return make(value, next, flag); }",
-  "function useWord(f: function() returns (Word)) returns (Word) { return f(); }",
-  "function useBool(f: function() returns (Bool)) returns (Bool) { return f(); }"]
+  "impl BitNot<word> { function bnot(value: word) returns (word) { let saved = value; let flag = true; while (flag) { saved = value; flag = false; } return saved; } }",
+  "impl BitNot<bool> { function bnot(value: bool) returns (bool) { let saved = value; let flag = true; while (flag) { saved = value; flag = false; } return saved; } }",
+  "function relay<T>(value: T, next: T, flag: bool) returns (T) where T: BitNot { let current = ~value; while (flag) { current = ~next; flag = false; } return ~current; }",
+  "function make<T>(value: T, next: T, flag: bool) returns (function() returns (T)) where T: BitNot { return lam() -> T { return relay(value, next, flag); }; }",
+  "function wordRoot(value: word, next: word, flag: bool) returns (function() returns (word)) { return make(value, next, flag); }",
+  "function boolRoot(value: bool, next: bool, flag: bool) returns (function() returns (bool)) { return make(value, next, flag); }",
+  "function useWord(f: function() returns (word)) returns (word) { return f(); }",
+  "function useBool(f: function() returns (bool)) returns (bool) { return f(); }"]
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ content}] }

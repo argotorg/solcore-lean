@@ -122,20 +122,20 @@ theorem actual_compiler_receipt {compilation : SourceCoreFunctions.Context} {cal
     compilation.globals[receipt.index]? = some signature := receipt.equation
 
 private def content : String := String.intercalate "\n" [
-  "enum Item { Item(Bool) }",
-  "function identity(value: Bool) returns (Bool) { return value; }",
-  "function two(first: Bool, second: Bool) returns (Bool) { return first; }",
-  "function accept(item: Item, flag: Bool) returns (Bool) { return flag; }",
-  "function fail(value: Bool) returns (Bool) { let written = !value; let gap: Bool; return gap; }",
-  "function one(flag: Bool) returns (Bool) { return identity(!flag); }",
-  "function many(flag: Bool, raw: mapping(Bool => Bool)) returns (Bool) { let m: mapping(Bool => Bool); return two(m[!flag], raw[flag]); }",
-  "function skipped(flag: Bool) returns (Bool) { let m: mapping(Bool => Bool); let gap: Bool; return two(m[flag], gap); }",
-  "function missing(flag: Bool) returns (Bool) { let m: mapping(Bool => Item); return accept(m[flag], !flag); }",
-  "function fault(flag: Bool) returns (Bool) { return fail(!flag); }",
-  "function echo(raw: mapping(Bool => Bool)) returns (mapping(Bool => Bool)) { return raw; }",
-  "function forwarded(raw: mapping(Bool => Bool)) returns (mapping(Bool => Bool)) { return echo(raw); }",
-  "function through(f: function(Bool) returns (Bool), flag: Bool) returns (function(Bool) returns (Bool)) { return f; }",
-  "function callable(f: function(Bool) returns (Bool), flag: Bool) returns (function(Bool) returns (Bool)) { return through(f, !flag); }"
+  "enum Item { Item(bool) }",
+  "function identity(value: bool) returns (bool) { return value; }",
+  "function two(first: bool, second: bool) returns (bool) { return first; }",
+  "function accept(item: Item, flag: bool) returns (bool) { return flag; }",
+  "function fail(value: bool) returns (bool) { let written = !value; let gap: bool; return gap; }",
+  "function one(flag: bool) returns (bool) { return identity(!flag); }",
+  "function many(flag: bool, raw: mapping(bool => bool)) returns (bool) { let m: mapping(bool => bool); return two(m[!flag], raw[flag]); }",
+  "function skipped(flag: bool) returns (bool) { let m: mapping(bool => bool); let gap: bool; return two(m[flag], gap); }",
+  "function missing(flag: bool) returns (bool) { let m: mapping(bool => Item); return accept(m[flag], !flag); }",
+  "function fault(flag: bool) returns (bool) { return fail(!flag); }",
+  "function echo(raw: mapping(bool => bool)) returns (mapping(bool => bool)) { return raw; }",
+  "function forwarded(raw: mapping(bool => bool)) returns (mapping(bool => bool)) { return echo(raw); }",
+  "function through(f: function(bool) returns (bool), flag: bool) returns (function(bool) returns (bool)) { return f; }",
+  "function callable(f: function(bool) returns (bool), flag: bool) returns (function(bool) returns (bool)) { return through(f, !flag); }"
 ]
 
 private def cells (initial final : SourceTypedRuntime.RuntimeState)
@@ -487,15 +487,15 @@ theorem profile_record_roundtrip
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function next(value: Word) returns (Word) { return value + 1; }",
-    "function less(value: Word, bound: Word) returns (Bool) { return value < bound; }",
-    "function bad() returns (Word) { let absent: Word; return absent; }",
-    "function equalBody(seed: Word) returns (Word) { let result = seed; for (result = next(seed); less(result, 5); result = next(result)) { let inner = 0; while (less(inner, 2)) { inner = next(inner); } if (result == 3) { continue; } if (result == 4) { break; } } return result; }",
-    "function unitBody(seed: Word) { let result = seed; for (result = next(seed); less(result, 3); result = next(result)) { } }",
-    "function initialFault(seed: Word) returns (Word) { let result = seed; for (result = bad(); false; result = next(result)) { result = next(result); } return result; }",
-    "function postFault(seed: Word) returns (Word) { let result = seed; for (result = next(seed); true; result = bad()) { result = next(result); } return result; }",
-    "function bodyFault(seed: Word) returns (Word) { let result = seed; let seen: mapping(Bool => Word); for (result = next(seed); true; result = next(result)) { seen[false] = next(result); result = bad(); } return result; }",
-    "function self(n: Word) returns (Word) { let result = 1; for (let i = 0; i < n; i = next(i)) { result = result + self(n - 1); } return result; }"
+    "function next(value: word) returns (word) { return value + 1; }",
+    "function less(value: word, bound: word) returns (bool) { return value < bound; }",
+    "function bad() returns (word) { let absent: word; return absent; }",
+    "function equalBody(seed: word) returns (word) { let result = seed; for (result = next(seed); less(result, 5); result = next(result)) { let inner = 0; while (less(inner, 2)) { inner = next(inner); } if (result == 3) { continue; } if (result == 4) { break; } } return result; }",
+    "function unitBody(seed: word) { let result = seed; for (result = next(seed); less(result, 3); result = next(result)) { } }",
+    "function initialFault(seed: word) returns (word) { let result = seed; for (result = bad(); false; result = next(result)) { result = next(result); } return result; }",
+    "function postFault(seed: word) returns (word) { let result = seed; for (result = next(seed); true; result = bad()) { result = next(result); } return result; }",
+    "function bodyFault(seed: word) returns (word) { let result = seed; let seen: mapping(bool => word); for (result = next(seed); true; result = next(result)) { seen[false] = next(result); result = bad(); } return result; }",
+    "function self(n: word) returns (word) { let result = 1; for (let i = 0; i < n; i = next(i)) { result = result + self(n - 1); } return result; }"
   ]}]
 }
 open Tests.SourceCompilerFeatureSupport in
@@ -756,16 +756,16 @@ theorem empty_installed_call
   exact ⟨origin, index, metadata, owned, history, (NamedCalls.installed_call_agreement globalReference globalRead).wrap bodyEvaluation⟩
 
 private def content : String := String.intercalate "\n" [
-  "enum Item { Item(Bool) }",
+  "enum Item { Item(bool) }",
   "function empty() {}",
-  "function first() returns (Bool) { return true; }",
-  "function middle() returns (Bool) { return first(); }",
-  "function unit() { let outer: Word; { let inner = first(); } }",
-  "function missing() returns (Bool) { let m: mapping(Bool => Item); let failed = m[true]; return false; }",
-  "function last() returns (Bool) { let before = middle(); if (before) { let nested = first(); return nested; } return false; }",
-  "function get() returns (function(Unit) returns (Bool)) { return first; }",
-  "function through() returns (Bool) { let f = first; return f(); }",
-  "function fault() returns (Bool) { let written = first(); let gap: Bool; let failed = gap; return false; }"
+  "function first() returns (bool) { return true; }",
+  "function middle() returns (bool) { return first(); }",
+  "function unit() { let outer: word; { let inner = first(); } }",
+  "function missing() returns (bool) { let m: mapping(bool => Item); let failed = m[true]; return false; }",
+  "function last() returns (bool) { let before = middle(); if (before) { let nested = first(); return nested; } return false; }",
+  "function get() returns (function(()) returns (bool)) { return first; }",
+  "function through() returns (bool) { let f = first; return f(); }",
+  "function fault() returns (bool) { let written = first(); let gap: bool; let failed = gap; return false; }"
 ]
 
 private def check (compiled : SourceCoreUnifiedCompilation.Compiled) (name : String)
@@ -921,12 +921,12 @@ example (initial : Core.Context) (binder : TypedBinder) :
       .function .word (LanguageResult.resultType .word) :: initial := rfl
 
 private def content : String := String.intercalate "\n" [
-  "function empty(flag: Bool, value: Word) { }",
-  "function selected(flag: Bool, value: Word, values: mapping(Word => Word)) returns (Word) { return flag ? values[value] : value; }",
-  "function duplicate(values: mapping(Word => Word), key: Word) returns (Word) { return values[key]; }",
-  "function captured(seed: Word) returns (function(Word) returns (Word)) { let total = seed; return lam(delta: Word) -> Word { total += delta; return total; }; }",
-  "function identity(value: Word) returns (Word) { return value; }",
-  "function invoke(f: function(Word) returns (Word), delta: Word) returns (Word) { return f(delta); }"
+  "function empty(flag: bool, value: word) { }",
+  "function selected(flag: bool, value: word, values: mapping(word => word)) returns (word) { return flag ? values[value] : value; }",
+  "function duplicate(values: mapping(word => word), key: word) returns (word) { return values[key]; }",
+  "function captured(seed: word) returns (function(word) returns (word)) { let total = seed; return lam(delta: word) -> word { total += delta; return total; }; }",
+  "function identity(value: word) returns (word) { return value; }",
+  "function invoke(f: function(word) returns (word), delta: word) returns (word) { return f(delta); }"
 ]
 
 private def check (compiled : SourceCoreUnifiedCompilation.Compiled) (name : String)
@@ -1160,7 +1160,7 @@ theorem FactoryShape.statementTyping
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function drain(n: Word) returns (Word) { while (n > 0) { n = n - 1; } return n; }"}] }
+    "function drain(n: word) returns (word) { while (n > 0) { n = n - 1; } return n; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)

@@ -46,13 +46,13 @@ private def workspace : Workspace.RawWorkspace := {
     "impl<A, B> Rel<A, B> {}",
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
-    "impl Coerce<Bool, (Word, Bool)> { function coerce(flag: Bool) returns ((Word, Bool)) {",
+    "impl Coerce<bool, (word, bool)> { function coerce(flag: bool) returns ((word, bool)) {",
     "let outer = lam(value, tag) { let inner = lam(item) { return keep(value, item); }; let touched = inner(true); return (value, tag); };",
     "let result = outer(1, flag);",
     "if (flag) { let discarded = keep(2, true); } else { let discarded = keep(3, false); }",
     "return result; } }",
 
-    "function entry(flag: Bool) returns (Word, Bool) { return flag; }",
+    "function entry(flag: bool) returns (word, bool) { return flag; }",
     "pragma no-coverage-condition;"]}] }
 
 def main : IO Unit := do
@@ -248,14 +248,14 @@ private def workspace : Workspace.RawWorkspace := {
     "trait Rel<A, B> {}",
     "impl<A, B> Rel<A, B> {}",
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",
-    "function run(flag: Bool) returns (Word, Bool) {",
+    "function run(flag: bool) returns (word, bool) {",
     "let outer = lam(value, tag) { let inner = lam(item) { return keep(value, item); }; let touched = inner(true); return (value, tag); };",
     "let result = outer(1, flag);",
     "if (flag) { let discarded = keep(2, true); } else { let discarded = keep(3, false); }",
     "return result; }",
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
-    "impl Coerce<Bool, (Word, Bool)> { function coerce(value: Bool) returns ((Word, Bool)) { return run(value); } }",
-    "function entry(flag: Bool) returns (Word, Bool) { return flag; }",
+    "impl Coerce<bool, (word, bool)> { function coerce(value: bool) returns ((word, bool)) { return run(value); } }",
+    "function entry(flag: bool) returns (word, bool) { return flag; }",
     "pragma no-coverage-condition;"]}] }
 
 def main : IO Unit := do
@@ -613,7 +613,7 @@ def workspace : Workspace.RawWorkspace := {
     "trait Rel<A, B> {}",
     "impl<A, B> Rel<A, B> {}",
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",
-    "function run(flag: Bool) returns (Word, Bool) {",
+    "function run(flag: bool) returns (word, bool) {",
     "let outer = lam(value, tag) { let inner = lam(item) { return keep(value, item); }; let touched = inner(true); return (value, tag); };",
     "let result = outer(1, flag);",
     "if (flag) { let discarded = keep(2, true); } else { let discarded = keep(3, false); }",
@@ -711,7 +711,7 @@ def workspace : Workspace.RawWorkspace := {
     "trait Rel<A, B> {}",
     "impl<A, B> Rel<A, B> {}",
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",
-    "function run(flag: Bool) returns (Word, Bool) {",
+    "function run(flag: bool) returns (word, bool) {",
     "let outer = lam(value, tag) { let inner = lam(item) { return keep(value, item); }; let touched = inner(true); return (value, tag); };",
     "let result = outer(1, flag);",
     "if (flag) { let discarded = keep(2, true); } else { let discarded = keep(3, false); }",
@@ -787,7 +787,7 @@ def workspace : Workspace.RawWorkspace := {
     "trait Rel<A, B> {}",
     "impl<A, B> Rel<A, B> {}",
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",
-    "function run(flag: Bool) returns (Word, Bool) {",
+    "function run(flag: bool) returns (word, bool) {",
     "let outer = lam(value, tag) { let inner = lam(item) { return keep(value, item); }; let touched = inner(true); return (value, tag); };",
     "let result = outer(1, flag);",
     "if (flag) { let discarded = keep(2, true); } else { let discarded = keep(3, false); }",
@@ -893,7 +893,7 @@ def workspace : Workspace.RawWorkspace := {
     "trait Rel<A, B> {}",
     "impl<A, B> Rel<A, B> {}",
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",
-    "function run(flag: Bool) returns (Word, Bool) {",
+    "function run(flag: bool) returns (word, bool) {",
     "let before = flag;",
     "let outer = lam(value, tag) { let prior = true; let inner = lam(item) { return keep(value, item); }; let touched = inner(true); return (value, tag); };",
     "let result = outer(1, before);",
@@ -958,7 +958,7 @@ def workspace : Workspace.RawWorkspace := {
     "trait Rel<A, B> {}",
     "impl<A, B> Rel<A, B> {}",
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",
-    "function run(flag: Bool) returns (Word, Bool) {",
+    "function run(flag: bool) returns (word, bool) {",
     "let outer = lam(value, tag) { let inner = lam(item) { return keep(value, item); }; let touched = inner(true); return (value, tag); };",
     "let result = outer(1, flag);",
     "if (flag) { let discarded = keep(2, true); } else { let discarded = keep(3, false); }",
@@ -1056,7 +1056,7 @@ def workspace : Workspace.RawWorkspace := {
     "trait Rel<A, B> {}",
     "impl<A, B> Rel<A, B> {}",
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",
-    "function run(flag: Bool) returns (Word, Bool) {",
+    "function run(flag: bool) returns (word, bool) {",
     "let outer = lam(value, tag) { let inner = lam(item) { return keep(value, item); }; let touched = inner(true); return (value, tag); };",
     "let result = outer(1, flag);",
     "if (flag) { let discarded = keep(2, true); } else { let discarded = keep(3, false); }",
@@ -1283,11 +1283,11 @@ private def checkCase (label : String) (generalizedOuter : Bool) (body : List St
 
 def main : IO Unit := do
   checkCase "used-inner" false [
-    "function run(flag: Bool) returns (Word) {",
+    "function run(flag: bool) returns (word) {",
     "let outer = lam(value) { let inner = lam(item) { return keep(value, item); }; let touched = inner(true); return value; };",
     "return outer(1); }"]
   checkCase "separate-outer-variable" true [
-    "function run(flag: Bool) returns (Word, Bool) {",
+    "function run(flag: bool) returns (word, bool) {",
     "let outer = lam(value, tag) { let inner = lam(item) { return keep(value, item); }; let touched = inner(true); return (value, tag); };",
     "return outer(1, flag); }"]
 
@@ -1309,7 +1309,7 @@ def workspace : Workspace.RawWorkspace := {
     "trait Rel<A, B> {}",
     "impl<A, B> Rel<A, B> {}",
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",
-    "function run(flag: Bool) returns (Word, Bool) {",
+    "function run(flag: bool) returns (word, bool) {",
     "let outer = lam(value, tag) { let inner = lam(item) { return keep(value, item); }; let touched = inner(true); return (value, tag); };",
     "return outer(1, flag); }",
     "pragma no-coverage-condition;"]}] }
@@ -1797,12 +1797,12 @@ private def require := SourceCoreUnifiedCorpusSupport.assertTrue
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
 private def word (n : Nat) : SourceTypedRuntime.Value := .word (Core.Word.ofNatModulo n)
 private def content := String.intercalate "\n" [
-  "function arithmetic() returns (Word) { return 2 + 3 * 4; }",
-  "function inverted() returns (Word) { return ~4; }",
-  "function logic() returns (Bool) { return !false && true; }",
-  "function skipped() returns (Bool) { let absent: Bool; return false && absent; }",
-  "function firstFault() returns (Word) { let first: Word; let second: Word; return first + second; }",
-  "function secondFault() returns (Word) { let first: Word = 9; let second: Word; return first + second; }"
+  "function arithmetic() returns (word) { return 2 + 3 * 4; }",
+  "function inverted() returns (word) { return ~4; }",
+  "function logic() returns (bool) { return !false && true; }",
+  "function skipped() returns (bool) { let absent: bool; return false && absent; }",
+  "function firstFault() returns (word) { let first: word; let second: word; return first + second; }",
+  "function secondFault() returns (word) { let first: word = 9; let second: word; return first + second; }"
 ]
 
 private def audit (compiled : SourceCoreUnifiedCompilation.Compiled) : IO Unit := do
@@ -2164,10 +2164,10 @@ private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get 
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
 private def content := String.intercalate "\n" [
   "function empty() { return (); }",
-  "function one() returns (Word) { return (7); }",
-  "function pair() returns ((Word, Bool)) { return (11, true); }",
-  "function triple() returns ((Word, Bool, Word)) { return (13, false, 17); }",
-  "function nested() returns (((Word, Bool, Word), Word, Bool)) { return ((19, true, 23), 29, false); }"
+  "function one() returns (word) { return (7); }",
+  "function pair() returns ((word, bool)) { return (11, true); }",
+  "function triple() returns ((word, bool, word)) { return (13, false, 17); }",
+  "function nested() returns (((word, bool, word), word, bool)) { return ((19, true, 23), 29, false); }"
 ]
 
 /-- The source fixture supplies exact uncoerced tuple occurrences and full
@@ -2252,10 +2252,10 @@ def workspace : Workspace.RawWorkspace := {
     "trait Rel<A, B> {}",
     "impl<A, B> Rel<A, B> {}",
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",
-    "function run(flag: Bool) returns (Word, Bool) {",
+    "function run(flag: bool) returns (word, bool) {",
     "let outer = lam(value, tag) { let inner = lam(item) { return keep(value, item); }; let touched = inner(true); return (value, tag); };",
     "let result = outer(1, flag);",
-    "if (flag) { let two: Word = 2; let discarded = keep(two, true); } else { let three: Word = 3; let discarded = keep(three, false); }",
+    "if (flag) { let two: word = 2; let discarded = keep(two, true); } else { let three: word = 3; let discarded = keep(three, false); }",
     "return result; }",
     "pragma no-coverage-condition;"]}] }
 

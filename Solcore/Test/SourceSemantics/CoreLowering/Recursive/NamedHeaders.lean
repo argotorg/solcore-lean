@@ -146,12 +146,12 @@ theorem closed_reflects_at [FunctionCalls.FaultTokens faults] (budget size : Nat
 end Concrete
 
 private def content : String := String.intercalate "\n" [
-  "function calculate() returns (Word) { let sum = 0; for (let i = 0; i < 5; i += 1) { if (i == 1) { continue; } sum += i; if (i == 3) { break; } } return sum; }",
-  "function early() returns (Bool) { let prior: Word = 21; while (true) { let inside: Word = 22; return true; } let skipped: Word = 99; return false; }",
-  "function unitFallthrough() { let saved: Word = 23; for (let i: Word = 0; i < 2; i += 1) { let saved = i; } }",
-  "function failBody() returns (Word) { let prior: Word = 24; for (let i: Word = 0; true; i += 1) { let saved: Word = 25; let gap: Word; return gap; } let skipped = 26; return skipped; }",
-  "function integerResult(left: Word, right: Word) returns (integer) { return integerSub(wordToInteger(left), wordToInteger(right)); }",
-  "function mapped() returns (Bool) { let m: mapping(Bool => Word); m[true] = 27; let expected = 27; return m[true] == expected; }"
+  "function calculate() returns (word) { let sum = 0; for (let i = 0; i < 5; i += 1) { if (i == 1) { continue; } sum += i; if (i == 3) { break; } } return sum; }",
+  "function early() returns (bool) { let prior: word = 21; while (true) { let inside: word = 22; return true; } let skipped: word = 99; return false; }",
+  "function unitFallthrough() { let saved: word = 23; for (let i: word = 0; i < 2; i += 1) { let saved = i; } }",
+  "function failBody() returns (word) { let prior: word = 24; for (let i: word = 0; true; i += 1) { let saved: word = 25; let gap: word; return gap; } let skipped = 26; return skipped; }",
+  "function integerResult(left: word, right: word) returns (integer) { return integerSub(wordToInteger(left), wordToInteger(right)); }",
+  "function mapped() returns (bool) { let m: mapping(bool => word); m[true] = 27; let expected = 27; return m[true] == expected; }"
 ]
 private def w (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def finish (compiled : SourceCoreUnifiedCompilation.Compiled) (name : String)
@@ -328,12 +328,12 @@ theorem post_below_loop {size budget : Nat} {actual : Environment} {before condi
   exact ⟨postSize, postStore, postValue, Nat.lt_of_lt_of_le (Nat.lt_trans postSmaller smaller) bounded, evaluated⟩
 
 private def content : String := String.intercalate "\n" [
-  "function next(value: Word) returns (Word) { return value + 1; }",
-  "function bad(value: Word) returns (Word) { let gap: Word; return gap; }",
-  "function empty(raw: mapping(Word => Word)) returns (Word) { for (; false;) { raw[1] = 999; } return raw[1]; }",
-  "function post(raw: mapping(Word => Word)) returns (Word) { let count = 0; for (let index: Word, index = 0, next(index); index < 3; let saved: Word, saved = next(index), let copy = saved, raw[1] += copy, index += 1) { count += 1; continue; } return raw[1] + count; }",
-  "function initialFault(raw: mapping(Word => Word)) returns (Word) { for (raw[1] += 1, let stop = bad(0); true; raw[1] += 90) { raw[1] += 99; } return raw[1]; }",
-  "function postFault(raw: mapping(Word => Word)) returns (Word) { for (let index = 0; index < 3; raw[1] += 1, let stop = bad(index), index += 1) { raw[1] += 2; } return raw[1]; }"
+  "function next(value: word) returns (word) { return value + 1; }",
+  "function bad(value: word) returns (word) { let gap: word; return gap; }",
+  "function empty(raw: mapping(word => word)) returns (word) { for (; false;) { raw[1] = 999; } return raw[1]; }",
+  "function post(raw: mapping(word => word)) returns (word) { let count = 0; for (let index: word, index = 0, next(index); index < 3; let saved: word, saved = next(index), let copy = saved, raw[1] += copy, index += 1) { count += 1; continue; } return raw[1] + count; }",
+  "function initialFault(raw: mapping(word => word)) returns (word) { for (raw[1] += 1, let stop = bad(0); true; raw[1] += 90) { raw[1] += 99; } return raw[1]; }",
+  "function postFault(raw: mapping(word => word)) returns (word) { for (let index = 0; index < 3; raw[1] += 1, let stop = bad(index), index += 1) { raw[1] += 2; } return raw[1]; }"
 ]
 private def word (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def table (n : Nat) : SourceTypedRuntime.Value :=
@@ -445,17 +445,17 @@ theorem product_arity_boundary :
 
 private def content : String := String.intercalate "\n" [
   "function empty() {}",
-  "function unitArg(value: Unit) returns (Unit) { return value; }",
-  "function tupleArg(value: (Word, Bool)) returns (Word) { return 1; }",
-  "function two(first: Word, second: Bool) returns (Word) { return first; }",
-  "function duplicate(first: Word, middle: Bool, last: Word) returns (Word) { return first + last; }",
+  "function unitArg(value: ()) returns (()) { return value; }",
+  "function tupleArg(value: (word, bool)) returns (word) { return 1; }",
+  "function two(first: word, second: bool) returns (word) { return first; }",
+  "function duplicate(first: word, middle: bool, last: word) returns (word) { return first + last; }",
   "function choose<A, B>(first: A, second: B) returns (A) { return first; }",
-  "function rootUnit() returns (Unit) { return unitArg(()); }",
-  "function rootTuple() returns (Word) { return tupleArg((7, true)); }",
-  "function rootTwo() returns (Word) { return two(7, true); }",
-  "function rootDuplicate() returns (Word) { return duplicate(7, false, 7); }",
-  "function rootWord() returns (Word) { return choose(9, true); }",
-  "function rootBool() returns (Bool) { let nine: Word = 9; return choose(false, nine); }"
+  "function rootUnit() returns (()) { return unitArg(()); }",
+  "function rootTuple() returns (word) { return tupleArg((7, true)); }",
+  "function rootTwo() returns (word) { return two(7, true); }",
+  "function rootDuplicate() returns (word) { return duplicate(7, false, 7); }",
+  "function rootWord() returns (word) { return choose(9, true); }",
+  "function rootBool() returns (bool) { let nine: word = 9; return choose(false, nine); }"
 ]
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
@@ -610,16 +610,16 @@ theorem missing_input_rejected :
 end Boundaries
 
 private def content : String := String.intercalate "\n" [
-  "function pick(first: Word, gate: Bool, last: Word) returns (Word) { if (gate) { return first; } else { return last; } }",
+  "function pick(first: word, gate: bool, last: word) returns (word) { if (gate) { return first; } else { return last; } }",
   "function second<A, B>(first: A, last: B) returns (B) { return last; }",
-  "function shadow(value: Word) returns (Word) { { let value: Word = 13; } return value; }",
-  "function fail(first: Word, gate: Bool) returns (Word) { let missing: Word; return missing; }",
+  "function shadow(value: word) returns (word) { { let value: word = 13; } return value; }",
+  "function fail(first: word, gate: bool) returns (word) { let missing: word; return missing; }",
   "function empty() {}",
-  "function rootPick() returns (Word) { return pick(7, false, 11); }",
-  "function rootGeneric() returns (Bool) { let nine: Word = 9; return second(nine, true); }",
-  "function rootReverse() returns (Word) { return second(false, 17); }",
-  "function rootShadow() returns (Word) { return shadow(19); }",
-  "function rootFault() returns (Word) { return fail(23, true); }"
+  "function rootPick() returns (word) { return pick(7, false, 11); }",
+  "function rootGeneric() returns (bool) { let nine: word = 9; return second(nine, true); }",
+  "function rootReverse() returns (word) { return second(false, 17); }",
+  "function rootShadow() returns (word) { return shadow(19); }",
+  "function rootFault() returns (word) { return fail(23, true); }"
 ]
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
@@ -896,12 +896,12 @@ end Boundary
 
 
 private def content : String := String.intercalate "\n" [
-  "function bump(value: Word) returns (Word) { let extra: Word = 3; return value + extra; }",
+  "function bump(value: word) returns (word) { let extra: word = 3; return value + extra; }",
   "function keep<T>(value: T) returns (T) { return value; }",
-  "function fail(value: Word) returns (Word) { let missing: Word; return missing; }",
-  "function wordRoot() returns (Word) { let kept: Word = 5; return bump(keep(kept)); }",
-  "function boolRoot() returns (Bool) { return keep(true); }",
-  "function faultRoot() returns (Word) { let kept: Word = 7; return fail(kept); }",
+  "function fail(value: word) returns (word) { let missing: word; return missing; }",
+  "function wordRoot() returns (word) { let kept: word = 5; return bump(keep(kept)); }",
+  "function boolRoot() returns (bool) { return keep(true); }",
+  "function faultRoot() returns (word) { let kept: word = 7; return fail(kept); }",
   "function empty() {}"
 ]
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
@@ -941,9 +941,9 @@ private def template_boundary : IO Unit := do
   let workspace : Workspace.RawWorkspace := {
     entry := "main.solc", externalLibraries := []
     mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-      "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
+      "trait Mark<T> {}", "impl Mark<word> {}", "impl Mark<bool> {}",
       "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
-      "function qualified(flag: Bool) returns (Word, Bool) {",
+      "function qualified(flag: bool) returns (word, bool) {",
       " let f = lam(item) { return keep(item); }; return (f(1), f(flag)); }"
     ]}] }
   let program ← get "initial validity checked template source" (checkProgram workspace)
@@ -1228,17 +1228,17 @@ abbrev closed_callee_reflects := @RecursiveNamedCatalogMutualMeaning.reflects_at
 end Boundaries
 
 private def content := String.intercalate "\n" [
-  "type F = function(Word) returns (Word);",
-  "function maker(seed: Word) returns(F) { return lam(item: Word) -> Word { return seed + item; }; }",
+  "type F = function(word) returns (word);",
+  "function maker(seed: word) returns(F) { return lam(item: word) -> word { return seed + item; }; }",
   "function keeper(value: F) returns(F) { return value; }",
-  "function caller(seed: Word) returns(F) { return keeper(maker(seed)); }",
-  "function stored(seed: Word) returns(F) { let value: F = maker(seed); return value; }",
-  "function pair(seed: Word) returns(F,F) { return (maker(seed), lam(item: Word) -> Word { return seed + item; }); }",
-  "function branch(seed: Word) returns(F) { if(seed == 0) { return lam(item: Word) -> Word { return item; }; } else { return lam(item: Word) -> Word { return seed + item; }; } }",
-  "function zero(seed: Word) returns(function() returns(Word)) { return lam() -> Word { { return seed; } }; }",
-  "function fail() returns(Word) { let written: Word = 5; let gap: Word; return gap; }",
-  "function firstFault(seed: Word) returns(Word,F,F) { return (fail(), maker(seed), maker(9)); }",
-  "function laterFault(seed: Word) returns(F,Word,F) { return (maker(seed), fail(), maker(9)); }"
+  "function caller(seed: word) returns(F) { return keeper(maker(seed)); }",
+  "function stored(seed: word) returns(F) { let value: F = maker(seed); return value; }",
+  "function pair(seed: word) returns(F,F) { return (maker(seed), lam(item: word) -> word { return seed + item; }); }",
+  "function branch(seed: word) returns(F) { if(seed == 0) { return lam(item: word) -> word { return item; }; } else { return lam(item: word) -> word { return seed + item; }; } }",
+  "function zero(seed: word) returns(function() returns(word)) { return lam() -> word { { return seed; } }; }",
+  "function fail() returns(word) { let written: word = 5; let gap: word; return gap; }",
+  "function firstFault(seed: word) returns(word,F,F) { return (fail(), maker(seed), maker(9)); }",
+  "function laterFault(seed: word) returns(F,word,F) { return (maker(seed), fail(), maker(9)); }"
 ]
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
@@ -1531,12 +1531,12 @@ theorem named_reflects [FunctionCalls.FaultTokens faults] (budget size : Nat) (b
       .reachable runtimeViews unique (trees request member childContext related) (errors request member childContext related) child smaller
 
 private def content : String := String.intercalate "\n" [
-  "function mark(value: Word) returns (Word) { let seen = value; return seen; }",
-  "function fail(value: Word) returns (Word) { let seen = value; let gap: Word; return gap; }",
-  "function choose(seed: Word) returns (Word) { let kept: Word = 5; match ((mark(seed), mark(7))) { case (0, value) { let selected = mark(value); return selected; } default { let selected = mark(9); return selected; } } }",
-  "function bodyFault(seed: Word) returns (Word) { match ((mark(seed), 19)) { case (0, value) { let prior = mark(value); return fail(prior); } default { return mark(23); } } }",
-  "function scrutineeFault() returns (Word) { match (fail(3)) { case 0 { return mark(29); } default { return mark(31); } } }",
-  "function emptyDefault(seed: Word) returns (Word) { match (seed) { case 0 { let selected = mark(1); } default {} } return mark(17); }"
+  "function mark(value: word) returns (word) { let seen = value; return seen; }",
+  "function fail(value: word) returns (word) { let seen = value; let gap: word; return gap; }",
+  "function choose(seed: word) returns (word) { let kept: word = 5; match ((mark(seed), mark(7))) { case (0, value) { let selected = mark(value); return selected; } default { let selected = mark(9); return selected; } } }",
+  "function bodyFault(seed: word) returns (word) { match ((mark(seed), 19)) { case (0, value) { let prior = mark(value); return fail(prior); } default { return mark(23); } } }",
+  "function scrutineeFault() returns (word) { match (fail(3)) { case 0 { return mark(29); } default { return mark(31); } } }",
+  "function emptyDefault(seed: word) returns (word) { match (seed) { case 0 { let selected = mark(1); } default {} } return mark(17); }"
 ]
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
@@ -1714,10 +1714,10 @@ theorem selected_entry {entry : ProtectedExpressionMeaning.Entry}
   ⟨installed transport binds initial spine maps worlds frame metadata, restored transport initial maps worlds frame metadata⟩
 
 private def content : String := String.intercalate "\n" [
-  "function ordered(seed: Word) returns (Word) { let kept = seed + 1; match ((seed, (11, 13))) { case (0, (left, right)) { let result = left + right; return result; } case (1, (left, right)) { return right; } default { return kept; } } }",
-  "function empty(seed: Word) returns (Word) { match (seed) { case 0 {} default {} } return 17; }",
-  "function failed(seed: Word) returns (Word) { match ((seed, 19)) { case (0, value) { let prior: Word = value; let gap: Word; return gap; } default { return 23; } } }",
-  "function scrutineeFault() returns (Word) { let gap: Word; match (gap) { case 0 { return 29; } default { return 31; } } }"
+  "function ordered(seed: word) returns (word) { let kept = seed + 1; match ((seed, (11, 13))) { case (0, (left, right)) { let result = left + right; return result; } case (1, (left, right)) { return right; } default { return kept; } } }",
+  "function empty(seed: word) returns (word) { match (seed) { case 0 {} default {} } return 17; }",
+  "function failed(seed: word) returns (word) { match ((seed, 19)) { case (0, value) { let prior: word = value; let gap: word; return gap; } default { return 23; } } }",
+  "function scrutineeFault() returns (word) { let gap: word; match (gap) { case 0 { return 29; } default { return 31; } } }"
 ]
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
@@ -2167,11 +2167,11 @@ end DuplicateArms
 
 
 private def content : String := String.intercalate "\n" [
-  "function choose(n: Word) returns (Word) { let result = 0; match (n) { case 0 { result = 5; } default { result = 7; } } return result; }",
-  "function branch(n: Word) returns (Word) { match (n) { case 0 { { return 11; } } default { if (true) { return 13; } else { return 17; } } } return 19; }",
-  "function loop(n: Word) returns (Word) { let result = 0; for (let i = 0; i < n; i += 1) { match (i) { case 0 { continue; } default { result += i; } } } return result; }",
-  "function keyed(m: mapping(Bool => Word)) returns (Word) { match (m[true]) { case 31 { m[true] = 7; } default { m[false] = 9; } } return m[true]; }",
-  "function fail(n: Word) returns (Word) { let result = 29; let gap: Word; match (n) { case 0 { result = 31; return gap; } default { result = 37; } } return result; }"
+  "function choose(n: word) returns (word) { let result = 0; match (n) { case 0 { result = 5; } default { result = 7; } } return result; }",
+  "function branch(n: word) returns (word) { match (n) { case 0 { { return 11; } } default { if (true) { return 13; } else { return 17; } } } return 19; }",
+  "function loop(n: word) returns (word) { let result = 0; for (let i = 0; i < n; i += 1) { match (i) { case 0 { continue; } default { result += i; } } } return result; }",
+  "function keyed(m: mapping(bool => word)) returns (word) { match (m[true]) { case 31 { m[true] = 7; } default { m[false] = 9; } } return m[true]; }",
+  "function fail(n: word) returns (word) { let result = 29; let gap: word; match (n) { case 0 { result = 31; return gap; } default { result = 37; } } return result; }"
 ]
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
@@ -2446,13 +2446,13 @@ theorem continuation_or_fault
 end SizedResults
 
 private def content : String := String.intercalate "\n" [
-  "function mark(value: Word) returns (Word) { let copied = value; return copied; }",
-  "function fail(value: Word) returns (Word) { let gap: Word; return gap; }",
-  "function nested(raw: mapping(Word => mapping(Word => Word)), a: Word, b: Word) returns (mapping(Word => mapping(Word => Word))) { raw[mark(a)][mark(b)] += mark(5); return raw; }",
-  "function keyFault(raw: mapping(Word => mapping(Word => Word)), a: Word, b: Word) returns (Word) { raw[mark(a)][fail(b)] += mark(5); return 99; }",
-  "function rhsFault(raw: mapping(Word => mapping(Word => Word)), a: Word, b: Word) returns (Word) { raw[mark(a)][mark(b)] += fail(5); return 99; }",
-  "function afterWrite(raw: mapping(Word => mapping(Word => Word)), a: Word, b: Word) returns (Word) { raw[mark(a)][mark(b)] += mark(5); return fail(99); }",
-  "function unitResult(raw: mapping(Word => mapping(Word => Word)), a: Word, b: Word) { raw[mark(a)][mark(b)] = mark(5); }"
+  "function mark(value: word) returns (word) { let copied = value; return copied; }",
+  "function fail(value: word) returns (word) { let gap: word; return gap; }",
+  "function nested(raw: mapping(word => mapping(word => word)), a: word, b: word) returns (mapping(word => mapping(word => word))) { raw[mark(a)][mark(b)] += mark(5); return raw; }",
+  "function keyFault(raw: mapping(word => mapping(word => word)), a: word, b: word) returns (word) { raw[mark(a)][fail(b)] += mark(5); return 99; }",
+  "function rhsFault(raw: mapping(word => mapping(word => word)), a: word, b: word) returns (word) { raw[mark(a)][mark(b)] += fail(5); return 99; }",
+  "function afterWrite(raw: mapping(word => mapping(word => word)), a: word, b: word) returns (word) { raw[mark(a)][mark(b)] += mark(5); return fail(99); }",
+  "function unitResult(raw: mapping(word => mapping(word => word)), a: word, b: word) { raw[mark(a)][mark(b)] = mark(5); }"
 ]
 private def wordValue (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def present (n : Nat) : TypeSystem.Ty × Option SourceTypedRuntime.Value := (.word, some (wordValue n))
@@ -2700,13 +2700,13 @@ theorem fault_keeps_successful_prefix {reason : Dynamic.SemanticFault} {later : 
 end SourceOrder
 
 private def content : String := String.intercalate "\n" [
-  "function key(value: Word) returns (Word) { let saved = value * 10; return value; }",
-  "function bad(value: Word) returns (Word) { let saved = value * 10; let gap: Word; return gap; }",
-  "function single(raw: mapping(Word => Word), seed: Word) returns (mapping(Word => Word)) { raw[key(seed)] = key(seed + 2); return raw; }",
-  "function ordered(raw: mapping(Word => mapping(Word => Word)), seed: Word) returns (mapping(Word => mapping(Word => Word))) { raw[key(seed)][key(seed + 1)] = key(seed + 2); return raw; }",
-  "function repeated(raw: mapping(Word => mapping(Word => Word)), seed: Word) returns (mapping(Word => mapping(Word => Word))) { raw[key(seed)][key(seed)] = key(seed + 2); return raw; }",
-  "function firstFault(raw: mapping(Word => mapping(Word => Word)), seed: Word) returns (mapping(Word => mapping(Word => Word))) { raw[bad(seed)][key(seed + 1)] = key(seed + 2); return raw; }",
-  "function secondFault(raw: mapping(Word => mapping(Word => Word)), seed: Word) returns (mapping(Word => mapping(Word => Word))) { raw[key(seed)][bad(seed + 1)] = key(seed + 2); return raw; }"
+  "function key(value: word) returns (word) { let saved = value * 10; return value; }",
+  "function bad(value: word) returns (word) { let saved = value * 10; let gap: word; return gap; }",
+  "function single(raw: mapping(word => word), seed: word) returns (mapping(word => word)) { raw[key(seed)] = key(seed + 2); return raw; }",
+  "function ordered(raw: mapping(word => mapping(word => word)), seed: word) returns (mapping(word => mapping(word => word))) { raw[key(seed)][key(seed + 1)] = key(seed + 2); return raw; }",
+  "function repeated(raw: mapping(word => mapping(word => word)), seed: word) returns (mapping(word => mapping(word => word))) { raw[key(seed)][key(seed)] = key(seed + 2); return raw; }",
+  "function firstFault(raw: mapping(word => mapping(word => word)), seed: word) returns (mapping(word => mapping(word => word))) { raw[bad(seed)][key(seed + 1)] = key(seed + 2); return raw; }",
+  "function secondFault(raw: mapping(word => mapping(word => word)), seed: word) returns (mapping(word => mapping(word => word))) { raw[key(seed)][bad(seed + 1)] = key(seed + 2); return raw; }"
 ]
 private def word (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def flat (first : Nat) : SourceTypedRuntime.Value :=
@@ -2924,11 +2924,11 @@ theorem wrong_raw_body_owner_rejected {signature : ProgramFunctionSignature} {ge
 private def content : String := String.intercalate "\n" [
   "function choose<A, B>(first: A, second: B) returns (A) { return first; }",
   "function local<T>(value: T) returns (T) { let copied = value; return copied; }",
-  "function calc(value: Word) returns (Word) { let first = value + 1; let second = first + 2; return second; }",
-  "function wordRoot() returns (Word) { return choose(7, true); }",
-  "function boolRoot() returns (Bool) { let nine: Word = 9; return choose(false, nine); }",
-  "function localRoot() returns (Word) { return local(11); }",
-  "function calcRoot() returns (Word) { return calc(5); }"
+  "function calc(value: word) returns (word) { let first = value + 1; let second = first + 2; return second; }",
+  "function wordRoot() returns (word) { return choose(7, true); }",
+  "function boolRoot() returns (bool) { let nine: word = 9; return choose(false, nine); }",
+  "function localRoot() returns (word) { return local(11); }",
+  "function calcRoot() returns (word) { return calc(5); }"
 ]
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
@@ -3037,11 +3037,11 @@ theorem raw_stage_marker_matters :
 
 private def content : String := String.intercalate "\n" [
   "function choose<A, B>(first: A, second: B) returns (A) { return first; }",
-  "function mutable(value: Word) returns (Word) { let saved = value; saved = saved + 1; return saved; }",
-  "function identity(comptime value: Word) returns (Word) { return value; }",
+  "function mutable(value: word) returns (word) { let saved = value; saved = saved + 1; return saved; }",
+  "function identity(comptime value: word) returns (word) { return value; }",
   "function dec(comptime value: integer) returns (comptime<integer>) { return integerSub(value, 1); }",
-  "function caller() returns (Word) { return wordFromInteger(dec(10)); }",
-  "function normal(value: Word) returns (Word) { return mutable(value); }",
+  "function caller() returns (word) { return wordFromInteger(dec(10)); }",
+  "function normal(value: word) returns (word) { return mutable(value); }",
   "function empty() {}"
 ]
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
@@ -3230,10 +3230,10 @@ theorem unused_nominal_boundary (owner : Resolved.DeclarationId) (parameter : Ty
 private def content : String := String.intercalate "\n" [
   "function choose<A, B>(first: A, second: B) returns (A) { let saved = first; return saved; }",
   "function staged<T>(comptime value: T) returns (comptime<T>) { return value; }",
-  "function unused<T>() returns (Word) { let value: Word = 3; return value; }",
-  "function wordRoot() returns (Word) { return choose(9, false); }",
-  "function boolRoot() returns (Bool) { let eight: Word = 8; return choose(true, eight); }",
-  "function stagedRoot() returns (comptime<Word>) { return staged(5); }"
+  "function unused<T>() returns (word) { let value: word = 3; return value; }",
+  "function wordRoot() returns (word) { return choose(9, false); }",
+  "function boolRoot() returns (bool) { let eight: word = 8; return choose(true, eight); }",
+  "function stagedRoot() returns (comptime<word>) { return staged(5); }"
 ]
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
@@ -3387,23 +3387,23 @@ theorem indirect_calls_are_outside_admission (callee : ExpressionId) (arguments 
   simp [compositionForm]
 
 private def content : String := String.intercalate "\n" [
-  "enum Box { Box(Bool) }",
-  "function side(n: Word) returns (Word) { let saved = n; return saved; }",
-  "function truth(flag: Bool) returns (Bool) { return flag; }",
+  "enum Box { Box(bool) }",
+  "function side(n: word) returns (word) { let saved = n; return saved; }",
+  "function truth(flag: bool) returns (bool) { return flag; }",
   "function pair<A, B>(a: A, b: B) returns (A) { return a; }",
-  "function take(a: Word, b: Word) returns (Word) { return a - b; }",
-  "function fail() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
-  "function ordered() returns (Word) { return pair(side(7), truth(true)); }",
-  "function duplicate() returns (Word) { return take(side(7), side(7)); }",
+  "function take(a: word, b: word) returns (word) { return a - b; }",
+  "function fail() returns (word) { let written: word = 5; let gap: word; return gap; }",
+  "function ordered() returns (word) { return pair(side(7), truth(true)); }",
+  "function duplicate() returns (word) { return take(side(7), side(7)); }",
   "function grouped() returns (integer) { return ((integerSub(wordToInteger(side(7)), wordToInteger(side(9))))); }",
   "function choose() returns (integer) { return truth(true) ? integerAdd(wordToInteger(side(7)), wordToInteger(side(9))) : wordToInteger(fail()); }",
   "function boxed() returns (Box) { return Box(truth(integerEq(7, 7))); }",
-  "function paired() returns ((Bool, Bool)) { return (truth(integerEq(7, 7)), truth(integerLt(7, 7))); }",
-  "function indexed(m: mapping(Bool => Word)) returns (Word) { return m[truth(true)]; }",
-  "function unary() returns (Bool) { return !truth(false); }",
-  "function skip() returns (Bool) { return false && truth(integerEq(7, 7)); }",
-  "function firstFault() returns (Word) { return take(fail(), side(99)); }",
-  "function laterFault() returns (Word) { return take(side(7), fail()); }"
+  "function paired() returns ((bool, bool)) { return (truth(integerEq(7, 7)), truth(integerLt(7, 7))); }",
+  "function indexed(m: mapping(bool => word)) returns (word) { return m[truth(true)]; }",
+  "function unary() returns (bool) { return !truth(false); }",
+  "function skip() returns (bool) { return false && truth(integerEq(7, 7)); }",
+  "function firstFault() returns (word) { return take(fail(), side(99)); }",
+  "function laterFault() returns (word) { return take(side(7), fail()); }"
 ]
 private def w (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _

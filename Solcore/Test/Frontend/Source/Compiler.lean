@@ -153,35 +153,35 @@ open Solcore Solcore.Frontend Tests.SourceCompilerFeatureSupport
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function mutate(flag: Bool, first: Word, second: Word) returns (Word, Bool) {",
-    "  let value: Word; value = first; value = second; return (value, flag);",
+    "function mutate(flag: bool, first: word, second: word) returns (word, bool) {",
+    "  let value: word; value = first; value = second; return (value, flag);",
     "}",
     "function replace<T>(first: T, second: T) returns (T) {",
     "  let value: T = first; value = second; return value;",
     "}",
-    "function absent(input: Word) returns (Word) { let value: Word; return value; }",
-    "function early(flag: Bool, initial: Word, replacement: Word) returns (Word) {",
-    "  let value: Word = initial;",
-    "  { let inner: Word = replacement; if (flag) { return value; } value = inner; }",
+    "function absent(input: word) returns (word) { let value: word; return value; }",
+    "function early(flag: bool, initial: word, replacement: word) returns (word) {",
+    "  let value: word = initial;",
+    "  { let inner: word = replacement; if (flag) { return value; } value = inner; }",
     "  value = replacement; return value;",
     "}",
-    "function branchFailure(flag: Bool) returns (Word) {",
-    "  let absent: Word; return flag ? absent : absent;",
+    "function branchFailure(flag: bool) returns (word) {",
+    "  let absent: word; return flag ? absent : absent;",
     "}",
-    "function chooseFailure(flag: Bool, value: Word) returns (Word) {",
-    "  let absent: Word; return flag ? value : absent;",
+    "function chooseFailure(flag: bool, value: word) returns (word) {",
+    "  let absent: word; return flag ? value : absent;",
     "}",
-    "function arithmetic(initial: Word) returns (Word) {",
-    "  let value: Word = initial + 2; value = value * 3; return value - 1;",
+    "function arithmetic(initial: word) returns (word) {",
+    "  let value: word = initial + 2; value = value * 3; return value - 1;",
     "}",
-    "function andFailure(flag: Bool) returns (Bool) {",
-    "  let absent: Bool; return flag && absent;",
+    "function andFailure(flag: bool) returns (bool) {",
+    "  let absent: bool; return flag && absent;",
     "}",
-    "function orFailure(flag: Bool) returns (Bool) {",
-    "  let absent: Bool; return flag || absent;",
+    "function orFailure(flag: bool) returns (bool) {",
+    "  let absent: bool; return flag || absent;",
     "}",
-    "function direct(input: Word) returns (Word) { return input; }",
-    "function recurse(value: Word) returns (Word) {",
+    "function direct(input: word) returns (word) { return input; }",
+    "function recurse(value: word) returns (word) {",
     "  return value == 0 ? 5 : recurse(value - 1);",
     "}"
   ] }]
@@ -302,7 +302,7 @@ private def testFallthroughChecking : IO Unit := do
   let incomplete : Workspace.RawWorkspace := {
     entry := "main.solc", externalLibraries := []
     mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++
-      "function incomplete(flag: Bool, input: Word) returns (Word) { if (flag) { return input; } }" }]
+      "function incomplete(flag: bool, input: word) returns (word) { if (flag) { return input; } }" }]
   }
   match checkProgram incomplete with
   | .error [.inference failure] =>
@@ -342,20 +342,20 @@ open Solcore Solcore.Frontend Tests.SourceCompilerFeatureSupport
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Tree { Leaf(Word), Pair(Tree, Tree) }",
-    "enum Command { Create(Word), Invoke(function(Word) returns (Word), Word) }",
-    "enum Reply { Made(function(Word) returns (Word)), Result(Word) }",
-    "function inc(value: Word) returns (Word) { return value + 1; }",
-    "function main(value: Word) returns (Tree) { return .Leaf(inc(value)); }",
+    "enum Tree { Leaf(word), Pair(Tree, Tree) }",
+    "enum Command { Create(word), Invoke(function(word) returns (word), word) }",
+    "enum Reply { Made(function(word) returns (word)), Result(word) }",
+    "function inc(value: word) returns (word) { return value + 1; }",
+    "function main(value: word) returns (Tree) { return .Leaf(inc(value)); }",
     "function echo(value: Tree) returns (Tree) { return value; }",
-    "function recurse(count: Word, value: Tree) returns (Tree) { return count == 0 ? value : recurse(count - 1, Tree.Pair(value, value)); }",
-    "function mappingValue(table: mapping(Word => Word)) returns (mapping(Word => Word)) { table[7] += 3; return table; }",
-    "function missing(table: mapping(Word => Tree), key: Word) returns (Tree) { return table[key]; }",
+    "function recurse(count: word, value: Tree) returns (Tree) { return count == 0 ? value : recurse(count - 1, Tree.Pair(value, value)); }",
+    "function mappingValue(table: mapping(word => word)) returns (mapping(word => word)) { table[7] += 3; return table; }",
+    "function missing(table: mapping(word => Tree), key: word) returns (Tree) { return table[key]; }",
     "function absent() returns (Tree) { let value: Tree; return value; }",
     "function proxyValue() returns (@Tree) { return @Tree; }",
-    "function makeAdder(value: Word) returns (function(Word) returns (Word)) { return lam(delta: Word) -> Word { value = value + delta; return inc(value); }; }",
+    "function makeAdder(value: word) returns (function(word) returns (word)) { return lam(delta: word) -> word { value = value + delta; return inc(value); }; }",
     "function step(command: Command) returns (Reply) { match (command) {",
-    " case .Create(value) { return .Made(lam(delta: Word) -> Word { value = value + delta; return inc(value); }); }",
+    " case .Create(value) { return .Made(lam(delta: word) -> word { value = value + delta; return inc(value); }); }",
     " case .Invoke(f, delta) { return .Result(f(delta)); } } }"
   ] }] }
 
@@ -490,20 +490,20 @@ open Solcore Solcore.Frontend Tests.SourceCompilerFeatureSupport
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function inc(value: Word) returns (Word) { return value + 1; }",
-    "function consume(f: function(Word) returns (Word), value: Word) returns (Word) { return f(value); }",
-    "function named(value: Word) returns (Word) { return consume(inc, value); }",
-    "function makeAdder(value: Word) returns (function(Word) returns (Word)) {",
-    " return lam(delta: Word) -> Word { value = value + delta; return value; }; }",
-    "function returned(value: Word) returns (Word, Word) {",
-    " let f: function(Word) returns (Word) = makeAdder(value); return (f(2), f(3)); }",
-    "function shared(value: Word) returns (Word, Word) {",
-    " let f: function(Word) returns (Word) = lam(delta: Word) -> Word { value = value + delta; return value; };",
-    " let g: function(Word) returns (Word) = lam(delta: Word) -> Word { value = value + delta; return value; }; return (f(2), g(3)); }",
-    "function selfCell(value: Word) returns (Word) {",
-    " let loop: function(Word) returns (Word);",
-    " loop = lam(n: Word) -> Word { return n == 0 ? value : loop(n - 1); }; return loop(3); }",
-    "function failure() returns (Word) { let f: function(Word) returns (Word); return f(0); }"
+    "function inc(value: word) returns (word) { return value + 1; }",
+    "function consume(f: function(word) returns (word), value: word) returns (word) { return f(value); }",
+    "function named(value: word) returns (word) { return consume(inc, value); }",
+    "function makeAdder(value: word) returns (function(word) returns (word)) {",
+    " return lam(delta: word) -> word { value = value + delta; return value; }; }",
+    "function returned(value: word) returns (word, word) {",
+    " let f: function(word) returns (word) = makeAdder(value); return (f(2), f(3)); }",
+    "function shared(value: word) returns (word, word) {",
+    " let f: function(word) returns (word) = lam(delta: word) -> word { value = value + delta; return value; };",
+    " let g: function(word) returns (word) = lam(delta: word) -> word { value = value + delta; return value; }; return (f(2), g(3)); }",
+    "function selfCell(value: word) returns (word) {",
+    " let loop: function(word) returns (word);",
+    " loop = lam(n: word) -> word { return n == 0 ? value : loop(n - 1); }; return loop(3); }",
+    "function failure() returns (word) { let f: function(word) returns (word); return f(0); }"
   ] }]
 }
 
@@ -597,13 +597,13 @@ private def operations : List (String × String × Bool) := [
 private def workspaceText : String := String.intercalate "\n"
     ((operations.flatMap fun (name, operator, comparison) => [0, 5].map fun (right : Nat) =>
       "function op" ++ name ++ toString right ++ "(" ++ (if comparison then "comptime " else "") ++
-        "left: integer) returns (" ++ (if comparison then "Bool" else "integer") ++
+        "left: integer) returns (" ++ (if comparison then "bool" else "integer") ++
         ") { return left " ++ operator ++ " " ++ toString right ++ "; }") ++ [
       "function negate() returns (integer) { return ~5; }",
       "function callBuiltin(left: integer, right: integer) returns (integer) { return integerAdd(left, right); }",
       "function builtinValue(left: integer, right: integer) returns (integer) { let f: function(integer, integer) returns (integer) = integerSub; return f(left, right); }",
-      "function intoWord(comptime left: integer) returns (Word) { return wordFromInteger(left); }",
-      "function intoInteger(left: Word) returns (integer) { return wordToInteger(left); }",
+      "function intoWord(comptime left: integer) returns (word) { return wordFromInteger(left); }",
+      "function intoInteger(left: word) returns (integer) { return wordToInteger(left); }",
       "function nativeLiteral() returns (integer) { return 1234567890123456789012345678901234567890; }",
       "function order(value: integer) returns (integer) {",
       " let step: function(integer) returns (integer) = lam(delta: integer) -> integer { value = integerAdd(value, delta); return value; };",
@@ -681,28 +681,28 @@ open Solcore Solcore.Frontend Tests.SourceCompilerFeatureSupport
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function whileCount(start: Word) returns (Word, Word) {",
-    "  let remaining: Word = start; let count: Word = 0;",
+    "function whileCount(start: word) returns (word, word) {",
+    "  let remaining: word = start; let count: word = 0;",
     "  while (remaining > 0) { remaining = remaining - 1; count = count + 1; }",
     "  return (remaining, count);",
     "}",
-    "function forOrder(limit: Word) returns (Word, Word) {",
-    "  let count: Word = 0;",
-    "  for (let i: Word = 0; limit > i; i = i + 1) {",
+    "function forOrder(limit: word) returns (word, word) {",
+    "  let count: word = 0;",
+    "  for (let i: word = 0; limit > i; i = i + 1) {",
     "    count = count + 1; if (i == 1) { continue; } count = count + 10;",
     "  } return (count, limit);",
     "}",
-    "function forBreak(limit: Word) returns (Word) {",
-    "  let i: Word = 17; for (let i: Word = 0; limit > i; i = i + 1) { break; } return i;",
+    "function forBreak(limit: word) returns (word) {",
+    "  let i: word = 17; for (let i: word = 0; limit > i; i = i + 1) { break; } return i;",
     "}",
-    "function nested() returns (Word) {",
-    "  let count: Word = 0; for (let i: Word = 0; 2 > i; i = i + 1) {",
-    "    for (let j: Word = 0; 2 > j; j = j + 1) { count = count + 1; }",
+    "function nested() returns (word) {",
+    "  let count: word = 0; for (let i: word = 0; 2 > i; i = i + 1) {",
+    "    for (let j: word = 0; 2 > j; j = j + 1) { count = count + 1; }",
     "  } return count;",
     "}",
-    "function absentCondition() returns (Word) { let missing: Bool; while (missing) { return 17; } return 0; }",
-    "function absentPost() returns (Word) { let missing: Word; for (let i: Word = 0; true; i = missing) { continue; } return 0; }",
-    "function absentInitializer() returns (Word) { let missing: Word; for (let i: Word = missing; true; i = i + 1) { break; } return 0; }",
+    "function absentCondition() returns (word) { let missing: bool; while (missing) { return 17; } return 0; }",
+    "function absentPost() returns (word) { let missing: word; for (let i: word = 0; true; i = missing) { continue; } return 0; }",
+    "function absentInitializer() returns (word) { let missing: word; for (let i: word = missing; true; i = i + 1) { break; } return 0; }",
     "function spin() { while (true) { continue; } }"
   ] }]
 }
@@ -929,13 +929,13 @@ private def workspace : Workspace.RawWorkspace := {
       path := "main.solc"
       content := "pragma solcore;\n" ++ String.intercalate "\n" [
         "import {Ticket, WordTicket} from provider;",
-        "function direct(value: Word) returns (Word) { return value * 2; }",
-        "function recurse(value: Word) returns (Word) { return value == 0 ? 31 : recurse(value - 1); }",
-        "function visibleAlias(value: (Word, Word)) returns (Word) {",
+        "function direct(value: word) returns (word) { return value * 2; }",
+        "function recurse(value: word) returns (word) { return value == 0 ? 31 : recurse(value - 1); }",
+        "function visibleAlias(value: (word, word)) returns (word) {",
         "  let ticket: WordTicket = .Open(7);",
         "  match (ticket) {",
         "    case .Open(inner) {",
-        "      let result: Word = inner;",
+        "      let result: word = inner;",
         "      result += 5;",
         "      return result;",
         "    }",
@@ -944,60 +944,60 @@ private def workspace : Workspace.RawWorkspace := {
         "}",
         "function globalIdentity<T>(value: T) returns (T) { return value; }",
         "trait Eq<T> {}",
-        "impl Eq<Word> {}",
+        "impl Eq<word> {}",
         "trait Coerce<From, To> {",
         "  function coerce(value: From) returns (To);",
         "}",
-        "function coercionSeed(value: Bool) returns (Word) {",
+        "function coercionSeed(value: bool) returns (word) {",
         "  return value ? 40 : 6;",
         "}",
-        "impl Coerce<Bool, Word> {",
-        "  function coerce(value: Bool) returns (Word) {",
-        "    let scratch: mapping(Word => Word);",
+        "impl Coerce<bool, word> {",
+        "  function coerce(value: bool) returns (word) {",
+        "    let scratch: mapping(word => word);",
         "    scratch[0] = coercionSeed(value);",
         "    scratch[0] += 2;",
         "    return scratch[0];",
         "  }",
         "}",
-        "type WordFunction = function(Word) returns (Word);",
-        "function returnedIdentity(value: Word) returns (Word) { return value; }",
-        "impl Coerce<Word, WordFunction> {",
-        "  function coerce(value: Word) returns (WordFunction) {",
+        "type WordFunction = function(word) returns (word);",
+        "function returnedIdentity(value: word) returns (word) { return value; }",
+        "impl Coerce<word, WordFunction> {",
+        "  function coerce(value: word) returns (WordFunction) {",
         "    return returnedIdentity;",
         "  }",
         "}",
-        "function functionFromCoercion(value: Word) returns (WordFunction) {",
+        "function functionFromCoercion(value: word) returns (WordFunction) {",
         "  return value;",
         "}",
         "function keepAs<T, U>(guard: T, value: U) returns (U) where T: Eq { return value; }",
-        "function localProof(flag: Bool) returns (Word, Bool) {",
-        "  let f = lam(value) { let one: Word = 1; return keepAs(one, value); };",
+        "function localProof(flag: bool) returns (word, bool) {",
+        "  let f = lam(value) { let one: word = 1; return keepAs(one, value); };",
         "  return (f(2), f(flag));",
         "}",
         "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
         "function relay<T>(value: T) returns (T) where T: Eq { return keep(value); }",
-        "function typedEvidence(value: Word) returns (Word) {",
-        "  let table: mapping(Word => Word);",
+        "function typedEvidence(value: word) returns (word) {",
+        "  let table: mapping(word => word);",
         "  table[0] = relay(value);",
         "  return table[0];",
         "}",
-        "function typedCoercion(value: Bool) returns (Word) {",
-        "  let table: mapping(Word => Word);",
+        "function typedCoercion(value: bool) returns (word) {",
+        "  let table: mapping(word => word);",
         "  table[0] = value;",
         "  return table[0];",
         "}",
-        "function polymorphicLocal(flag: Bool) returns (Word, Bool) {",
+        "function polymorphicLocal(flag: bool) returns (word, bool) {",
         "  let id = lam(value) { return globalIdentity(value); };",
         "  return (id(11), id(flag));",
         "}",
-        "function nestedPolymorphicLocal(flag: Bool) returns (Word, Bool) {",
+        "function nestedPolymorphicLocal(flag: bool) returns (word, bool) {",
         "  let outer = lam(value) {",
         "    let inner = lam(innerValue) { return globalIdentity(innerValue); };",
         "    return inner(value);",
         "  };",
         "  return (outer(13), outer(flag));",
         "}",
-        "function recursiveContextPolymorphicLocal(flag: Bool) returns (Word, Bool) {",
+        "function recursiveContextPolymorphicLocal(flag: bool) returns (word, bool) {",
         "  let outer = lam(value) {",
         "    let middle = lam(item) {",
         "      let inner = lam(innerValue) { return globalIdentity(innerValue); };",
@@ -1013,7 +1013,7 @@ private def workspace : Workspace.RawWorkspace := {
       path := "provider.solc"
       content := "pragma solcore;\n" ++ String.intercalate "\n" [
         "enum Ticket<T> { Open(T), Closed }",
-        "type WordTicket = Ticket<Word>;",
+        "type WordTicket = Ticket<word>;",
         "export {Ticket(Open), WordTicket};"
       ]
     },
@@ -1022,41 +1022,41 @@ private def workspace : Workspace.RawWorkspace := {
       content := "pragma solcore;\n" ++ String.intercalate "\n" [
         "trait Coerce<From, To> {}",
         "enum Box { Only }",
-        "impl Coerce<Word, Box> {}",
+        "impl Coerce<word, Box> {}",
         "function accept(value: Box) returns (Box) { return value; }",
-        "function blockedHelper(value: Word) returns (Box) { return accept(value); }",
-        "function blocked(value: Word) returns (Box) { return blockedHelper(value); }",
+        "function blockedHelper(value: word) returns (Box) { return accept(value); }",
+        "function blocked(value: word) returns (Box) { return blockedHelper(value); }",
         "trait Marker<T> {}",
-        "impl Marker<Word> {}",
-        "function constrained(value: Word) returns (Word) where Word: Marker {",
-        "  let table: mapping(Word => Word);",
+        "impl Marker<word> {}",
+        "function constrained(value: word) returns (word) where word: Marker {",
+        "  let table: mapping(word => word);",
         "  table[0] = value;",
         "  return table[0];",
         "}",
-        "function staged(comptime value: Word) returns (Word) { return value; }",
-        "type StagedWord = comptime<Word>;",
-        "type PairWithStage = (Word, StagedWord);",
-        "type DeepStage = (StagedWord, (Word, StagedWord));",
-        "function stagedType(value: StagedWord) returns (Word) { return 1; }",
+        "function staged(comptime value: word) returns (word) { return value; }",
+        "type StagedWord = comptime<word>;",
+        "type PairWithStage = (word, StagedWord);",
+        "type DeepStage = (StagedWord, (word, StagedWord));",
+        "function stagedType(value: StagedWord) returns (word) { return 1; }",
         "function integerResult() returns (integer) { return 1; }",
-        "function nestedStaged(value: PairWithStage) returns (Word) { return 1; }",
-        "function dependent(flag: Bool) returns (Word) { return wordFromInteger(flag ? 1 : 2); }",
+        "function nestedStaged(value: PairWithStage) returns (word) { return 1; }",
+        "function dependent(flag: bool) returns (word) { return wordFromInteger(flag ? 1 : 2); }",
         "function nestedComptime(value: DeepStage) returns (DeepStage) { return value; }",
         "function integerBitAnd() returns (integer) { return 5 & 3; }",
         "function integerBitXor() returns (integer) { return 5 ^ 3; }",
         "function integerBitOr() returns (integer) { return 5 | 3; }",
         "function integerBitNot() returns (integer) { return ~5; }",
-        "function markedEffects(comptime seed: Word) returns (comptime<Word>) {",
-        "  let total: Word = seed;",
-        "  let table: mapping(Word => Word);",
-        "  let bump = lam(comptime delta: Word) -> Word {",
+        "function markedEffects(comptime seed: word) returns (comptime<word>) {",
+        "  let total: word = seed;",
+        "  let table: mapping(word => word);",
+        "  let bump = lam(comptime delta: word) -> word {",
         "    total += delta;",
         "    table[0] = total;",
         "    return table[0];",
         "  };",
         "  return bump(3);",
         "}",
-        "function markedEffectsEntry() returns (Word) {",
+        "function markedEffectsEntry() returns (word) {",
         "  return markedEffects(9);",
         "}"
       ]
@@ -1074,20 +1074,20 @@ private def orchestrationWorkspace : Workspace.RawWorkspace := {
       path := "api.solc"
       content := "pragma solcore;\n" ++ String.intercalate "\n" [
         "import {twice as doubled, recursive} from provider;",
-        "function main() returns (Word) { return 17; }",
-        "function local(value: Word) returns (Word) { return value + 1; }",
-        "function hidden(value: Word) returns (Word) { return value; }",
+        "function main() returns (word) { return 17; }",
+        "function local(value: word) returns (word) { return value + 1; }",
+        "function hidden(value: word) returns (word) { return value; }",
         "export {doubled, local, recursive};"
       ]
     },
     {
       path := "provider.solc"
       content := "pragma solcore;\n" ++ String.intercalate "\n" [
-        "function twice(value: Word) returns (Word) { return value * 2; }",
-        "function recursive(value: Word) returns (Word) {",
+        "function twice(value: word) returns (word) { return value * 2; }",
+        "function recursive(value: word) returns (word) {",
         "  return value == 0 ? 31 : recursive(value - 1);",
         "}",
-        "function providerOnly(value: Word) returns (Word) { return value; }",
+        "function providerOnly(value: word) returns (word) { return value; }",
         "export {twice, recursive, providerOnly};"
       ]
     }
@@ -1253,7 +1253,7 @@ private def testCompilationErrors (checked : CheckedProgram) : IO Unit := do
   | _ => throw (IO.userError "dependent staged Integer escaped plan validation")
   let invalid : Workspace.RawWorkspace := {
     entry := "broken.solc", externalLibraries := [],
-    mainSources := [{path := "broken.solc", content := "pragma solcore;\n" ++ "function broken(value: Word returns (Word) { return value; }"}] }
+    mainSources := [{path := "broken.solc", content := "pragma solcore;\n" ++ "function broken(value: Word returns (word) { return value; }"}] }
   match compile invalid [SourceCoreCompiler.Seed.named (← moduleId "broken.solc") "broken"] compilerOptions with
   | .error (.compilation (.checking (_ :: _))) => pure ()
   | _ => throw (IO.userError "malformed source escaped checking precedence")
@@ -1327,7 +1327,7 @@ private def testProgramOrchestration : IO Unit := do
     entry := "missing.solc"
     mainSources := [{
       path := "missing.solc"
-      content := "pragma solcore;\n" ++ "function helper() returns (Word) { return 0; }"
+      content := "pragma solcore;\n" ++ "function helper() returns (word) { return 0; }"
     }]
     externalLibraries := []
   }
@@ -1345,7 +1345,7 @@ private def testProgramOrchestration : IO Unit := do
     mainSources := [{
       path := "bad.solc"
       content := "pragma solcore;\n" ++ String.intercalate "\n" [
-        "function bad(value: Bool) returns (Word) { return value ? 1 : 0; }",
+        "function bad(value: bool) returns (word) { return value ? 1 : 0; }",
         "export {bad};"
       ]
     }]
@@ -1364,8 +1364,8 @@ private def testProgramOrchestration : IO Unit := do
     mainSources := [{
       path := "duplicate.solc"
       content := "pragma solcore;\n" ++ String.intercalate "\n" [
-        "function same(value: Word) returns (Word) { return value; }",
-        "function same(value: Word) returns (Word) { return value + 1; }",
+        "function same(value: word) returns (word) { return value; }",
+        "function same(value: word) returns (word) { return value + 1; }",
         "export {same};"
       ]
     }]
@@ -1390,8 +1390,8 @@ private def testProgramOrchestration : IO Unit := do
     mainSources := [{
       path := "collision.solc"
       content := "pragma solcore;\n" ++ String.intercalate "\n" [
-        "function f116643(value: Word) returns (Word) { return value; }",
-        "function f38491(value: Word) returns (Word) { return value; }",
+        "function f116643(value: word) returns (word) { return value; }",
+        "function f38491(value: word) returns (word) { return value; }",
         "export {f38491, f116643};"
       ]
     }]
@@ -1478,14 +1478,14 @@ private def functionType : TypeSystem.Ty := .function .word .word
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Holder { Put(function(Word) returns (Word)) }",
-    "function inc(value: Word) returns (Word) { return value + 1; }",
-    "function makeAdder(value: Word) returns (function(Word) returns (Word)) {",
-    " return lam(delta: Word) -> Word { value = value + delta; return inc(value); }; }",
-    "function use(f: function(Word) returns (Word), delta: Word) returns (Word) { return f(delta); }",
-    "function mirror(f: function(Word) returns (Word)) returns (function(Word) returns (Word)) { return f; }",
-    "function box(f: function(Word) returns (Word)) returns (Holder) { return .Put(f); }",
-    "function unbox(value: Holder) returns (function(Word) returns (Word)) { match (value) { case .Put(f) { return f; } } }",
+    "enum Holder { Put(function(word) returns (word)) }",
+    "function inc(value: word) returns (word) { return value + 1; }",
+    "function makeAdder(value: word) returns (function(word) returns (word)) {",
+    " return lam(delta: word) -> word { value = value + delta; return inc(value); }; }",
+    "function use(f: function(word) returns (word), delta: word) returns (word) { return f(delta); }",
+    "function mirror(f: function(word) returns (word)) returns (function(word) returns (word)) { return f; }",
+    "function box(f: function(word) returns (word)) returns (Holder) { return .Put(f); }",
+    "function unbox(value: Holder) returns (function(word) returns (word)) { match (value) { case .Put(f) { return f; } } }",
     "function keep<T>(value: T) returns (T) { return value; }"
   ] }] }
 
@@ -1621,7 +1621,7 @@ def run : IO Unit := do
   | .error {code := .missingEntry key, ..} => assertTrue (key == maker.key) "missing cached entry key changed"
   | _ => throw (IO.userError "empty artifact ran an uncompiled root")
   let invalid : Workspace.RawWorkspace := { workspace with
-    mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ "function broken() returns (Word) { return absent; }" }] }
+    mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ "function broken() returns (word) { return absent; }" }] }
   match compile invalid [] options with
   | .error (.compilation (.checking _)) => pure ()
   | _ => throw (IO.userError "raw facade bypassed source checking for an empty root list")
@@ -1651,19 +1651,19 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
-    "function proxyEcho(value: @Word) returns (@Word) { return value; }",
-    "function proxyLookup(table: mapping(@Word => Word)) returns (Word) { return table[@Word]; }",
-    "function proxyMissing(table: mapping(Word => @Word)) returns (@Word) { return table[9]; }",
-    "function mappingEcho(value: mapping(Word => Word)) returns (mapping(Word => Word)) { return value; }",
-    "function boxEcho(value: Box<Word>) returns (Box<Word>) { return value; }",
-    "function boxMatch(value: Box<Word>) returns (Word) { match (value) { case .Box(inner) { return inner; } default { return 99; } } }",
-    "function scalar(value: Word) returns (Word) { return value; }",
-    "function returnClosure() returns (function() returns (Word)) { let captured: Word = 7; return lam() -> Word { return captured; }; }",
-    "function unusedPoly(captured: Word) returns (Word) { let f = lam(value) { return (value, captured); }; return captured; }",
-    "function apply(f: function(Word) returns (Word), value: Word) returns (Word) { let retained: function(Word) returns (Word) = scalar; return f(value); }",
-    "function applyUnselected(f: function(Word) returns (Word), value: Word) returns (Word) { return f(value); }",
-    "function invokeUnit(f: function() returns (Word)) returns (Word) { return f(); }",
-    "function applyInteger(f: function(Word) returns (integer), value: Word) returns (integer) { return f(value); }"
+    "function proxyEcho(value: @word) returns (@word) { return value; }",
+    "function proxyLookup(table: mapping(@word => word)) returns (word) { return table[@word]; }",
+    "function proxyMissing(table: mapping(word => @word)) returns (@word) { return table[9]; }",
+    "function mappingEcho(value: mapping(word => word)) returns (mapping(word => word)) { return value; }",
+    "function boxEcho(value: Box<word>) returns (Box<word>) { return value; }",
+    "function boxMatch(value: Box<word>) returns (word) { match (value) { case .Box(inner) { return inner; } default { return 99; } } }",
+    "function scalar(value: word) returns (word) { return value; }",
+    "function returnClosure() returns (function() returns (word)) { let captured: word = 7; return lam() -> word { return captured; }; }",
+    "function unusedPoly(captured: word) returns (word) { let f = lam(value) { return (value, captured); }; return captured; }",
+    "function apply(f: function(word) returns (word), value: word) returns (word) { let retained: function(word) returns (word) = scalar; return f(value); }",
+    "function applyUnselected(f: function(word) returns (word), value: word) returns (word) { return f(value); }",
+    "function invokeUnit(f: function() returns (word)) returns (word) { return f(); }",
+    "function applyInteger(f: function(word) returns (integer), value: word) returns (integer) { return f(value); }"
   ] }] }
 
 private def compile (program : CheckedProgram) (name : String) : IO SourceCompilerFeatureSupport.Entry :=
@@ -1848,13 +1848,13 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function scalar(value: Word) returns (Word) { return value; }",
-    "function mappingEcho(value: mapping(Word => Word)) returns (mapping(Word => Word)) { return value; }",
-    "function apply(f: function(Word) returns (Word), value: Word) returns (Word) { let retained: function(Word) returns (Word) = scalar; return f(value); }",
-    "function integerApply(f: function(Word) returns (integer), value: Word) returns (integer) { return f(value); }",
-    "function capture(start: Word) returns (Word) { let value = start; let f = lam(step: Word) { value += step; return value; }; f(3); return f(4); }",
-    "function failAfterWrite() returns (Word) { let value: Word = 1; let fail = lam() -> Word { value += 2; let missing: Word; return missing; }; return fail(); }",
-    "function spin() returns (Word) { return spin(); }"
+    "function scalar(value: word) returns (word) { return value; }",
+    "function mappingEcho(value: mapping(word => word)) returns (mapping(word => word)) { return value; }",
+    "function apply(f: function(word) returns (word), value: word) returns (word) { let retained: function(word) returns (word) = scalar; return f(value); }",
+    "function integerApply(f: function(word) returns (integer), value: word) returns (integer) { return f(value); }",
+    "function capture(start: word) returns (word) { let value = start; let f = lam(step: word) { value += step; return value; }; f(3); return f(4); }",
+    "function failAfterWrite() returns (word) { let value: word = 1; let fail = lam() -> word { value += 2; let missing: word; return missing; }; return fail(); }",
+    "function spin() returns (word) { return spin(); }"
   ] }] }
 
 private def compile (program : CheckedProgram) (name : String) : IO SourceCompilerFeatureSupport.Entry :=
@@ -2026,18 +2026,18 @@ private def expectBodyError (label : String)
 private def testLocalAndImportedVisibility : IO Unit := do
   expectAccepted "local defining module" "local.solc" [
     ("local.solc", String.intercalate "\n" [
-      "enum Box { Wrap(Word) }",
+      "enum Box { Wrap(word) }",
       "export {Box};",
-      "function local(value: Word) returns (Box) { return Box.Wrap(value); }"
+      "function local(value: word) returns (Box) { return Box.Wrap(value); }"
     ])
   ]
   let opaqueProvider := String.intercalate "\n" [
-    "enum Box { Empty, Wrap(Word) }",
+    "enum Box { Empty, Wrap(word) }",
     "export {Box};"
   ]
   let opaqueConsumer := String.intercalate "\n" [
     "import provider;",
-    "function bad(value: Word) returns (provider.Box) {",
+    "function bad(value: word) returns (provider.Box) {",
     "  return provider.Box.Wrap(value);",
     "}"
   ]
@@ -2045,12 +2045,12 @@ private def testLocalAndImportedVisibility : IO Unit := do
     [("provider.solc", opaqueProvider), ("consumer.solc", opaqueConsumer)]
     ["provider", "Box"] "Wrap"
   let visibleProvider := String.intercalate "\n" [
-    "enum Box { Empty, Wrap(Word) }",
+    "enum Box { Empty, Wrap(word) }",
     "export {Box(Wrap)};"
   ]
   let visibleConsumer := String.intercalate "\n" [
     "import provider;",
-    "function good(value: Word) returns (provider.Box) {",
+    "function good(value: word) returns (provider.Box) {",
     "  return provider.Box.Wrap(value);",
     "}"
   ]
@@ -2058,7 +2058,7 @@ private def testLocalAndImportedVisibility : IO Unit := do
     [("provider.solc", visibleProvider), ("consumer.solc", visibleConsumer)]
   let selectedConsumer := String.intercalate "\n" [
     "import {Box} from provider;",
-    "function good(value: Word) returns (Box) { return Box.Wrap(value); }"
+    "function good(value: word) returns (Box) { return Box.Wrap(value); }"
   ]
   expectAccepted "unqualified selected type import" "selected.solc"
     [("provider.solc", visibleProvider), ("selected.solc", selectedConsumer)]
@@ -2069,12 +2069,12 @@ private def testLocalAndImportedVisibility : IO Unit := do
 
 private def testSubsetAndContextualVisibility : IO Unit := do
   let provider := String.intercalate "\n" [
-    "enum Choice { Shown(Word), Hidden(Word) }",
+    "enum Choice { Shown(word), Hidden(word) }",
     "export {Choice(Shown)};"
   ]
   let hidden := String.intercalate "\n" [
     "import provider;",
-    "function bad(value: Word) returns (provider.Choice) {",
+    "function bad(value: word) returns (provider.Choice) {",
     "  return provider.Choice.Hidden(value);",
     "}"
   ]
@@ -2083,7 +2083,7 @@ private def testSubsetAndContextualVisibility : IO Unit := do
     ["provider", "Choice"] "Hidden"
   let contextual := String.intercalate "\n" [
     "import provider;",
-    "function bad(value: Word) returns (provider.Choice) {",
+    "function bad(value: word) returns (provider.Choice) {",
     "  return .Hidden(value);",
     "}"
   ]
@@ -2092,12 +2092,12 @@ private def testSubsetAndContextualVisibility : IO Unit := do
 
 private def testReExportVisibility : IO Unit := do
   let provider := String.intercalate "\n" [
-    "enum Box { Wrap(Word) }",
+    "enum Box { Wrap(word) }",
     "export {Box(*)};"
   ]
   let consumer := String.intercalate "\n" [
     "import facade;",
-    "function use(value: Word) returns (facade.Box) {",
+    "function use(value: word) returns (facade.Box) {",
     "  return facade.Box.Wrap(value);",
     "}"
   ]
@@ -2116,15 +2116,15 @@ private def testAliasConstructorBoundary : IO Unit := do
   expectAccepted "contextual constructor through transparent alias" "main.solc" [
     ("main.solc", String.intercalate "\n" [
       "enum Box<T> { Wrap(T) }",
-      "type WordBox = Box<Word>;",
-      "function good(value: Word) returns (WordBox) { return .Wrap(value); }"
+      "type WordBox = Box<word>;",
+      "function good(value: word) returns (WordBox) { return .Wrap(value); }"
     ])
   ]
   let qualifiedAlias := workspace "main.solc" [
     ("main.solc", String.intercalate "\n" [
       "enum Box<T> { Wrap(T) }",
-      "type WordBox = Box<Word>;",
-      "function bad(value: Word) returns (WordBox) {",
+      "type WordBox = Box<word>;",
+      "function bad(value: word) returns (WordBox) {",
       "  return WordBox.Wrap(value);",
       "}"
     ])
@@ -2136,25 +2136,25 @@ private def testAliasConstructorBoundary : IO Unit := do
 
   let provider := String.intercalate "\n" [
     "enum Box<T> { Wrap(T), Hidden(T) }",
-    "type WordBox = Box<Word>;",
+    "type WordBox = Box<word>;",
     "export {Box(Wrap), WordBox};"
   ]
   let imported := String.intercalate "\n" [
     "import {Box, WordBox} from provider;",
-    "function good(value: Word) returns (WordBox) { return .Wrap(value); }"
+    "function good(value: word) returns (WordBox) { return .Wrap(value); }"
   ]
   expectAccepted "imported contextual constructor through transparent alias"
     "imported.solc" [("provider.solc", provider), ("imported.solc", imported)]
   let hidden := String.intercalate "\n" [
     "import {Box, WordBox} from provider;",
-    "function bad(value: Word) returns (WordBox) { return .Hidden(value); }"
+    "function bad(value: word) returns (WordBox) { return .Hidden(value); }"
   ]
   expectUnknownConstructor "hidden constructor through imported alias"
     "hidden.solc" [("provider.solc", provider), ("hidden.solc", hidden)]
     [] "Hidden"
   let aliasOnly := String.intercalate "\n" [
     "import {WordBox} from provider;",
-    "function bad(value: Word) returns (WordBox) { return .Wrap(value); }"
+    "function bad(value: word) returns (WordBox) { return .Wrap(value); }"
   ]
   expectUnknownConstructor "alias import without constructor visibility"
     "alias_only.solc"
@@ -2162,9 +2162,9 @@ private def testAliasConstructorBoundary : IO Unit := do
 
 private def testCanonicalPathDoesNotBypassImports : IO Unit := do
   let provider :=
-    "enum Box { Wrap(Word) } export {Box(*)};"
+    "enum Box { Wrap(word) } export {Box(*)};"
   let consumer := String.intercalate "\n" [
-    "function bad(value: Word) returns (Word) {",
+    "function bad(value: word) returns (word) {",
     "  return provider.Box.Wrap(value);",
     "}"
   ]
@@ -2272,7 +2272,7 @@ private def rawWorkspace (entry : String)
 
 private def basicSource : String := String.intercalate "\n" [
   "function identity<T>(value: T) returns (T) { return value; }",
-  "function entry(value: Word, flag: Bool) returns (Word) {",
+  "function entry(value: word, flag: bool) returns (word) {",
   "  return flag ? identity(value) : 7;",
   "}"
 ]
@@ -2328,8 +2328,8 @@ private def testModuleQualifiedName : IO Unit := do
   let mainId ← mainModule "main.solc"
   let otherId ← mainModule "other.solc"
   let workspace := rawWorkspace "main.solc" [
-    ("main.solc", "function entry() returns (Word) { return 11; }"),
-    ("other.solc", "function entry() returns (Word) { return 22; }")
+    ("main.solc", "function entry() returns (word) { return 11; }"),
+    ("other.solc", "function entry() returns (word) { return 22; }")
   ]
   match run workspace (Seed.named otherId "entry") [] generousLimits with
   | .ok result =>
@@ -2348,9 +2348,9 @@ private def testDeferredIntegerOperators : IO Unit := do
   let moduleId ← mainModule "main.solc"
   let workspace := rawWorkspace "main.solc" [("main.solc",
     String.intercalate "\n" [
-      "function accept(value: Word) returns (Word) { return value; }",
-      "function nestedAdd() returns (Word) { return accept(1 + 1); }",
-      "function nestedNot() returns (Word) { return accept(~1); }"
+      "function accept(value: word) returns (word) { return value; }",
+      "function nestedAdd() returns (word) { return accept(1 + 1); }",
+      "function nestedNot() returns (word) { return accept(~1); }"
     ])]
   match run workspace (Seed.named moduleId "nestedAdd") [] generousLimits with
   | .ok result =>
@@ -2371,7 +2371,7 @@ the `uint256` default is exercised through `SourceCoreExecution` instead. -/
 private def testDefaultedIntegerLiterals : IO Unit := do
   let moduleId ← mainModule "main.solc"
   let workspace := rawWorkspace "main.solc" [("main.solc",
-    "function defaulted() returns (Word) { let unused = 1; return 9; }")]
+    "function defaulted() returns (word) { let unused = 1; return 9; }")]
   match run workspace (Seed.named moduleId "defaulted") [] generousLimits with
   | .error (.checking [.inference { error := .ambiguousIntegerLiteral _, .. }]) => pure ()
   | .ok _ => throw (IO.userError
@@ -2389,14 +2389,14 @@ private def testDefaultImplementationPriority : IO Unit := do
       "default impl<T> Add<T> {",
       "  function add(left: T, right: T) returns (T) { return left; }",
       "}",
-      "impl Add<Word> {",
-      "  function add(left: Word, right: Word) returns (Word) { return 73; }",
+      "impl Add<word> {",
+      "  function add(left: word, right: word) returns (word) { return 73; }",
       "}",
       "function addWithEvidence<T>(left: T, right: T) returns (T) where T: Add {",
       "  return left + right;",
       "}",
-      "function ordinary() returns (Word) { return addWithEvidence(1, 2); }",
-      "function fallbackCase(left: Bool, right: Bool) returns (Bool) {",
+      "function ordinary() returns (word) { return addWithEvidence(1, 2); }",
+      "function fallbackCase(left: bool, right: bool) returns (bool) {",
       "  return addWithEvidence(left, right);",
       "}"
     ])]
@@ -2464,8 +2464,8 @@ private def testDuplicateAndNonFunctionSeeds : IO Unit := do
   -- Two functions of one name are refused at the load (`SC0108`), before a seed names either.
   let overloaded := rawWorkspace "main.solc" [("main.solc",
     String.intercalate "\n" [
-      "function choose(value: Word) returns (Word) { return value; }",
-      "function choose(value: Bool) returns (Bool) { return value; }"
+      "function choose(value: word) returns (word) { return value; }",
+      "function choose(value: bool) returns (bool) { return value; }"
     ])]
   match prepare overloaded (Seed.named moduleId "choose") with
   | .error (.checking errors) =>
@@ -2482,7 +2482,7 @@ private def testDuplicateAndNonFunctionSeeds : IO Unit := do
   let traitWorkspace := rawWorkspace "main.solc" [("main.solc",
     String.intercalate "\n" [
       "trait Marker<T> {}",
-      "function entry() returns (Word) { return 1; }"
+      "function entry() returns (word) { return 1; }"
     ])]
   let traitId : Resolved.DeclarationId := {
     moduleId
@@ -2498,7 +2498,7 @@ private def testDuplicateAndNonFunctionSeeds : IO Unit := do
 private def testStageErrors : IO Unit := do
   let moduleId ← mainModule "main.solc"
   let malformed := rawWorkspace "main.solc" [("main.solc",
-    "function broken(value: Missing) returns (Word) { return 1; }")]
+    "function broken(value: Missing) returns (word) { return 1; }")]
   match prepare malformed (Seed.named moduleId "broken") with
   | .error (.checking (_ :: _)) => pure ()
   | result => throw (IO.userError
@@ -2526,14 +2526,14 @@ private def testStageErrors : IO Unit := do
   | result => throw (IO.userError
       s!"specialization exhaustion lost its public stage: {reprStr result}")
   let indirect := rawWorkspace "main.solc" [("main.solc",
-    "function apply(f: function(Word) returns (Word), value: Word) returns (Word) { return f(value); }")]
+    "function apply(f: function(word) returns (word), value: word) returns (word) { return f(value); }")]
   match prepare indirect (Seed.named moduleId "apply") generousLimits with
   | .error (.linking (.sourceCore {
       reason := .unsupportedType (.function .word .word), .. })) => pure ()
   | result => throw (IO.userError
       s!"indirect call did not retain its direct-linking rejection: {reprStr result}")
   let arrayLocal := rawWorkspace "main.solc" [("main.solc",
-    "function count() returns (Word) { let m: uint256[]; return 0; }")]
+    "function count() returns (word) { let m: uint256[]; return 0; }")]
   match prepare arrayLocal (Seed.named moduleId "count") generousLimits with
   | .error (.linking (.sourceCore { reason := .unsupportedType type, .. })) =>
       assertTrue (decide (type = .array (.fixed ⟨false, .w256⟩)))
@@ -2541,7 +2541,7 @@ private def testStageErrors : IO Unit := do
   | result => throw (IO.userError
       s!"an array local reached a Core representation: {reprStr result}")
   let sliceLocal := rawWorkspace "main.solc" [("main.solc",
-    "function count() returns (Word) { let s: arraySlice<uint256[]>; return 0; }")]
+    "function count() returns (word) { let s: arraySlice<uint256[]>; return 0; }")]
   match prepare sliceLocal (Seed.named moduleId "count") generousLimits with
   | .error (.linking (.sourceCore { reason := .unsupportedType type, .. })) =>
       assertTrue (decide (type = .arraySlice (.array (.fixed ⟨false, .w256⟩))))
@@ -2549,7 +2549,7 @@ private def testStageErrors : IO Unit := do
   | result => throw (IO.userError
       s!"a slice local reached a Core representation: {reprStr result}")
   let memrefLocal := rawWorkspace "main.solc" [("main.solc",
-    "function count() returns (Word) { let r: memref<uint256>; return 0; }")]
+    "function count() returns (word) { let r: memref<uint256>; return 0; }")]
   match prepare memrefLocal (Seed.named moduleId "count") generousLimits with
   | .error (.linking (.sourceCore { reason := .unsupportedType type, .. })) =>
       assertTrue (decide (type = .memref (.fixed ⟨false, .w256⟩)))
@@ -2557,7 +2557,7 @@ private def testStageErrors : IO Unit := do
   | result => throw (IO.userError
       s!"a memref local reached a Core representation: {reprStr result}")
   let arrayNew := rawWorkspace "main.solc" [("main.solc",
-    "function make(n: uint256) returns (Word) { let m: uint256[] = new uint256[](n); return 0; }")]
+    "function make(n: uint256) returns (word) { let m: uint256[] = new uint256[](n); return 0; }")]
   match prepare arrayNew (Seed.named moduleId "make") generousLimits with
   | .error (.linking (.sourceCore { reason := .unsupportedExpression .newArray, .. }))
   | .error (.linking (.sourceCore { reason := .unsupportedType _, .. })) => pure ()
@@ -2647,7 +2647,7 @@ private def testStageErrors : IO Unit := do
   | result => throw (IO.userError
       s!"an element write reached a Core representation or failed before linking: {reprStr result}")
   let recursive := rawWorkspace "main.solc" [("main.solc",
-    "function loop(value: Word) returns (Word) { return loop(value); }")]
+    "function loop(value: word) returns (word) { return loop(value); }")]
   match prepare recursive (Seed.named moduleId "loop") generousLimits with
   | .error (.linking (.recursiveCallCycle key)) =>
       assertTrue (decide (key.declaration.moduleId = moduleId ∧

@@ -104,8 +104,8 @@ private def require (condition : Bool) (message : String) : IO Unit :=
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function header(value: Word, rhs: Word) returns (Word) { for (value += rhs, value += rhs; false; value -= rhs) { } return value; }",
-    "function equalOnly(value: Word, rhs: Word) returns (Word) { value = rhs; return value; }"
+    "function header(value: word, rhs: word) returns (word) { for (value += rhs, value += rhs; false; value -= rhs) { } return value; }",
+    "function equalOnly(value: word, rhs: word) returns (word) { value = rhs; return value; }"
   ]}]
 }
 
@@ -283,9 +283,9 @@ open Tests.SourceCompilerFeatureSupport in
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function plain() returns (Word) { let root: Word; let vals: mapping(Bool => Word); root = vals[false] + 2; let later: Bool = true; return root; }",
-    "function compound() returns (Word) { let root: Word; let vals: mapping(Bool => Word); root += vals[false] + 2; let later: Bool = true; return root; }",
-    "function rhsFault() returns (Word) { let root: Word; let vals: mapping(Bool => Word); let missing: Word; root += vals[false] + missing; let later: Bool = true; return root; }"
+    "function plain() returns (word) { let root: word; let vals: mapping(bool => word); root = vals[false] + 2; let later: bool = true; return root; }",
+    "function compound() returns (word) { let root: word; let vals: mapping(bool => word); root += vals[false] + 2; let later: bool = true; return root; }",
+    "function rhsFault() returns (word) { let root: word; let vals: mapping(bool => word); let missing: word; root += vals[false] + missing; let later: bool = true; return root; }"
   ]}]
 }
 
@@ -2579,14 +2579,14 @@ end Receipt
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function copied(value: Word) returns (Word) { let local = value; return local; }",
-    "function bad(value: Word) returns (Word) { let local = value; let gap: Word; return gap; }",
-    "function initialEqual(seed: Word) returns (Word) { for (let root: Word, root = copied(seed); false; ) { return 99; } return seed; }",
-    "function postEqual(seed: Word) returns (Word) { let outer = 17; let index: Word = 0; for (; index < 1; let outer: Word, outer = copied(seed), index = index + 1) { continue; } return outer; }",
-    "function initialCompound(seed: Word) returns (Word) { for (let root: Word, root += copied(seed), let never: Word = 99; true; ) { return 99; } return 99; }",
-    "function postCompound(seed: Word) returns (Word) { let index: Word = 0; for (; true; let root: Word, root += copied(seed), let never: Word = 99) { index = index + 1; continue; } return 99; }",
-    "function initialRhsFault(seed: Word) returns (Word) { for (let root: Word, root = bad(seed), let never: Word = 99; true; ) { return 99; } return 99; }",
-    "function postRhsFault(seed: Word) returns (Word) { let index: Word = 0; for (; true; let root: Word, root = bad(seed), let never: Word = 99) { index = index + 1; continue; } return 99; }"
+    "function copied(value: word) returns (word) { let local = value; return local; }",
+    "function bad(value: word) returns (word) { let local = value; let gap: word; return gap; }",
+    "function initialEqual(seed: word) returns (word) { for (let root: word, root = copied(seed); false; ) { return 99; } return seed; }",
+    "function postEqual(seed: word) returns (word) { let outer = 17; let index: word = 0; for (; index < 1; let outer: word, outer = copied(seed), index = index + 1) { continue; } return outer; }",
+    "function initialCompound(seed: word) returns (word) { for (let root: word, root += copied(seed), let never: word = 99; true; ) { return 99; } return 99; }",
+    "function postCompound(seed: word) returns (word) { let index: word = 0; for (; true; let root: word, root += copied(seed), let never: word = 99) { index = index + 1; continue; } return 99; }",
+    "function initialRhsFault(seed: word) returns (word) { for (let root: word, root = bad(seed), let never: word = 99; true; ) { return 99; } return 99; }",
+    "function postRhsFault(seed: word) returns (word) { let index: word = 0; for (; true; let root: word, root = bad(seed), let never: word = 99) { index = index + 1; continue; } return 99; }"
   ]}]
 }
 
@@ -3761,24 +3761,24 @@ private def word (value : Nat) : Core.Value := .word (Core.Word.ofNatModulo valu
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Tree { Leaf(Word), Pair(Tree, Tree) }",
-    "function leaf(value: Word) returns (Tree) { return .Leaf(value); }",
+    "enum Tree { Leaf(word), Pair(Tree, Tree) }",
+    "function leaf(value: word) returns (Tree) { return .Leaf(value); }",
     "function branch(left: Tree, right: Tree) returns (Tree) { return .Pair(left, right); }",
-    "function choose(flag: Bool, value: Word) returns (Tree) { return flag ? leaf(value) : .Pair(leaf(value), leaf(value + 1)); }",
+    "function choose(flag: bool, value: word) returns (Tree) { return flag ? leaf(value) : .Pair(leaf(value), leaf(value + 1)); }",
     "function mutate(value: Tree, replacement: Tree) returns (Tree) {",
     " let setter: function(Tree) returns (Tree) = lam(next: Tree) -> Tree { value = next; return value; };",
     " setter(replacement); return value; }",
     "function transform(value: Tree, change: function(Tree) returns (Tree)) returns (Tree) { return change(value); }",
     "function through(value: Tree) returns (Tree) { return transform(value, lam(input: Tree) -> Tree { return .Pair(input, input); }); }",
-    "function recurse(count: Word, value: Tree) returns (Tree) { return count == 0 ? value : recurse(count - 1, Tree.Pair(value, value)); }",
-    "function proxyValue() returns (@Word) { return @Word; }",
-    "function find(table: mapping(Word => Word), key: Word) returns (Word) { return table[key]; }",
-    "function empty() returns (Word) { let table: mapping(Word => Word); return table[1]; }",
-    "function missing(table: mapping(Word => Tree), key: Word) returns (Tree) { return table[key]; }",
+    "function recurse(count: word, value: Tree) returns (Tree) { return count == 0 ? value : recurse(count - 1, Tree.Pair(value, value)); }",
+    "function proxyValue() returns (@word) { return @word; }",
+    "function find(table: mapping(word => word), key: word) returns (word) { return table[key]; }",
+    "function empty() returns (word) { let table: mapping(word => word); return table[1]; }",
+    "function missing(table: mapping(word => Tree), key: word) returns (Tree) { return table[key]; }",
     "function absent() returns (Tree) { let value: Tree; return value; }"
-    , "function select(value: Tree) returns (Word) { match (value) { case .Leaf(x) { return x; } case .Pair(.Leaf(left), .Leaf(right)) { return left + right; } default { return 0; } } }"
-    , "function patternCall(value: Tree) returns (Word) { let out: Word; match (value) { case .Leaf(x) { let f: function() returns (Word) = lam() -> Word { return x; }; out = f(); } default { out = 0; } } return out; }"
-    , "function matchContinue(value: Tree) returns (Word) { let count: Word = 0; while (count < 2) { count += 1; match (value) { case .Leaf(x) { continue; } default { break; } } count += 10; } return count; }"
+    , "function select(value: Tree) returns (word) { match (value) { case .Leaf(x) { return x; } case .Pair(.Leaf(left), .Leaf(right)) { return left + right; } default { return 0; } } }"
+    , "function patternCall(value: Tree) returns (word) { let out: word; match (value) { case .Leaf(x) { let f: function() returns (word) = lam() -> word { return x; }; out = f(); } default { out = 0; } } return out; }"
+    , "function matchContinue(value: Tree) returns (word) { let count: word = 0; while (count < 2) { count += 1; match (value) { case .Leaf(x) { continue; } default { break; } } count += 10; } return count; }"
   ] }]
 }
 
@@ -5499,10 +5499,10 @@ private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get 
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
 private def huge : Nat := 115792089237316195423570985008687907853269984665640564039457584007913129639937
 private def content : String := String.intercalate "\n" [
-  "function wordRoot() returns (Word) { let first = 0x25; return first; }",
-  s!"function wrapRoot() returns (Word) \{ return {huge}; }",
+  "function wordRoot() returns (word) { let first = 0x25; return first; }",
+  s!"function wrapRoot() returns (word) \{ return {huge}; }",
   s!"function integerRoot() returns (integer) \{ let full = {huge}; return full; }",
-  "function faultRoot() returns (Word) { let prior: Word = 41; let missing: Word; return missing + 43; }"
+  "function faultRoot() returns (word) { let prior: word = 41; let missing: word; return missing + 43; }"
 ]
 
 private def inspect (compiled : SourceCoreUnifiedCompilation.Compiled) : IO Unit := do

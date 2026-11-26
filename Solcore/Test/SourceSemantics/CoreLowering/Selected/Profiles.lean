@@ -250,14 +250,14 @@ open RecursiveNamedPublicPhysicalSessionState (StartedCall)
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function invert(value: Word) returns (Word) { value ~=; return value; }",
-    "function initialize(value: Word) returns (Word) { for (value ~=; false; value ~=) { } return value; }",
-    "function post(value: Word) returns (Word) { for (let i: Word = 0; i < 1; value ~=, i += 1) { continue; } return value; }",
-    "function stop(value: Word) returns (Word) { for (let i: Word = 0; true; value ~=) { break; } return value; }",
-    "function missing() returns (Word) { let absent: Word; absent ~=; return 0; }",
-    "function postMissing() returns (Word) { let absent: Word; for (let i: Word = 0; true; absent ~=) { continue; } return 0; }",
-    "function initialMissing() returns (Word) { let absent: Word; for (absent ~=; false; ) { } return 0; }",
-    "function make(value: Word) returns (function(Word) returns (Word)) { return lam(ignored: Word) -> Word { value ~=; return value; }; }"
+    "function invert(value: word) returns (word) { value ~=; return value; }",
+    "function initialize(value: word) returns (word) { for (value ~=; false; value ~=) { } return value; }",
+    "function post(value: word) returns (word) { for (let i: word = 0; i < 1; value ~=, i += 1) { continue; } return value; }",
+    "function stop(value: word) returns (word) { for (let i: word = 0; true; value ~=) { break; } return value; }",
+    "function missing() returns (word) { let absent: word; absent ~=; return 0; }",
+    "function postMissing() returns (word) { let absent: word; for (let i: word = 0; true; absent ~=) { continue; } return 0; }",
+    "function initialMissing() returns (word) { let absent: word; for (absent ~=; false; ) { } return 0; }",
+    "function make(value: word) returns (function(word) returns (word)) { return lam(ignored: word) -> word { value ~=; return value; }; }"
   ]}] }
 def options : SourceCompiler.Options := {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
 def runOptions : SourceCoreExecution.RunOptions := {executionFuel := 100000, outputValidationFuel := 1000}
@@ -889,7 +889,7 @@ open RecursiveNamedPublicPhysicalSessionState (StartedCall PlainValue SourceCall
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function discard(value: Word) returns (Word) { value; return value; }"}] }
+    "function discard(value: word) returns (word) { value; return value; }"}] }
 
 def options : SourceCompiler.Options := {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
 def runOptions : SourceCoreExecution.RunOptions := {executionFuel := 100000, outputValidationFuel := 1000}
@@ -1297,7 +1297,7 @@ open RecursiveNamedPublicPhysicalSessionState (StartedCall PlainValue SourceCall
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "enum Box { Wrap(Word) } function box(value: Word) returns (Box) { return .Wrap(value); }"}] }
+    "enum Box { Wrap(word) } function box(value: word) returns (Box) { return .Wrap(value); }"}] }
 
 def options : SourceCompiler.Options := {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
 def runOptions : SourceCoreExecution.RunOptions := {executionFuel := 100000, outputValidationFuel := 1000}
@@ -2001,10 +2001,10 @@ inductive Example where
 def Example.workspace (spec : Example) : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     match spec with
-    | .branch _ => "function choose(flag: Bool, value: Word) returns (Word) { if (flag) { let copy: Word = value; return copy; } else { return value; } }"
-    | .tail => "function identity(value: Word) returns (Word) { value }"
+    | .branch _ => "function choose(flag: bool, value: word) returns (word) { if (flag) { let copy: word = value; return copy; } else { return value; } }"
+    | .tail => "function identity(value: word) returns (word) { value }"
     | .unit => "function empty() {}"
-    | .letUnit => "function consume(value: Word) { let copy: Word = value; }"}] }
+    | .letUnit => "function consume(value: word) { let copy: word = value; }"}] }
 
 def Example.Shape (spec : Example) (function : CheckedFunction) (signature : ProgramFunctionSignature) : Type :=
   match spec with
@@ -2423,20 +2423,20 @@ private def failure {artifact : SourceCoreExecution.Artifact}
 def casesWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function letUnit() { let value: Word = 37; }",
-    "function missing() returns (Word) { let value: Word; value }",
-    "function reuse(value: Word) returns (Word) { value }",
-    "function discarded(value: Word) returns (Word) { { value; } return 41; }",
-    "function conditionFault(flag: Bool) returns (Word) { if (flag) { let value: Word; return value; } else { return 7; } }",
-    "function matchReturn(value: Word) returns (Word) { match (value) { case 0 { return 41; } default { return 7; } } }",
-    "function blockReturn(value: Word) returns (Word) { { let copy: Word = value; return copy; } }"
+    "function letUnit() { let value: word = 37; }",
+    "function missing() returns (word) { let value: word; value }",
+    "function reuse(value: word) returns (word) { value }",
+    "function discarded(value: word) returns (word) { { value; } return 41; }",
+    "function conditionFault(flag: bool) returns (word) { if (flag) { let value: word; return value; } else { return 7; } }",
+    "function matchReturn(value: word) returns (word) { match (value) { case 0 { return 41; } default { return 7; } } }",
+    "function blockReturn(value: word) returns (word) { { let copy: word = value; return copy; } }"
   ]}]
 }
 
 def factoryWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function make(value: Word) returns (function(Word) returns ()) { return lam(next: Word) -> Unit { value = next; }; }"}]
+    "function make(value: word) returns (function(word) returns ()) { return lam(next: word) -> () { value = next; }; }"}]
 }
 
 private def expected : Example → SourceCorePublicValues.Value
@@ -2488,8 +2488,8 @@ private def sourceFirst (spec : Example) : IO Unit := do
 /-- The profile expansion does not change the parser's nested-block policy. -/
 private def parserBoundaries : IO Unit := do
   for content in [
-      "function bad(value: Word) returns (Word) { { value } return 41; }",
-      "function bad() returns (function(Word) returns (Word)) { return lam(value: Word) -> Word { value }; }"] do
+      "function bad(value: word) returns (word) { { value } return 41; }",
+      "function bad() returns (function(word) returns (word)) { return lam(value: word) -> word { value }; }"] do
     let workspace : Workspace.RawWorkspace := {
       entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ content}]}
     match checkProgram workspace options.checkingFuel with
@@ -2506,7 +2506,7 @@ private def parserBoundaries : IO Unit := do
 after it is refused where the body is checked (`SC0222`). -/
 private def completionSuffixGuards : IO Unit := do
   for (content, stopped) in [
-      ("function suffix(flag: Bool, value: Word) returns (Word) { if (flag) { return value; } else { return value; } value }", true)] do
+      ("function suffix(flag: bool, value: word) returns (word) { if (flag) { return value; } else { return value; } value }", true)] do
     let workspace : Workspace.RawWorkspace := {
       entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ content}]}
     let .ok checked := checkProgram workspace options.checkingFuel
@@ -2524,7 +2524,7 @@ private def completionSuffixGuards : IO Unit := do
   let directReturn : Workspace.RawWorkspace := {
     entry := "main.solc", externalLibraries := [], mainSources := [{
       path := "main.solc"
-      content := "pragma solcore;\nfunction suffix(value: Word) returns (Word) { return value; value }"}]}
+      content := "pragma solcore;\nfunction suffix(value: word) returns (word) { return value; value }"}]}
   match checkProgram directReturn options.checkingFuel with
   | .error [.inference failure] =>
       match failure.error with
@@ -2592,29 +2592,29 @@ open Solcore Core Frontend SourceInference SourceSemantics CoreLowering
 def entryWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function mutate(flag: Bool, first: Word, second: Word) returns (Word, Bool) {",
-    "  let value: Word; value = first; value = second; return (value, flag);",
+    "function mutate(flag: bool, first: word, second: word) returns (word, bool) {",
+    "  let value: word; value = first; value = second; return (value, flag);",
     "}",
     "function keep<T>(input: T) returns (T) { let stored: T = input; return stored; }",
-    "function absent(input: Word) returns (Word) { let value: Word; return value; }",
-    "function staged(comptime input: (Word, Bool)) returns (Word, Bool) {",
-    "  let stored: (Word, Bool) = input; return stored;",
+    "function absent(input: word) returns (word) { let value: word; return value; }",
+    "function staged(comptime input: (word, bool)) returns (word, bool) {",
+    "  let stored: (word, bool) = input; return stored;",
     "}",
-    "function nested(input: (Word, (Bool, Word))) returns (Word, (Bool, Word)) { return input; }",
-    "function blocked(input: Word) returns (Word) { { return input; } }",
-    "function scoped(flag: Bool, initial: Word, replacement: Word) returns (Word) {",
-    "  let value: Word = initial; { let value: Word = replacement; value = initial; }",
+    "function nested(input: (word, (bool, word))) returns (word, (bool, word)) { return input; }",
+    "function blocked(input: word) returns (word) { { return input; } }",
+    "function scoped(flag: bool, initial: word, replacement: word) returns (word) {",
+    "  let value: word = initial; { let value: word = replacement; value = initial; }",
     "  if (flag) { value = replacement; } return value;",
     "}",
-    "function branchFailure(flag: Bool) returns (Word) {",
-    "  let absent: Word; return flag ? absent : absent;",
+    "function branchFailure(flag: bool) returns (word) {",
+    "  let absent: word; return flag ? absent : absent;",
     "}",
-    "function chooseFailure(flag: Bool, value: Word) returns (Word) {",
-    "  let absent: Word; return flag ? value : absent;",
+    "function chooseFailure(flag: bool, value: word) returns (word) {",
+    "  let absent: word; return flag ? value : absent;",
     "}",
-    "function loop(flag: Bool) { while (flag) { break; } }",
-    "function stagedResult(comptime input: Word) returns (comptime<Word>) { return input; }",
-    "function literalEvidence() returns (Word) { return 1; }"
+    "function loop(flag: bool) { while (flag) { break; } }",
+    "function stagedResult(comptime input: word) returns (comptime<word>) { return input; }",
+    "function literalEvidence() returns (word) { return 1; }"
   ] }]
   externalLibraries := []
 }
@@ -2622,46 +2622,46 @@ def entryWorkspace : Workspace.RawWorkspace := {
 def basicWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function sequence(flag: Bool, initial: Word, replacement: Word) returns (Word, Bool) {",
-    "  let value: Word; value = initial; let copied: Word = value;",
+    "function sequence(flag: bool, initial: word, replacement: word) returns (word, bool) {",
+    "  let value: word; value = initial; let copied: word = value;",
     "  value = replacement; copied; return (copied, flag);",
     "}",
-    "function early(initial: Word, replacement: Word) returns (Word) {",
-    "  let value: Word = initial; { return value; } value = replacement;",
+    "function early(initial: word, replacement: word) returns (word) {",
+    "  let value: word = initial; { return value; } value = replacement;",
     "}",
-    "function initializerFailure(input: Word) returns (Word) {",
-    "  let absent: Word; let never: Word = absent; let later: Word = input; return later;",
+    "function initializerFailure(input: word) returns (word) {",
+    "  let absent: word; let never: word = absent; let later: word = input; return later;",
     "}",
-    "function assignmentFailure(input: Word, replacement: Word) returns (Word) {",
-    "  let target: Word = input; let absent: Word; target = absent;",
+    "function assignmentFailure(input: word, replacement: word) returns (word) {",
+    "  let target: word = input; let absent: word; target = absent;",
     "  target = replacement; return target;",
     "}",
-    "function discardFailure(input: Word) returns (Word) {",
-    "  let absent: Word; absent; let later: Word = input; return later;",
+    "function discardFailure(input: word) returns (word) {",
+    "  let absent: word; absent; let later: word = input; return later;",
     "}",
-    "function pairFailure(flag: Bool) returns (Word, Bool) {",
-    "  let absent: Word; return (absent, flag);",
+    "function pairFailure(flag: bool) returns (word, bool) {",
+    "  let absent: word; return (absent, flag);",
     "}",
-    "function tail(value: Word) returns (Word) { value }",
+    "function tail(value: word) returns (word) { value }",
     "function empty() { return; }",
     "function fallthrough() { true; }",
     "function unit() { return (); }",
-    "function bool() returns (Bool) { return (true); }",
-    "function literalEvidence() returns (Word) { return 1; }",
-    "function blocked(value: Word) returns (Word) { { return value; } }"
+    "function bool() returns (bool) { return (true); }",
+    "function literalEvidence() returns (word) { return 1; }",
+    "function blocked(value: word) returns (word) { { return value; } }"
   ] }]
   externalLibraries := []
 }
 
 def tupleContent : String := String.intercalate "\n" [
-  "function side(x: Word) returns (Word) { return x; }",
-  "function fail() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
-  "function triple() returns ((Word, Bool, Word)) { return (side(7), true, 3 + 4); }",
-  "function quadruple() returns ((Word, Bool, Word, Bool)) { return (side(11), false, side(13), true); }",
-  "function nested() returns (((Word, Bool, Word), Word, Bool)) { return ((side(17), true, 5 + 6), side(19), false); }",
-  "function firstFault() returns ((Word, Word, Word)) { return (fail(), side(91), side(92)); }",
-  "function laterFault() returns ((Word, Word, Word, Word)) { return (side(23), side(29), fail(), side(99)); }",
-  "function singleton() returns (Word) { return (side(31)); }"
+  "function side(x: word) returns (word) { return x; }",
+  "function fail() returns (word) { let written: word = 5; let gap: word; return gap; }",
+  "function triple() returns ((word, bool, word)) { return (side(7), true, 3 + 4); }",
+  "function quadruple() returns ((word, bool, word, bool)) { return (side(11), false, side(13), true); }",
+  "function nested() returns (((word, bool, word), word, bool)) { return ((side(17), true, 5 + 6), side(19), false); }",
+  "function firstFault() returns ((word, word, word)) { return (fail(), side(91), side(92)); }",
+  "function laterFault() returns ((word, word, word, word)) { return (side(23), side(29), fail(), side(99)); }",
+  "function singleton() returns (word) { return (side(31)); }"
 ]
 
 def tupleWorkspace : Workspace.RawWorkspace := {
@@ -2862,21 +2862,21 @@ private def failure {artifact : SourceCoreExecution.Artifact}
 
 private def controlWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function blockReturn(first: Word, second: Word) returns (Word) {",
-    "  { return first; } let later: Word = second; return later;",
+    "function blockReturn(first: word, second: word) returns (word) {",
+    "  { return first; } let later: word = second; return later;",
     "}",
-    "function branch(flag: Bool, first: Word, second: Word) returns (Word) {",
-    "  let result: Word = first; if (flag) { return first; } else { result = second; } return result;",
+    "function branch(flag: bool, first: word, second: word) returns (word) {",
+    "  let result: word = first; if (flag) { return first; } else { result = second; } return result;",
     "}",
-    "function branchFault(flag: Bool, value: Word) returns (Word) {",
-    "  let absent: Word; if (flag) { absent; } else { value; } let later: Word = value; return later;",
+    "function branchFault(flag: bool, value: word) returns (word) {",
+    "  let absent: word; if (flag) { absent; } else { value; } let later: word = value; return later;",
     "}"
   ]}] }
 
 private def checkConditionalBoundary : IO Unit := do
   let workspace : Workspace.RawWorkspace := {
     entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-      "function both(flag: Bool, first: Word, second: Word) returns (Word) { if (flag) { return first; } else { return second; } return first; }"}] }
+      "function both(flag: bool, first: word, second: word) returns (word) { if (flag) { return first; } else { return second; } return first; }"}] }
   match checked : checkProgram workspace options.checkingFuel with
   | .error errors => throw (IO.userError s!"body control boundary checking: {reprStr errors}")
   | .ok program =>
@@ -3240,7 +3240,7 @@ open RecursiveNamedPublicPhysicalSessionState (StartedCall)
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function add(left: Word, right: Word) returns (Word) { left += right; return left; } function divide(left: Word, right: Word) returns (Word) { left /= right; return left; } function missing(right: Word) returns (Word) { let value: Word; value /= right; return value; }"}] }
+    "function add(left: word, right: word) returns (word) { left += right; return left; } function divide(left: word, right: word) returns (word) { left /= right; return left; } function missing(right: word) returns (word) { let value: word; value /= right; return value; }"}] }
 def options : SourceCompiler.Options := {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
 def runOptions : SourceCoreExecution.RunOptions := {executionFuel := 100000, outputValidationFuel := 1000}
 
@@ -3781,10 +3781,10 @@ private def sourceFirst : IO Unit := do
 
 def headerWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function post(limit: Word) returns (Word) { let count: Word = 0; for (let i: Word = 0; limit > i; i += 1) { count += 1; continue; } return count; }",
-    "function stop() returns (Word) { let missing: Word; for (let i: Word = 0; true; missing += 1) { break; } return 7; }",
-    "function failedPost() returns (Word) { let missing: Word; for (let i: Word = 0; true; missing += 1) { continue; } return 7; }",
-    "function initialize(value: Word) returns (Word) { for (value += 1; false; value += 1) { } return value; }"
+    "function post(limit: word) returns (word) { let count: word = 0; for (let i: word = 0; limit > i; i += 1) { count += 1; continue; } return count; }",
+    "function stop() returns (word) { let missing: word; for (let i: word = 0; true; missing += 1) { break; } return 7; }",
+    "function failedPost() returns (word) { let missing: word; for (let i: word = 0; true; missing += 1) { continue; } return 7; }",
+    "function initialize(value: word) returns (word) { for (value += 1; false; value += 1) { } return value; }"
   ]}] }
 
 /-- The runtime companion's retained closure starts every call from the value
@@ -3792,8 +3792,8 @@ it captured at creation: neither a successful call nor the indirect RHS call
 before an operand fault carries its captured assignment over to a later call. -/
 def captureWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function make(value: Word) returns (function(Word) returns (Word)) { return lam(next: Word) -> Word { value += next; return value; }; }",
-    "function missingRhs(action: function(Word) returns (Word)) returns (Word) { let missing: Word; missing += action(9); return missing; }"
+    "function make(value: word) returns (function(word) returns (word)) { return lam(next: word) -> word { value += next; return value; }; }",
+    "function missingRhs(action: function(word) returns (word)) returns (word) { let missing: word; missing += action(9); return missing; }"
   ]}] }
 
 private def handleSuccess {artifact : SourceCoreExecution.Artifact}

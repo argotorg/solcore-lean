@@ -283,7 +283,7 @@ def observeSelect (function : CheckedFunction) (signature echo choose : ProgramF
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   externalLibraries := []
-  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ "function make(seed: Word) returns (function() returns (Word)) { return lam() { return seed; }; } function echo(table: mapping(Word => function() returns (Word))) returns (mapping(Word => function() returns (Word))) { return table; } function choose(key: Word) returns (Word) { return key; } function select(table: mapping(Word => function() returns (Word)), key: Word) returns (function() returns (Word)) { return echo(table)[choose(key)]; }"}] }
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ "function make(seed: word) returns (function() returns (word)) { return lam() { return seed; }; } function echo(table: mapping(word => function() returns (word))) returns (mapping(word => function() returns (word))) { return table; } function choose(key: word) returns (word) { return key; } function select(table: mapping(word => function() returns (word)), key: word) returns (function() returns (word)) { return echo(table)[choose(key)]; }"}] }
 
 structure CheckedFixture where
   program : CheckedProgram

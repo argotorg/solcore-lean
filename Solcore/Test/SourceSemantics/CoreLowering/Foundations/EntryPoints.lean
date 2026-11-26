@@ -35,30 +35,30 @@ private def present (value : Core.Value) : Core.Value := .inRight .unit value
 def fixtures : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function operators(value: Word) returns (Word) {",
+    "function operators(value: word) returns (word) {",
     " value += 3; value -= 1; value *= 2; value /= 3; value %= 5; value |= 8; value &= 15; value ^= 2; value ~=; return value; }",
-    "function forOrder(limit: Word) returns (Word, Word) { let count: Word = 0;",
-    " for (let i: Word = 0; limit > i; i += 1) { count += 1; if (i == 1) { continue; } count += 10; } return (count, limit); }",
-    "function absent() returns (Word) { let target: Word; target += 3; return target; }",
-    "function unaryAbsent() returns (Word) { let target: Word; target ~=; return target; }",
-    "function headerAbsent() returns (Word) { let target: Word; for (target += 3; false; target += 1) { } return 0; }",
-    "function postAbsent() returns (Word) { let target: Word; for (let i: Word = 0; true; target += 1) { continue; } return 0; }",
-    "function unaryPostAbsent() returns (Word) { let target: Word; for (let i: Word = 0; true; target ~=) { continue; } return 0; }",
-    "function rhsAbsent() returns (Word) { let target: Word; let absent: Word; target += absent; return target; }",
-    "function failLeft() returns (Word) { let target: Word; target += 1; return target; }",
-    "function failRight() returns (Word) { let target: Word; target -= 1; return target; }",
-    "function choose(flag: Bool) returns (Word) { return flag ? failLeft() : failRight(); }",
-    "function snapshot(value: Word) returns (Word) {",
-    " let rhs: function() returns (Word) = lam() -> Word { value = 100; return 3; }; value += rhs(); return value; }",
-    "function snapshotAbsent() returns (Word) { let target: Word;",
-    " let rhs: function() returns (Word) = lam() -> Word { target = 100; return 3; }; target += rhs(); return target; }",
-    "function failurePriority() returns (Word) { let target: Word; let absent: Word;",
-    " let rhs: function() returns (Word) = lam() -> Word { target = 100; return absent; }; target += rhs(); return target; }",
-    "function captured(value: Word) returns (Word, Word) {",
-    " let f: function(Word) returns (Word) = lam(delta: Word) -> Word { value += delta; return value; }; return (f(2), f(3)); }",
-    "function functionEqual() returns (Word) {",
-    " let f: function() returns (Word) = lam() -> Word { return 1; };",
-    " let g: function() returns (Word) = lam() -> Word { return 2; }; f = g; return f(); }"
+    "function forOrder(limit: word) returns (word, word) { let count: word = 0;",
+    " for (let i: word = 0; limit > i; i += 1) { count += 1; if (i == 1) { continue; } count += 10; } return (count, limit); }",
+    "function absent() returns (word) { let target: word; target += 3; return target; }",
+    "function unaryAbsent() returns (word) { let target: word; target ~=; return target; }",
+    "function headerAbsent() returns (word) { let target: word; for (target += 3; false; target += 1) { } return 0; }",
+    "function postAbsent() returns (word) { let target: word; for (let i: word = 0; true; target += 1) { continue; } return 0; }",
+    "function unaryPostAbsent() returns (word) { let target: word; for (let i: word = 0; true; target ~=) { continue; } return 0; }",
+    "function rhsAbsent() returns (word) { let target: word; let absent: word; target += absent; return target; }",
+    "function failLeft() returns (word) { let target: word; target += 1; return target; }",
+    "function failRight() returns (word) { let target: word; target -= 1; return target; }",
+    "function choose(flag: bool) returns (word) { return flag ? failLeft() : failRight(); }",
+    "function snapshot(value: word) returns (word) {",
+    " let rhs: function() returns (word) = lam() -> word { value = 100; return 3; }; value += rhs(); return value; }",
+    "function snapshotAbsent() returns (word) { let target: word;",
+    " let rhs: function() returns (word) = lam() -> word { target = 100; return 3; }; target += rhs(); return target; }",
+    "function failurePriority() returns (word) { let target: word; let absent: word;",
+    " let rhs: function() returns (word) = lam() -> word { target = 100; return absent; }; target += rhs(); return target; }",
+    "function captured(value: word) returns (word, word) {",
+    " let f: function(word) returns (word) = lam(delta: word) -> word { value += delta; return value; }; return (f(2), f(3)); }",
+    "function functionEqual() returns (word) {",
+    " let f: function() returns (word) = lam() -> word { return 1; };",
+    " let g: function() returns (word) = lam() -> word { return 2; }; f = g; return f(); }"
   ] }]
 }
 
@@ -267,13 +267,13 @@ private def word (value : Nat) : Core.Word := Core.Word.ofNatModulo value
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function sites(value: Word, rhs: Word) returns (Word) {",
+    "function sites(value: word, rhs: word) returns (word) {",
     "  value += rhs; value = rhs; value ~=;",
     "  for (value += rhs, rhs += value, value += rhs, value -= rhs; false;",
     "       value *= rhs, value ~=, value *= rhs) { value ^= rhs; }",
     "  return value;",
     "}",
-    "function equalOnly(value: (Word, Bool), rhs: (Word, Bool)) returns (Word, Bool) { value = rhs; return value; }"
+    "function equalOnly(value: (word, bool), rhs: (word, bool)) returns (word, bool) { value = rhs; return value; }"
   ] }]
 }
 
@@ -439,16 +439,16 @@ private def readReason : Core.Word := word 70
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function add(left: Word, right: Word) returns (Word) { left += right; return left; }",
-    "function sub(left: Word, right: Word) returns (Word) { left -= right; return left; }",
-    "function mul(left: Word, right: Word) returns (Word) { left *= right; return left; }",
-    "function div(left: Word, right: Word) returns (Word) { left /= right; return left; }",
-    "function mod(left: Word, right: Word) returns (Word) { left %= right; return left; }",
-    "function band(left: Word, right: Word) returns (Word) { left &= right; return left; }",
-    "function bor(left: Word, right: Word) returns (Word) { left |= right; return left; }",
-    "function bxor(left: Word, right: Word) returns (Word) { left ^= right; return left; }",
-    "function invert(left: Word) returns (Word) { left ~=; return left; }",
-    "function pair(left: (Word, Bool), right: (Word, Bool)) returns (Word, Bool) { left = right; return left; }"
+    "function add(left: word, right: word) returns (word) { left += right; return left; }",
+    "function sub(left: word, right: word) returns (word) { left -= right; return left; }",
+    "function mul(left: word, right: word) returns (word) { left *= right; return left; }",
+    "function div(left: word, right: word) returns (word) { left /= right; return left; }",
+    "function mod(left: word, right: word) returns (word) { left %= right; return left; }",
+    "function band(left: word, right: word) returns (word) { left &= right; return left; }",
+    "function bor(left: word, right: word) returns (word) { left |= right; return left; }",
+    "function bxor(left: word, right: word) returns (word) { left ^= right; return left; }",
+    "function invert(left: word) returns (word) { left ~=; return left; }",
+    "function pair(left: (word, bool), right: (word, bool)) returns (word, bool) { left = right; return left; }"
   ] }]
 }
 
@@ -618,30 +618,30 @@ private def reason : Core.Word := word 77
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function sequence(flag: Bool, initial: Word, replacement: Word) returns (Word, Bool) {",
-    "  let value: Word; value = initial; let copied: Word = value;",
+    "function sequence(flag: bool, initial: word, replacement: word) returns (word, bool) {",
+    "  let value: word; value = initial; let copied: word = value;",
     "  value = replacement; copied; return (copied, flag);",
     "}",
-    "function initializerFailure(input: Word) returns (Word) {",
-    "  let absent: Word; let never: Word = absent; let later: Word = input; return later;",
+    "function initializerFailure(input: word) returns (word) {",
+    "  let absent: word; let never: word = absent; let later: word = input; return later;",
     "}",
-    "function assignmentFailure(input: Word, replacement: Word) returns (Word) {",
-    "  let target: Word = input; let absent: Word; target = absent;",
+    "function assignmentFailure(input: word, replacement: word) returns (word) {",
+    "  let target: word = input; let absent: word; target = absent;",
     "  target = replacement; return target;",
     "}",
-    "function discardFailure(input: Word) returns (Word) {",
-    "  let absent: Word; absent; let later: Word = input; return later;",
+    "function discardFailure(input: word) returns (word) {",
+    "  let absent: word; absent; let later: word = input; return later;",
     "}",
-    "function pairFailure(flag: Bool) returns (Word, Bool) {",
-    "  let absent: Word; return (absent, flag);",
+    "function pairFailure(flag: bool) returns (word, bool) {",
+    "  let absent: word; return (absent, flag);",
     "}",
-    "function tail(value: Word) returns (Word) { value }",
+    "function tail(value: word) returns (word) { value }",
     "function empty() { return; }",
     "function fallthrough() { true; }",
     "function unit() { return (); }",
-    "function bool() returns (Bool) { return (true); }",
-    "function literalEvidence() returns (Word) { return 1; }",
-    "function blocked(value: Word) returns (Word) { { return value; } }"
+    "function bool() returns (bool) { return (true); }",
+    "function literalEvidence() returns (word) { return 1; }",
+    "function blocked(value: word) returns (word) { { return value; } }"
   ] }]
   externalLibraries := []
 }
@@ -922,29 +922,29 @@ private def reason : Core.Word := word 93
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function mutate(flag: Bool, first: Word, second: Word) returns (Word, Bool) {",
-    "  let value: Word; value = first; value = second; return (value, flag);",
+    "function mutate(flag: bool, first: word, second: word) returns (word, bool) {",
+    "  let value: word; value = first; value = second; return (value, flag);",
     "}",
     "function keep<T>(input: T) returns (T) { let stored: T = input; return stored; }",
-    "function absent(input: Word) returns (Word) { let value: Word; return value; }",
-    "function staged(comptime input: (Word, Bool)) returns (Word, Bool) {",
-    "  let stored: (Word, Bool) = input; return stored;",
+    "function absent(input: word) returns (word) { let value: word; return value; }",
+    "function staged(comptime input: (word, bool)) returns (word, bool) {",
+    "  let stored: (word, bool) = input; return stored;",
     "}",
-    "function nested(input: (Word, (Bool, Word))) returns (Word, (Bool, Word)) { return input; }",
-    "function blocked(input: Word) returns (Word) { { return input; } }",
-    "function scoped(flag: Bool, initial: Word, replacement: Word) returns (Word) {",
-    "  let value: Word = initial; { let value: Word = replacement; value = initial; }",
+    "function nested(input: (word, (bool, word))) returns (word, (bool, word)) { return input; }",
+    "function blocked(input: word) returns (word) { { return input; } }",
+    "function scoped(flag: bool, initial: word, replacement: word) returns (word) {",
+    "  let value: word = initial; { let value: word = replacement; value = initial; }",
     "  if (flag) { value = replacement; } return value;",
     "}",
-    "function branchFailure(flag: Bool) returns (Word) {",
-    "  let absent: Word; return flag ? absent : absent;",
+    "function branchFailure(flag: bool) returns (word) {",
+    "  let absent: word; return flag ? absent : absent;",
     "}",
-    "function chooseFailure(flag: Bool, value: Word) returns (Word) {",
-    "  let absent: Word; return flag ? value : absent;",
+    "function chooseFailure(flag: bool, value: word) returns (word) {",
+    "  let absent: word; return flag ? value : absent;",
     "}",
-    "function loop(flag: Bool) { while (flag) { break; } }",
-    "function stagedResult(comptime input: Word) returns (comptime<Word>) { return input; }",
-    "function literalEvidence() returns (Word) { return 1; }"
+    "function loop(flag: bool) { while (flag) { break; } }",
+    "function stagedResult(comptime input: word) returns (comptime<word>) { return input; }",
+    "function literalEvidence() returns (word) { return 1; }"
   ] }]
   externalLibraries := []
 }
@@ -1191,18 +1191,18 @@ private def internalReason : Core.Word := word 99
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function zero() returns (Word) { return 7; }",
-    "function increment(value: Word) returns (Word) { return value + 1; }",
-    "function combine(a: Word, b: Word, c: Word) returns (Word) { return a + b + c; }",
-    "function nested(value: Word) returns (Word) { return combine(zero(), increment(value), value) * 2; }",
-    "function countdown(n: Word) returns (Word) { return n == 0 ? n : countdown(n - 1); }",
-    "function even(n: Word) returns (Bool) { return n == 0 ? true : odd(n - 1); }",
-    "function odd(n: Word) returns (Bool) { return n == 0 ? false : even(n - 1); }",
-    "function conditional(flag: Bool, value: Word) returns (Word, Bool) { return ((flag ? increment(value) : zero()), (flag || increment(value) > 0)); }",
-    "function echoProduct(value: (Word, Bool)) returns (Word, Bool) { return value; }",
-    "function productCall(value: Word) returns (Word, Bool) { return echoProduct((value, true)); }",
-    "function staged(comptime value: Word) returns (Word) { return value; }",
-    "function stagedCall() returns (Word) { return staged(1); }"
+    "function zero() returns (word) { return 7; }",
+    "function increment(value: word) returns (word) { return value + 1; }",
+    "function combine(a: word, b: word, c: word) returns (word) { return a + b + c; }",
+    "function nested(value: word) returns (word) { return combine(zero(), increment(value), value) * 2; }",
+    "function countdown(n: word) returns (word) { return n == 0 ? n : countdown(n - 1); }",
+    "function even(n: word) returns (bool) { return n == 0 ? true : odd(n - 1); }",
+    "function odd(n: word) returns (bool) { return n == 0 ? false : even(n - 1); }",
+    "function conditional(flag: bool, value: word) returns (word, bool) { return ((flag ? increment(value) : zero()), (flag || increment(value) > 0)); }",
+    "function echoProduct(value: (word, bool)) returns (word, bool) { return value; }",
+    "function productCall(value: word) returns (word, bool) { return echoProduct((value, true)); }",
+    "function staged(comptime value: word) returns (word) { return value; }",
+    "function stagedCall() returns (word) { return staged(1); }"
   ] }]
 }
 
@@ -1487,31 +1487,31 @@ private def fellThrough : Core.Word := word 88
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function early(flag: Bool, initial: Word, replacement: Word) returns (Word) {",
-    "  let value: Word = initial;",
-    "  { let inner: Word = replacement; if (flag) { return value; } value = inner; }",
+    "function early(flag: bool, initial: word, replacement: word) returns (word) {",
+    "  let value: word = initial;",
+    "  { let inner: word = replacement; if (flag) { return value; } value = inner; }",
     "  value = replacement; return value;",
     "}",
-    "function scoped(flag: Bool, initial: Word, replacement: Word) returns (Word) {",
-    "  let value: Word = initial; { let value: Word = replacement; value = initial; }",
+    "function scoped(flag: bool, initial: word, replacement: word) returns (word) {",
+    "  let value: word = initial; { let value: word = replacement; value = initial; }",
     "  if (flag) { value = replacement; } return value;",
     "}",
-    "function choices(flag: Bool, left: Word, right: Word) returns (Word, Bool) {",
+    "function choices(flag: bool, left: word, right: word) returns (word, bool) {",
     "  return ((flag ? (flag ? left : right) : right), (flag ? true : false));",
     "}",
-    "function chooseFailure(flag: Bool, value: Word) returns (Word) {",
-    "  let absent: Word; return flag ? value : absent;",
+    "function chooseFailure(flag: bool, value: word) returns (word) {",
+    "  let absent: word; return flag ? value : absent;",
     "}",
-    "function conditionFailure(initial: Word, replacement: Word) returns (Word) {",
-    "  let value: Word = initial; let absent: Bool;",
+    "function conditionFailure(initial: word, replacement: word) returns (word) {",
+    "  let value: word = initial; let absent: bool;",
     "  if (absent) { value = replacement; } else { value = replacement; } return value;",
     "}",
-    "function nestedTail(value: Word, replacement: Word) returns (Word) {",
+    "function nestedTail(value: word, replacement: word) returns (word) {",
     "  { value; } return replacement;",
     "}",
-    "function nestedOnly(flag: Bool) { if (flag) { true; } else { false; } }",
-    "function nonTail(value: Word, replacement: Word) returns (Word) { value; return replacement; }",
-    "function loop(flag: Bool) { while (flag) { break; } }"
+    "function nestedOnly(flag: bool) { if (flag) { true; } else { false; } }",
+    "function nonTail(value: word, replacement: word) returns (word) { value; return replacement; }",
+    "function loop(flag: bool) { while (flag) { break; } }"
   ] }]
   externalLibraries := []
 }
@@ -1693,7 +1693,7 @@ private def workspace : Workspace.RawWorkspace := {
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Tree<T> { Leaf(T), Pair(Tree<T>, Tree<T>) }",
     "enum Box { Only }",
-    "function identity(value: Word) returns (Word) { return value; }"
+    "function identity(value: word) returns (word) { return value; }"
   ] }]
 }
 
@@ -1797,8 +1797,8 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Tree<T> { Leaf(T), Pair(Tree<T>, Tree<T>) }",
-    "enum Packet<T> { Empty, Only(T), Many(T, Bool, Word) }",
-    "function identity(value: Word) returns (Word) { return value; }"
+    "enum Packet<T> { Empty, Only(T), Many(T, bool, word) }",
+    "function identity(value: word) returns (word) { return value; }"
   ] }] }
 
 private def dataSignature (program : CheckedProgram) (name : String) : IO ProgramDataSignature :=
@@ -2038,39 +2038,39 @@ private def present (value : Core.Value) : Core.Value := .inRight .unit value
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function inc(value: Word) returns (Word) { return value + 1; }",
-    "function consume(f: function(Word) returns (Word), value: Word) returns (Word) { return f(value); }",
-    "function named(value: Word) returns (Word) { let f: function(Word) returns (Word) = inc; return consume(f, value); }",
-    "function makeAdder(value: Word) returns (function(Word) returns (Word)) {",
-    " return lam(delta: Word) -> Word { value = value + delta; return value; }; }",
-    "function useReturned(value: Word) returns (Word, Word) {",
-    " let f: function(Word) returns (Word) = makeAdder(value); return (f(2), f(3)); }",
-    "function shared(value: Word) returns (Word, Word) {",
-    " let f: function(Word) returns (Word) = lam(delta: Word) -> Word { value = value + delta; return value; };",
-    " let g: function(Word) returns (Word) = lam(delta: Word) -> Word { value = value + delta; return value; }; return (f(2), g(3)); }",
-    "function selfCell(value: Word) returns (Word) {",
-    " let loop: function(Word) returns (Word);",
-    " loop = lam(n: Word) -> Word { return n == 0 ? value : loop(n - 1); }; return loop(3); }",
-    "function nestedCapture(value: Word) returns (Word) {",
-    " let outer: function(Word) returns (function() returns (Word)) = lam(delta: Word) -> function() returns (Word) {",
-    "   return lam() -> Word { return inc(value + delta); }; };",
-    " let inner: function() returns (Word) = outer(3); value = 9; return inner(); }",
-    "function bounce(count: Word, f: function(Word) returns (Word)) returns (Word) {",
+    "function inc(value: word) returns (word) { return value + 1; }",
+    "function consume(f: function(word) returns (word), value: word) returns (word) { return f(value); }",
+    "function named(value: word) returns (word) { let f: function(word) returns (word) = inc; return consume(f, value); }",
+    "function makeAdder(value: word) returns (function(word) returns (word)) {",
+    " return lam(delta: word) -> word { value = value + delta; return value; }; }",
+    "function useReturned(value: word) returns (word, word) {",
+    " let f: function(word) returns (word) = makeAdder(value); return (f(2), f(3)); }",
+    "function shared(value: word) returns (word, word) {",
+    " let f: function(word) returns (word) = lam(delta: word) -> word { value = value + delta; return value; };",
+    " let g: function(word) returns (word) = lam(delta: word) -> word { value = value + delta; return value; }; return (f(2), g(3)); }",
+    "function selfCell(value: word) returns (word) {",
+    " let loop: function(word) returns (word);",
+    " loop = lam(n: word) -> word { return n == 0 ? value : loop(n - 1); }; return loop(3); }",
+    "function nestedCapture(value: word) returns (word) {",
+    " let outer: function(word) returns (function() returns (word)) = lam(delta: word) -> function() returns (word) {",
+    "   return lam() -> word { return inc(value + delta); }; };",
+    " let inner: function() returns (word) = outer(3); value = 9; return inner(); }",
+    "function bounce(count: word, f: function(word) returns (word)) returns (word) {",
     " return count == 0 ? f(count) : bounce(count - 1, f); }",
-    "function useBounce(value: Word) returns (Word) {",
-    " let f: function(Word) returns (Word) = lam(n: Word) -> Word { return value + n; }; return bounce(3, f); }",
-    "function closureLoop(value: Word) returns (Word) {",
-    " let f: function(Word) returns (Word) = lam(n: Word) -> Word {",
+    "function useBounce(value: word) returns (word) {",
+    " let f: function(word) returns (word) = lam(n: word) -> word { return value + n; }; return bounce(3, f); }",
+    "function closureLoop(value: word) returns (word) {",
+    " let f: function(word) returns (word) = lam(n: word) -> word {",
     "   while (n > 0) { value = inc(value); n = n - 1; } return value; }; return f(3); }",
-    "function failBeforeArgument() returns (Word) {",
-    " let f: function(Word) returns (Word); let marker: Word = 0;",
-    " let argument: function() returns (Word) = lam() -> Word { marker = 9; return marker; }; return f(argument()); }",
-    "function makeFailure() returns (function() returns (Word)) {",
-    " let absent: Word; return lam() -> Word { return absent; }; }",
-    "function useFailure() returns (Word) { let f: function() returns (Word) = makeFailure(); return f(); }",
-    "function pairInput(pair: (Word, Bool)) returns (Word, Bool) { return pair; }",
-    "function rejectProduct(pair: (Word, function(Word) returns (Word))) returns (Word) { return 0; }",
-    "function staged(comptime value: Word) returns (Word) { return value; }"
+    "function failBeforeArgument() returns (word) {",
+    " let f: function(word) returns (word); let marker: word = 0;",
+    " let argument: function() returns (word) = lam() -> word { marker = 9; return marker; }; return f(argument()); }",
+    "function makeFailure() returns (function() returns (word)) {",
+    " let absent: word; return lam() -> word { return absent; }; }",
+    "function useFailure() returns (word) { let f: function() returns (word) = makeFailure(); return f(); }",
+    "function pairInput(pair: (word, bool)) returns (word, bool) { return pair; }",
+    "function rejectProduct(pair: (word, function(word) returns (word))) returns (word) { return 0; }",
+    "function staged(comptime value: word) returns (word) { return value; }"
   ] }]
 }
 
@@ -2257,35 +2257,35 @@ private def present (value : Core.Value) : Core.Value := .inRight .unit value
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function inc(value: Word) returns (Word) { return value + 1; }",
-    "function dec(value: Word) returns (Word) { return value - 1; }",
-    "function consume(f: function(Word) returns (Word), value: Word) returns (Word) { return f(value); }",
-    "function named(value: Word) returns (Word) { let f: function(Word) returns (Word) = inc; return consume(f, value); }",
-    "function shared(value: Word) returns (Word, Word) {",
-    " let f: function(Word) returns (Word) = lam(delta: Word) -> Word { value = value + delta; return value; };",
-    " let g: function(Word) returns (Word) = lam(delta: Word) -> Word { value = value + delta; return value; };",
+    "function inc(value: word) returns (word) { return value + 1; }",
+    "function dec(value: word) returns (word) { return value - 1; }",
+    "function consume(f: function(word) returns (word), value: word) returns (word) { return f(value); }",
+    "function named(value: word) returns (word) { let f: function(word) returns (word) = inc; return consume(f, value); }",
+    "function shared(value: word) returns (word, word) {",
+    " let f: function(word) returns (word) = lam(delta: word) -> word { value = value + delta; return value; };",
+    " let g: function(word) returns (word) = lam(delta: word) -> word { value = value + delta; return value; };",
     " return (f(2), g(3)); }",
-    "function selfCell(value: Word) returns (Word) {",
-    " let loop: function(Word) returns (Word);",
-    " loop = lam(n: Word) -> Word { return n == 0 ? value : loop(n - 1); }; return loop(3); }",
-    "function nestedCapture(value: Word) returns (Word) {",
-    " let outer: function(Word) returns (function() returns (Word)) = lam(delta: Word) -> function() returns (Word) {",
-    "   return lam() -> Word { return inc(value + delta); }; };",
-    " let inner: function() returns (Word) = outer(3); value = 9; return inner(); }",
-    "function failBeforeArgument() returns (Word) {",
-    " let f: function(Word) returns (Word); let marker: Word = 0;",
-    " let argument: function() returns (Word) = lam() -> Word { marker = 9; return marker; }; return f(argument()); }",
-    "function argumentFailure() returns (Word) {",
-    " let f: function(Word) returns (Word) = lam(value: Word) -> Word { return value; };",
-    " let absent: Word; return f(absent); }",
-    "function names() returns (function(Word) returns (Word), function(Word) returns (Word)) { return (inc, dec); }",
-    "function sameName() returns (function(Word) returns (Word), function(Word) returns (Word)) { return (inc, inc); }",
-    "function lambdaGlobal(value: Word) returns (Word) {",
-    " let f: function(Word) returns (Word) = lam(n: Word) -> Word { return inc(n) + value; }; return f(2); }",
-    "function closureLoop(value: Word) returns (Word) {",
-    " let f: function(Word) returns (Word) = lam(n: Word) -> Word {",
+    "function selfCell(value: word) returns (word) {",
+    " let loop: function(word) returns (word);",
+    " loop = lam(n: word) -> word { return n == 0 ? value : loop(n - 1); }; return loop(3); }",
+    "function nestedCapture(value: word) returns (word) {",
+    " let outer: function(word) returns (function() returns (word)) = lam(delta: word) -> function() returns (word) {",
+    "   return lam() -> word { return inc(value + delta); }; };",
+    " let inner: function() returns (word) = outer(3); value = 9; return inner(); }",
+    "function failBeforeArgument() returns (word) {",
+    " let f: function(word) returns (word); let marker: word = 0;",
+    " let argument: function() returns (word) = lam() -> word { marker = 9; return marker; }; return f(argument()); }",
+    "function argumentFailure() returns (word) {",
+    " let f: function(word) returns (word) = lam(value: word) -> word { return value; };",
+    " let absent: word; return f(absent); }",
+    "function names() returns (function(word) returns (word), function(word) returns (word)) { return (inc, dec); }",
+    "function sameName() returns (function(word) returns (word), function(word) returns (word)) { return (inc, inc); }",
+    "function lambdaGlobal(value: word) returns (word) {",
+    " let f: function(word) returns (word) = lam(n: word) -> word { return inc(n) + value; }; return f(2); }",
+    "function closureLoop(value: word) returns (word) {",
+    " let f: function(word) returns (word) = lam(n: word) -> word {",
     "   while (n > 0) { value = inc(value); n = n - 1; } return value; }; return f(3); }",
-    "function principal() returns (Word) { let id = lam(value) { return value; }; return id(4); }"
+    "function principal() returns (word) { let id = lam(value) { return value; }; return id(4); }"
   ] }]
 }
 
@@ -2558,7 +2558,7 @@ private def testMetadata (program : CheckedProgram) : IO Unit := do
   let badRecursiveInitializer : Workspace.RawWorkspace := {
     entry := "bad.solc", externalLibraries := []
     mainSources := [{ path := "bad.solc", content := "pragma solcore;\n" ++
-      "function bad() returns (Word) { let f: function() returns (Word) = lam() -> Word { return f(); }; return f(); }" }]
+      "function bad() returns (word) { let f: function() returns (word) = lam() -> word { return f(); }; return f(); }" }]
   }
   match checkProgram badRecursiveInitializer with
   | .error _ => pure ()
@@ -2597,13 +2597,13 @@ private def workspace : Workspace.RawWorkspace := {
     "enum Tree { Leaf(integer), Pair(Tree, Tree) }",
     "function keepTree(value: Tree) returns (Tree) { return value; }",
     "function keepMap(value: mapping(integer => Tree)) returns (mapping(integer => Tree)) { return value; }",
-    "function keepProxy(value: @Word) returns (@Word) { return value; }",
-    "function keepScalar(value: (integer, (Word, Bool))) returns (integer, (Word, Bool)) { return value; }",
-    "function pack(first: Tree, second: mapping(integer => Tree), third: @Word) returns (Tree, (mapping(integer => Tree), @Word)) { return (first, (second, third)); }",
+    "function keepProxy(value: @word) returns (@word) { return value; }",
+    "function keepScalar(value: (integer, (word, bool))) returns (integer, (word, bool)) { return value; }",
+    "function pack(first: Tree, second: mapping(integer => Tree), third: @word) returns (Tree, (mapping(integer => Tree), @word)) { return (first, (second, third)); }",
     "function absent(value: Tree) returns (Tree) { let missing: Tree; return missing; }",
     "function make(value: Tree) returns (function() returns (Tree)) { return lam() -> Tree { return value; }; }",
     "function keepFunction(value: function() returns (Tree)) returns (function() returns (Tree)) { return value; }",
-    "function staged(comptime value: Word) returns (Word) { return value; }"
+    "function staged(comptime value: word) returns (word) { return value; }"
   ] }]
 }
 
@@ -3325,9 +3325,9 @@ def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function echo(value: integer) returns (integer) { let copied: integer = value; return copied; }",
-    "function tree(input: (integer, (Bool, (Word, integer)))) returns (integer, (Bool, (Word, integer))) { return input; }",
-    "function replace(input: (integer, (Bool, (Word, integer))), replacement: (integer, (Bool, (Word, integer)))) returns (integer, (Bool, (Word, integer))) {",
-    " let saved: (integer, (Bool, (Word, integer))) = input; saved = replacement; return saved; }",
+    "function tree(input: (integer, (bool, (word, integer)))) returns (integer, (bool, (word, integer))) { return input; }",
+    "function replace(input: (integer, (bool, (word, integer))), replacement: (integer, (bool, (word, integer)))) returns (integer, (bool, (word, integer))) {",
+    " let saved: (integer, (bool, (word, integer))) = input; saved = replacement; return saved; }",
     "function named(value: integer) returns (integer) { return echo(value); }",
     "function shared(value: integer) returns (integer) {",
     " let f: function(integer) returns (integer) = lam(n: integer) -> integer { value = integerAdd(value, n); return value; };",
@@ -3336,7 +3336,7 @@ def workspace : Workspace.RawWorkspace := {
     " return integerEq(count, 0) ? value : recurse(integerSub(count, 1), value); }",
     "function absent() returns (integer) { let missing: integer; return missing; }",
     "function calleeFailure() returns (integer) { return absent(); }",
-    "function comptimeCompare(comptime value: integer) returns (Bool) { return integerLt(value, 0); }",
+    "function comptimeCompare(comptime value: integer) returns (bool) { return integerLt(value, 0); }",
     "function stagedEcho(comptime value: integer) returns (integer) { return value; }",
     "function useStaged(value: integer) returns (integer) { return stagedEcho(value); }",
     "function publicFunction(f: function(integer) returns (integer)) returns (integer) { return f(0); }",
@@ -3499,20 +3499,20 @@ private def literal (value : Nat) : Core.Expr := .word (word value)
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
+    "trait Mark<T> {}", "impl Mark<word> {}", "impl Mark<bool> {}",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
-    "function sameInnerType(flag: Bool) returns (Word, Word) {",
+    "function sameInnerType(flag: bool) returns (word, word) {",
     " let outer = lam(value) { let inner = lam(item) { return item; }; return inner(1); };",
-    " let one: Word = 1; return (outer(one), outer(flag)); }",
-    "function dependentInner(flag: Bool) returns ((Word, Word), (Bool, Bool)) {",
+    " let one: word = 1; return (outer(one), outer(flag)); }",
+    "function dependentInner(flag: bool) returns ((word, word), (bool, bool)) {",
     " let outer = lam(value) { let inner = lam(item) { return (value, item); }; return inner(value); };",
     " return (outer(1), outer(flag)); }",
-    "function sharedCapture(flag: Bool) returns (Word) {",
-    " let total: Word = 0; let f = lam(item) { total += 1; return item; };",
-    " let one: Word = 1; let two: Word = 2; f(one); f(flag); f(two); return total; }",
-    "function qualified(flag: Bool) returns (Word, Bool) {",
+    "function sharedCapture(flag: bool) returns (word) {",
+    " let total: word = 0; let f = lam(item) { total += 1; return item; };",
+    " let one: word = 1; let two: word = 2; f(one); f(flag); f(two); return total; }",
+    "function qualified(flag: bool) returns (word, bool) {",
     " let f = lam(item) { return keep(item); }; return (f(1), f(flag)); }",
-    "function unused() returns (Word) {",
+    "function unused() returns (word) {",
     " let outer = lam(value) { let inner = lam(item) { return item; }; return inner(value); }; return 9; }"
   ] }] }
 
@@ -3764,43 +3764,43 @@ private def present (value : Core.Value) : Core.Value := .inRight .unit value
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function whileCount(start: Word) returns (Word, Word) {",
-    "  let remaining: Word = start; let count: Word = 0;",
-    "  while (remaining > 0) { let copy: Word = remaining; remaining = remaining - 1; count = count + 1; }",
+    "function whileCount(start: word) returns (word, word) {",
+    "  let remaining: word = start; let count: word = 0;",
+    "  while (remaining > 0) { let copy: word = remaining; remaining = remaining - 1; count = count + 1; }",
     "  return (remaining, count);",
     "}",
-    "function forOrder(limit: Word) returns (Word, Word) {",
-    "  let count: Word = 0;",
-    "  for (let i: Word = 0; limit > i; i = i + 1) {",
+    "function forOrder(limit: word) returns (word, word) {",
+    "  let count: word = 0;",
+    "  for (let i: word = 0; limit > i; i = i + 1) {",
     "    count = count + 1; if (i == 1) { continue; } count = count + 10;",
     "  } return (count, limit);",
     "}",
-    "function forBreak(limit: Word) returns (Word) {",
-    "  let count: Word = 0; for (let i: Word = 0; limit > i; i = i + 1) { count = count + 1; break; }",
+    "function forBreak(limit: word) returns (word) {",
+    "  let count: word = 0; for (let i: word = 0; limit > i; i = i + 1) { count = count + 1; break; }",
     "  return count;",
     "}",
-    "function initializerScope(limit: Word) returns (Word) {",
-    "  let i: Word = 17; for (let i: Word = 0; limit > i; i = i + 1) { } return i;",
+    "function initializerScope(limit: word) returns (word) {",
+    "  let i: word = 17; for (let i: word = 0; limit > i; i = i + 1) { } return i;",
     "}",
-    "function postScope(limit: Word) returns (Word) {",
-    "  let copy: Word = 99;",
-    "  for (let i: Word = 0; limit > i; let copy: Word = i, i = copy + 1) { } return copy;",
+    "function postScope(limit: word) returns (word) {",
+    "  let copy: word = 99;",
+    "  for (let i: word = 0; limit > i; let copy: word = i, i = copy + 1) { } return copy;",
     "}",
-    "function nested() returns (Word, Word) {",
-    "  let outer: Word = 2; let count: Word = 0; while (outer > 0) {",
-    "    let inner: Word = 2; while (inner > 0) {",
+    "function nested() returns (word, word) {",
+    "  let outer: word = 2; let count: word = 0; while (outer > 0) {",
+    "    let inner: word = 2; while (inner > 0) {",
     "      inner = inner - 1; if (inner == 1) { continue; } count = count + 1; break;",
     "    } outer = outer - 1;",
     "  } return (count, outer);",
     "}",
-    "function returnInside(limit: Word) returns (Word) {",
-    "  let remaining: Word = limit; while (remaining > 0) { return remaining; } return 0;",
+    "function returnInside(limit: word) returns (word) {",
+    "  let remaining: word = limit; while (remaining > 0) { return remaining; } return 0;",
     "}",
-    "function absentCondition() returns (Word) { let missing: Bool; while (missing) { return 17; } return 0; }",
-    "function absentPost() returns (Word) { let missing: Word; for (let i: Word = 0; true; i = missing) { continue; } return 0; }",
-    "function absentInitializer() returns (Word) { let missing: Word; for (let i: Word = missing; true; i = i + 1) { break; } return 0; }",
+    "function absentCondition() returns (word) { let missing: bool; while (missing) { return 17; } return 0; }",
+    "function absentPost() returns (word) { let missing: word; for (let i: word = 0; true; i = missing) { continue; } return 0; }",
+    "function absentInitializer() returns (word) { let missing: word; for (let i: word = missing; true; i = i + 1) { break; } return 0; }",
     "function spin() { while (true) { continue; } }",
-    "function compound(limit: Word) { for (let i: Word = 0; limit > i; i += 1) { } }"
+    "function compound(limit: word) { for (let i: word = 0; limit > i; i += 1) { } }"
   ] }]
 }
 
@@ -4059,21 +4059,21 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" (
     (wordOperators.map fun (name, operator) =>
-      s!"function {name}(left: Word, right: Word) returns (Word)" ++ " { return left " ++ operator ++ " right; }") ++
+      s!"function {name}(left: word, right: word) returns (word)" ++ " { return left " ++ operator ++ " right; }") ++
     (comparisons.map fun (name, operator) =>
-      s!"function {name}(left: Word, right: Word) returns (Bool)" ++ " { return left " ++ operator ++ " right; }") ++ [
-    "function conjunction(left: Bool, right: Bool) returns (Bool) { return left && right; }",
-    "function disjunction(left: Bool, right: Bool) returns (Bool) { return left || right; }",
-    "function negation(input: Bool) returns (Bool) { return !input; }",
-    "function complement(input: Word) returns (Word) { return ~input; }",
-    "function literal() returns (Word) { return 17; }",
-    "function hugeLiteral() returns (Word) { return " ++ toString (Core.wordModulus + 5) ++ "; }",
-    "function nested(flag: Bool, value: Word) returns (Word, Bool) {",
+      s!"function {name}(left: word, right: word) returns (bool)" ++ " { return left " ++ operator ++ " right; }") ++ [
+    "function conjunction(left: bool, right: bool) returns (bool) { return left && right; }",
+    "function disjunction(left: bool, right: bool) returns (bool) { return left || right; }",
+    "function negation(input: bool) returns (bool) { return !input; }",
+    "function complement(input: word) returns (word) { return ~input; }",
+    "function literal() returns (word) { return 17; }",
+    "function hugeLiteral() returns (word) { return " ++ toString (Core.wordModulus + 5) ++ "; }",
+    "function nested(flag: bool, value: word) returns (word, bool) {",
     "  return ((flag ? value + 2 : value * 3), (!flag || (value > 0)));",
     "}",
-    "function builtin() returns (Word) { return wordFromInteger(1); }",
-    "function lt(left: Word, right: Word) returns (Bool) { return right > left; }",
-    "function lessCall(left: Word, right: Word) returns (Bool) { return left < right; }"
+    "function builtin() returns (word) { return wordFromInteger(1); }",
+    "function lt(left: word, right: word) returns (bool) { return right > left; }",
+    "function lessCall(left: word, right: word) returns (bool) { return left < right; }"
   ]) }]
 }
 
@@ -4357,32 +4357,32 @@ private def present (value : Core.Value) : Core.Value := .inRight .unit value
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function countdown(n: Word) returns (Word) { return n == 0 ? n : countdown(n - 1); }",
-    "function even(n: Word) returns (Bool) { return n == 0 ? true : odd(n - 1); }",
-    "function odd(n: Word) returns (Bool) { return n == 0 ? false : even(n - 1); }",
-    "function positive(n: Word) returns (Bool) { return n > 0; }",
-    "function decrement(n: Word) returns (Word) { return n - 1; }",
-    "function spin() returns (Word) { return spin(); }",
-    "function sumDown(n: Word) returns (Word) {",
-    "  let total: Word = 0; while (positive(n)) { total = total + n; n = decrement(n); } return total;",
+    "function countdown(n: word) returns (word) { return n == 0 ? n : countdown(n - 1); }",
+    "function even(n: word) returns (bool) { return n == 0 ? true : odd(n - 1); }",
+    "function odd(n: word) returns (bool) { return n == 0 ? false : even(n - 1); }",
+    "function positive(n: word) returns (bool) { return n > 0; }",
+    "function decrement(n: word) returns (word) { return n - 1; }",
+    "function spin() returns (word) { return spin(); }",
+    "function sumDown(n: word) returns (word) {",
+    "  let total: word = 0; while (positive(n)) { total = total + n; n = decrement(n); } return total;",
     "}",
-    "function useLoop(n: Word) returns (Word) { return sumDown(n) + 1; }",
-    "function zero() returns (Word) { return 7; }",
-    "function increment(value: Word) returns (Word) { let next: Word = value + 1; return next; }",
-    "function combine(a: Word, b: Word, c: Word) returns (Word) { return a + b + c; }",
-    "function nested(value: Word) returns (Word) { return combine(zero(), increment(value), value) * 2; }",
-    "function echoProduct(value: (Word, Bool)) returns (Word, Bool) { return value; }",
-    "function productCall(value: Word) returns (Word, Bool) { return echoProduct((value, true)); }",
-    "function failLeft() returns (Word) { let absent: Word; return absent; }",
-    "function failRight() returns (Word) { let absent: Word; return absent; }",
-    "function add(left: Word, right: Word) returns (Word) { return left + right; }",
-    "function chooseFailure(flag: Bool) returns (Word) { return flag ? add(failLeft(), failRight()) : add(1, failRight()); }",
-    "function leftValue() returns (Word) { let mark: Word = 31; return mark; }",
-    "function rightValue() returns (Word) { let mark: Word = 47; return mark; }",
-    "function ordered() returns (Word) { return add(leftValue(), rightValue()); }",
+    "function useLoop(n: word) returns (word) { return sumDown(n) + 1; }",
+    "function zero() returns (word) { return 7; }",
+    "function increment(value: word) returns (word) { let next: word = value + 1; return next; }",
+    "function combine(a: word, b: word, c: word) returns (word) { return a + b + c; }",
+    "function nested(value: word) returns (word) { return combine(zero(), increment(value), value) * 2; }",
+    "function echoProduct(value: (word, bool)) returns (word, bool) { return value; }",
+    "function productCall(value: word) returns (word, bool) { return echoProduct((value, true)); }",
+    "function failLeft() returns (word) { let absent: word; return absent; }",
+    "function failRight() returns (word) { let absent: word; return absent; }",
+    "function add(left: word, right: word) returns (word) { return left + right; }",
+    "function chooseFailure(flag: bool) returns (word) { return flag ? add(failLeft(), failRight()) : add(1, failRight()); }",
+    "function leftValue() returns (word) { let mark: word = 31; return mark; }",
+    "function rightValue() returns (word) { let mark: word = 47; return mark; }",
+    "function ordered() returns (word) { return add(leftValue(), rightValue()); }",
     "function empty() { }",
-    "function staged(comptime value: Word) returns (Word) { return value; }",
-    "function stagedResult(value: Word) returns (comptime<Word>) { return 1; }"
+    "function staged(comptime value: word) returns (word) { return value; }",
+    "function stagedResult(value: word) returns (comptime<word>) { return 1; }"
   ] }]
 }
 
@@ -4573,28 +4573,28 @@ private def functionType : TypeSystem.Ty := .function .word .word
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Holder { Put(function(Word) returns (Word)) }",
-    "enum Branch { Leaf(function(Word) returns (Word)), Pair(Branch, Branch) }",
-    "function inc(value: Word) returns (Word) { return value + 1; }",
-    "function make(value: Word) returns (function(Word) returns (Word)) {",
-    " return lam(delta: Word) -> Word { value = value + delta; return inc(value); }; }",
-    "function twins(value: Word) returns (function(Word) returns (Word), function(Word) returns (Word)) {",
-    " let f: function(Word) returns (Word) = lam(delta: Word) -> Word { value = value + delta; return value; };",
-    " let g: function(Word) returns (Word) = lam(delta: Word) -> Word { value = value + delta; return value; }; return (f, g); }",
-    "function use(f: function(Word) returns (Word), delta: Word) returns (Word) { return f(delta); }",
-    "function mirror(f: function(Word) returns (Word)) returns (function(Word) returns (Word)) { return f; }",
-    "function named() returns (function(Word) returns (Word)) { return inc; }",
-    "function boxed(f: function(Word) returns (Word)) returns (Holder) { return .Put(f); }",
+    "enum Holder { Put(function(word) returns (word)) }",
+    "enum Branch { Leaf(function(word) returns (word)), Pair(Branch, Branch) }",
+    "function inc(value: word) returns (word) { return value + 1; }",
+    "function make(value: word) returns (function(word) returns (word)) {",
+    " return lam(delta: word) -> word { value = value + delta; return inc(value); }; }",
+    "function twins(value: word) returns (function(word) returns (word), function(word) returns (word)) {",
+    " let f: function(word) returns (word) = lam(delta: word) -> word { value = value + delta; return value; };",
+    " let g: function(word) returns (word) = lam(delta: word) -> word { value = value + delta; return value; }; return (f, g); }",
+    "function use(f: function(word) returns (word), delta: word) returns (word) { return f(delta); }",
+    "function mirror(f: function(word) returns (word)) returns (function(word) returns (word)) { return f; }",
+    "function named() returns (function(word) returns (word)) { return inc; }",
+    "function boxed(f: function(word) returns (word)) returns (Holder) { return .Put(f); }",
     "function echoBox(value: Holder) returns (Holder) { return value; }",
-    "function unbox(value: Holder) returns (function(Word) returns (Word)) { match (value) { case .Put(f) { return f; } } }",
-    "function echoMap(value: mapping(Word => function(Word) returns (Word))) returns (mapping(Word => function(Word) returns (Word))) { return value; }",
-    "function fromMap(value: mapping(Word => function(Word) returns (Word)), key: Word) returns (function(Word) returns (Word)) { return value[key]; }",
-    "function echoPair(value: (Word, function(Word) returns (Word))) returns (Word, function(Word) returns (Word)) { return value; }",
-    "function failurePair(value: Word) returns (function(Word) returns (Word), function() returns (Word)) {",
-    " let f: function(Word) returns (Word) = lam(delta: Word) -> Word { value = value + delta; let absent: Word; return absent; };",
-    " let g: function() returns (Word) = lam() -> Word { return value; }; return (f, g); }",
-    "function get(f: function() returns (Word)) returns (Word) { return f(); }"
-    , "function proxyWord() returns (@Word) { return @Word; }"
+    "function unbox(value: Holder) returns (function(word) returns (word)) { match (value) { case .Put(f) { return f; } } }",
+    "function echoMap(value: mapping(word => function(word) returns (word))) returns (mapping(word => function(word) returns (word))) { return value; }",
+    "function fromMap(value: mapping(word => function(word) returns (word)), key: word) returns (function(word) returns (word)) { return value[key]; }",
+    "function echoPair(value: (word, function(word) returns (word))) returns (word, function(word) returns (word)) { return value; }",
+    "function failurePair(value: word) returns (function(word) returns (word), function() returns (word)) {",
+    " let f: function(word) returns (word) = lam(delta: word) -> word { value = value + delta; let absent: word; return absent; };",
+    " let g: function() returns (word) = lam() -> word { return value; }; return (f, g); }",
+    "function get(f: function() returns (word)) returns (word) { return f(); }"
+    , "function proxyWord() returns (@word) { return @word; }"
     , "function echoBranch(value: Branch) returns (Branch) { return value; }"
   ] }] }
 

@@ -3231,8 +3231,8 @@ private def raw (sources : List (String × String)) (entry : String) :
 private def provider : String := String.intercalate "\n" [
   "export {*};",
   "trait Eq<T> {}",
-  "function remote(value: Bool) returns (Bool) { return value; }",
-  "function hidden(value: Bool) returns (Bool) { return value; }"
+  "function remote(value: bool) returns (bool) { return value; }",
+  "function hidden(value: bool) returns (bool) { return value; }"
 ]
 
 private def expectSuccess (workspace : Workspace.RawWorkspace) : IO Unit := do
@@ -3243,13 +3243,13 @@ private def expectSuccess (workspace : Workspace.RawWorkspace) : IO Unit := do
 private def testSelectedValuesTraitsAndLocalShadowing : IO Unit := do
   let consumer := String.intercalate "\n" [
     "import {remote as imported, Eq as Comparable} from provider;",
-    "function remote(value: Word) returns (Word) { return value; }",
+    "function remote(value: word) returns (word) { return value; }",
     -- An implementation away from its trait's module is for this module's own
     -- type, as upstream's orphan rule (`SC0246`) requires.
     "enum Local { Only }",
     "impl Comparable<Local> {}",
     "function constrained<T>(value: T) returns (T) where T: Comparable { return value; }",
-    "function run() returns (Word, Bool) { return (remote(1), imported(true)); }"
+    "function run() returns (word, bool) { return (remote(1), imported(true)); }"
   ]
   expectSuccess (raw [("provider.solc", provider), ("consumer.solc", consumer)]
     "consumer.solc")
@@ -3257,7 +3257,7 @@ private def testSelectedValuesTraitsAndLocalShadowing : IO Unit := do
 private def testQualifiedNamespaceValue : IO Unit := do
   let consumer := String.intercalate "\n" [
     "import * as Provider from provider;",
-    "function run() returns (Bool) { return Provider.remote(true); }"
+    "function run() returns (bool) { return Provider.remote(true); }"
   ]
   expectSuccess (raw [("provider.solc", provider), ("consumer.solc", consumer)]
     "consumer.solc")
@@ -3265,7 +3265,7 @@ private def testQualifiedNamespaceValue : IO Unit := do
 private def testImportsCloseUnqualifiedVisibility : IO Unit := do
   let consumer := String.intercalate "\n" [
     "import {remote} from provider;",
-    "function bad() returns (Bool) { return hidden(true); }"
+    "function bad() returns (bool) { return hidden(true); }"
   ]
   match SourceInference.loadAndCheckProgram
       (raw [("provider.solc", provider), ("consumer.solc", consumer)]
@@ -3280,7 +3280,7 @@ private def testImportsCloseUnqualifiedVisibility : IO Unit := do
 
 private def testNoImportIsolation : IO Unit := do
   let consumer :=
-    "function run() returns (Bool) { return hidden(true); }"
+    "function run() returns (bool) { return hidden(true); }"
   match SourceInference.loadAndCheckProgram
       (raw [("provider.solc", provider), ("consumer.solc", consumer)]
         "consumer.solc") with
@@ -3294,7 +3294,7 @@ private def testNoImportIsolation : IO Unit := do
 
 private def testCanonicalPathDoesNotBypassImports : IO Unit := do
   let consumer :=
-    "function bad() returns (Bool) { return provider.hidden(true); }"
+    "function bad() returns (bool) { return provider.hidden(true); }"
   match SourceInference.loadAndCheckProgram
       (raw [("provider.solc", provider), ("consumer.solc", consumer)]
         "consumer.solc") with
@@ -3309,12 +3309,12 @@ private def testCanonicalPathDoesNotBypassImports : IO Unit := do
 /-- Two namespace imports under one alias are refused at the load, as upstream's `SC0116` refuses
 them, before any qualified name of the alias resolves. -/
 private def testAmbiguousNamespace : IO Unit := do
-  let left := "export {*}; function choose(value: Word) returns (Word) { return value; }"
-  let right := "export {*}; function choose(value: Word) returns (Word) { return value; }"
+  let left := "export {*}; function choose(value: word) returns (word) { return value; }"
+  let right := "export {*}; function choose(value: word) returns (word) { return value; }"
   let consumer := String.intercalate "\n" [
     "import * as Shared from left;",
     "import * as Shared from right;",
-    "function run() returns (Word) { return Shared.choose(1); }"
+    "function run() returns (word) { return Shared.choose(1); }"
   ]
   match SourceInference.loadAndCheckProgram
       (raw [("left.solc", left), ("right.solc", right),
@@ -3333,7 +3333,7 @@ private def testReexportedEntitiesAndModulePath : IO Unit := do
   let provider := String.intercalate "\n" [
     "enum Box { Only }",
     "trait Marker<T> {}",
-    "function keep(value: Bool) returns (Bool) { return value; }",
+    "function keep(value: bool) returns (bool) { return value; }",
     "export {*};"
   ]
   let facade := String.intercalate "\n" [
@@ -3349,7 +3349,7 @@ private def testReexportedEntitiesAndModulePath : IO Unit := do
     "enum Local { Only }",
     "impl Comparable<Local> {}",
     "function constrained<T>(value: T) returns (T) where T: Comparable { return value; }",
-    "function run(value: F.P.Box) returns (Bool, Bool) { return (renamed(true), F.P.keep(true)); }"
+    "function run(value: F.P.Box) returns (bool, bool) { return (renamed(true), F.P.keep(true)); }"
   ]
   expectSuccess (raw [
     ("provider.solc", provider),
@@ -3359,13 +3359,13 @@ private def testReexportedEntitiesAndModulePath : IO Unit := do
 
 private def testNamespaceHonorsPublicInterface : IO Unit := do
   let provider := String.intercalate "\n" [
-    "function visible(value: Bool) returns (Bool) { return value; }",
-    "function hidden(value: Bool) returns (Bool) { return value; }",
+    "function visible(value: bool) returns (bool) { return value; }",
+    "function hidden(value: bool) returns (bool) { return value; }",
     "export {visible};"
   ]
   let consumer := String.intercalate "\n" [
     "import * as Provider from provider;",
-    "function bad() returns (Bool) { return Provider.hidden(true); }"
+    "function bad() returns (bool) { return Provider.hidden(true); }"
   ]
   match SourceInference.loadAndCheckProgram
       (raw [("provider.solc", provider), ("consumer.solc", consumer)]

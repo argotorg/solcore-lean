@@ -72,12 +72,12 @@ theorem context_and_owner {program : CheckedProgram} {method : ExecutableImplMet
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Marker<T> {}", "impl Marker<Word> {}",
-    "trait Witness<T> {}", "impl Witness<Word> {}",
+    "trait Marker<T> {}", "impl Marker<word> {}",
+    "trait Witness<T> {}", "impl Witness<word> {}",
     "trait Coerce<From, To> where From: Marker { function coerce(value: From) returns (To) where From: Witness; }",
     "function hold<T>(value: T) returns (T) where T: Witness { return value; }",
-    "impl<T> Coerce<T, Bool> where T: Marker { function coerce(value: T) returns (Bool) where T: Witness { let local: T = hold(value); return true; } }",
-    "function converted(value: Word) returns (Bool) where Word: Marker { return value; }"
+    "impl<T> Coerce<T, bool> where T: Marker { function coerce(value: T) returns (bool) where T: Witness { let local: T = hold(value); return true; } }",
+    "function converted(value: word) returns (bool) where word: Marker { return value; }"
   ]}] }
 
 private def audit (entry : SourceCompilerFeatureSupport.Entry) : IO Unit := do
@@ -231,14 +231,14 @@ theorem nonempty_header_profile (seed : SourceSpecialization.SpecializedFunction
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Marker<T> {}",
-    "impl Marker<Bool> {}",
+    "impl Marker<bool> {}",
     "trait Witness<T> {}",
-    "impl Witness<Bool> {}",
+    "impl Witness<bool> {}",
     "trait Coerce<From, To> where From: Marker { function coerce(value: From) returns (To) where From: Witness; }",
-    "impl Coerce<Bool, Word> where Bool: Marker { function coerce(value: Bool) returns (Word) where Bool: Witness { return value ? 17 : 4; } }",
-    "function covered(flag: Bool) returns (Word) where Bool: Marker { return flag; }",
-    "function repeated(flag: Bool) returns (Word) where Bool: Marker, Bool: Marker { return flag; }",
-    "function uncovered(flag: Bool) returns (Word) { return flag; }"
+    "impl Coerce<bool, word> where bool: Marker { function coerce(value: bool) returns (word) where bool: Witness { return value ? 17 : 4; } }",
+    "function covered(flag: bool) returns (word) where bool: Marker { return flag; }",
+    "function repeated(flag: bool) returns (word) where bool: Marker, bool: Marker { return flag; }",
+    "function uncovered(flag: bool) returns (word) { return flag; }"
   ]}] }
 
 private def audit (entry : SourceCompilerFeatureSupport.Entry) (expectCovered : Bool) : IO Unit := do
@@ -414,23 +414,23 @@ end Meaning
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Box { Box(Bool) }", "enum Final { Final(Box) }", "enum Broken { Broken(Box) }",
-    "trait Marker<T> {}", "impl Marker<Word> {}", "impl Marker<Bool> {}", "impl Marker<Box> {}",
-    "trait Witness<T> {}", "impl Witness<Word> {}", "impl Witness<Bool> {}", "impl Witness<Box> {}",
+    "enum Box { Box(bool) }", "enum Final { Final(Box) }", "enum Broken { Broken(Box) }",
+    "trait Marker<T> {}", "impl Marker<word> {}", "impl Marker<bool> {}", "impl Marker<Box> {}",
+    "trait Witness<T> {}", "impl Witness<word> {}", "impl Witness<bool> {}", "impl Witness<Box> {}",
     "trait Coerce<From, To> where From: Marker { function coerce(value: From) returns (To) where From: Witness; }",
-    "impl Coerce<Word, Bool> where Word: Marker { function coerce(value: Word) returns (Bool) where Word: Witness { let saved: Word = value; if (value == 0) { let firstGap: Bool; return firstGap; } return value == 1; } }",
-    "impl Coerce<Bool, Box> where Bool: Marker { function coerce(value: Bool) returns (Box) where Bool: Witness { let m: mapping(Bool => Word); let touched = m[value]; if (value) { return Box(value); } let secondGap: Box; return secondGap; } }",
-    "impl Coerce<Box, Final> where Box: Marker { function coerce(value: Box) returns (Final) where Box: Witness { let reached: Word = 31; return Final(value); } }",
-    "impl Coerce<Box, Broken> where Box: Marker { function coerce(value: Box) returns (Broken) where Box: Witness { let reached: Word = 37; let lastGap: Broken; return lastGap; } }",
-    "function identity(value: Word) returns (Word) { let rawEffect: Word = 19; return value; }",
-    "function rawFail() returns (Word) { let rawEffect: Word = 23; let rawGap: Word; return rawGap; }",
-    "function direct(value: Word) returns (Final) where Word: Marker, Bool: Marker, Box: Marker { let result: Final = identity(value); return result; }",
-    "function emptySelected(value: Word) returns (Word) where Word: Marker { return identity(value); }",
-    "function bypass(value: Word) returns (Word) { return identity(value); }",
-    "function path(value: Word) returns (Final) where Word: Marker, Word: Marker, Bool: Marker, Box: Marker { let result: Final = value + 0; return result; }",
-    "function late(value: Word) returns (Broken) where Word: Marker, Bool: Marker, Box: Marker { let result: Broken = value + 0; return result; }",
-    "function early() returns (Final) where Word: Marker, Bool: Marker, Box: Marker { let result: Final = rawFail(); return result; }",
-    "function empty(value: Word) returns (Word) { return value; }"
+    "impl Coerce<word, bool> where word: Marker { function coerce(value: word) returns (bool) where word: Witness { let saved: word = value; if (value == 0) { let firstGap: bool; return firstGap; } return value == 1; } }",
+    "impl Coerce<bool, Box> where bool: Marker { function coerce(value: bool) returns (Box) where bool: Witness { let m: mapping(bool => word); let touched = m[value]; if (value) { return Box(value); } let secondGap: Box; return secondGap; } }",
+    "impl Coerce<Box, Final> where Box: Marker { function coerce(value: Box) returns (Final) where Box: Witness { let reached: word = 31; return Final(value); } }",
+    "impl Coerce<Box, Broken> where Box: Marker { function coerce(value: Box) returns (Broken) where Box: Witness { let reached: word = 37; let lastGap: Broken; return lastGap; } }",
+    "function identity(value: word) returns (word) { let rawEffect: word = 19; return value; }",
+    "function rawFail() returns (word) { let rawEffect: word = 23; let rawGap: word; return rawGap; }",
+    "function direct(value: word) returns (Final) where word: Marker, bool: Marker, Box: Marker { let result: Final = identity(value); return result; }",
+    "function emptySelected(value: word) returns (word) where word: Marker { return identity(value); }",
+    "function bypass(value: word) returns (word) { return identity(value); }",
+    "function path(value: word) returns (Final) where word: Marker, word: Marker, bool: Marker, Box: Marker { let result: Final = value + 0; return result; }",
+    "function late(value: word) returns (Broken) where word: Marker, bool: Marker, Box: Marker { let result: Broken = value + 0; return result; }",
+    "function early() returns (Final) where word: Marker, bool: Marker, Box: Marker { let result: Final = rawFail(); return result; }",
+    "function empty(value: word) returns (word) { return value; }"
   ]}] }
 
 private def word (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
@@ -906,12 +906,12 @@ theorem accepted_method_reflects [FunctionCalls.FaultTokens faults] {call : Call
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Marker<T> {}", "impl Marker<Bool> {}",
-    "trait Witness<T> {}", "impl Witness<Bool> {}",
+    "trait Marker<T> {}", "impl Marker<bool> {}",
+    "trait Witness<T> {}", "impl Witness<bool> {}",
     "trait Coerce<From, To> where From: Marker { function coerce(value: From) returns (To) where From: Witness; }",
-    "impl Coerce<Bool, Word> where Bool: Marker { function coerce(value: Bool) returns (Word) where Bool: Witness { let m: mapping(Bool => Word); let first = m[value]; { let shadow: Word = first + 6; shadow; } if (value) { return first + 19; } let gap: Word; return gap; } }",
-    "function covered(flag: Bool) returns (Word) where Bool: Marker, Bool: Marker { let converted: Word = flag; return converted; }",
-    "function early() returns (Word) where Bool: Marker { let missing: Bool; let converted: Word = missing; return converted; }"
+    "impl Coerce<bool, word> where bool: Marker { function coerce(value: bool) returns (word) where bool: Witness { let m: mapping(bool => word); let first = m[value]; { let shadow: word = first + 6; shadow; } if (value) { return first + 19; } let gap: word; return gap; } }",
+    "function covered(flag: bool) returns (word) where bool: Marker, bool: Marker { let converted: word = flag; return converted; }",
+    "function early() returns (word) where bool: Marker { let missing: bool; let converted: word = missing; return converted; }"
   ]}] }
 
 private def methodAt (entry : SourceCompilerFeatureSupport.Entry) : IO ExecutableImplMethods.CheckedMethod := do
@@ -1122,13 +1122,13 @@ theorem completed_at_two_dictionaries [FunctionCalls.FaultTokens faults]
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Marker<T> {}", "impl Marker<Bool> {}",
-    "trait Witness<T> {}", "impl Witness<Bool> {}",
+    "trait Marker<T> {}", "impl Marker<bool> {}",
+    "trait Witness<T> {}", "impl Witness<bool> {}",
     "trait Coerce<From, To> where From: Marker { function coerce(value: From) returns (To) where From: Witness; }",
-    "impl Coerce<Bool, Word> where Bool: Marker { function coerce(value: Bool) returns (Word) where Bool: Witness { let m: mapping(Bool => Word); let first = m[value]; { let shadow: Word = first + 6; shadow; } if (value) { return first + 19; } let gap: Word; return gap; } }",
-    "function covered(flag: Bool) returns (Word) where Bool: Marker, Bool: Marker, Bool: Witness { let converted: Word = flag; return converted; }",
-    "function reordered(flag: Bool) returns (Word) where Bool: Witness, Bool: Marker, Bool: Marker { let converted: Word = flag; return converted; }",
-    "function early() returns (Word) where Bool: Marker { let missing: Bool; let converted: Word = missing; return converted; }"
+    "impl Coerce<bool, word> where bool: Marker { function coerce(value: bool) returns (word) where bool: Witness { let m: mapping(bool => word); let first = m[value]; { let shadow: word = first + 6; shadow; } if (value) { return first + 19; } let gap: word; return gap; } }",
+    "function covered(flag: bool) returns (word) where bool: Marker, bool: Marker, bool: Witness { let converted: word = flag; return converted; }",
+    "function reordered(flag: bool) returns (word) where bool: Witness, bool: Marker, bool: Marker { let converted: word = flag; return converted; }",
+    "function early() returns (word) where bool: Marker { let missing: bool; let converted: word = missing; return converted; }"
   ]}] }
 
 private def methodAt (entry : SourceCompilerFeatureSupport.Entry) : IO (ExecutableImplMethods.CheckedMethod × SourceCompilationPlan.EvidenceEnvironment × SourceCompilationPlan.EvidenceEnvironment) := do
@@ -1346,14 +1346,14 @@ theorem first_fault_skips_second [FunctionCalls.FaultTokens faults]
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Box { Box(Bool) }",
-    "trait Marker<T> {}", "impl Marker<Word> {}", "impl Marker<Bool> {}",
-    "trait Witness<T> {}", "impl Witness<Word> {}", "impl Witness<Bool> {}",
+    "enum Box { Box(bool) }",
+    "trait Marker<T> {}", "impl Marker<word> {}", "impl Marker<bool> {}",
+    "trait Witness<T> {}", "impl Witness<word> {}", "impl Witness<bool> {}",
     "trait Coerce<From, To> where From: Marker { function coerce(value: From) returns (To) where From: Witness; }",
-    "impl Coerce<Word, Bool> where Word: Marker { function coerce(value: Word) returns (Bool) where Word: Witness { let saved: Word = value; if (value == 0) { let firstGap: Bool; return firstGap; } return value == 1; } }",
-    "impl Coerce<Bool, Box> where Bool: Marker { function coerce(value: Bool) returns (Box) where Bool: Witness { let m: mapping(Bool => Word); let touched = m[value]; if (value) { return Box(value); } let secondGap: Box; return secondGap; } }",
-    "function path(value: Word) returns (Box) where Word: Marker, Word: Marker, Bool: Marker { let result: Box = value; return result; }",
-    "function early() returns (Box) where Word: Marker, Bool: Marker { let missing: Word; let result: Box = missing; return result; }"
+    "impl Coerce<word, bool> where word: Marker { function coerce(value: word) returns (bool) where word: Witness { let saved: word = value; if (value == 0) { let firstGap: bool; return firstGap; } return value == 1; } }",
+    "impl Coerce<bool, Box> where bool: Marker { function coerce(value: bool) returns (Box) where bool: Witness { let m: mapping(bool => word); let touched = m[value]; if (value) { return Box(value); } let secondGap: Box; return secondGap; } }",
+    "function path(value: word) returns (Box) where word: Marker, word: Marker, bool: Marker { let result: Box = value; return result; }",
+    "function early() returns (Box) where word: Marker, bool: Marker { let missing: word; let result: Box = missing; return result; }"
   ]}] }
 
 private def word (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
@@ -1540,12 +1540,12 @@ theorem changed_stage_rejected {left right : SourceSpecialization.SpecializedFun
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Marker<T> {}", "impl Marker<Bool> {}",
-    "trait Witness<T> {}", "impl Witness<Bool> {}",
+    "trait Marker<T> {}", "impl Marker<bool> {}",
+    "trait Witness<T> {}", "impl Witness<bool> {}",
     "trait Coerce<From, To> where From: Marker { function coerce(value: From) returns (To) where From: Witness; }",
-    "function choose(flag: Bool) returns (Word) { return flag ? 17 : 4; }",
-    "impl Coerce<Bool, Word> where Bool: Marker { function coerce(value: Bool) returns (Word) where Bool: Witness { let seen: Word = 2; let other: Word = 3; return choose(value); } }",
-    "function converted(flag: Bool) returns (Word) where Bool: Marker { return flag; }"
+    "function choose(flag: bool) returns (word) { return flag ? 17 : 4; }",
+    "impl Coerce<bool, word> where bool: Marker { function coerce(value: bool) returns (word) where bool: Witness { let seen: word = 2; let other: word = 3; return choose(value); } }",
+    "function converted(flag: bool) returns (word) where bool: Marker { return flag; }"
   ]}] }
 
 private def checkSelected (plan : Plan) (value : SourceSpecialization.SpecializedFunction) : IO Unit := do
@@ -1678,12 +1678,12 @@ theorem prepared_dictionary {program : CheckedProgram} {before after : SourceSpe
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
-    "function isZero(value: Word) returns (Bool) { return value == 0; }",
-    "impl Coerce<Word, Bool> { function coerce(value: Word) returns (Bool) { let flag: Bool = isZero(value); let roundtrip: Word = flag; return flag; } }",
-    "impl Coerce<Bool, Word> { function coerce(value: Bool) returns (Word) { if (value) { return 7; } return 3; } }",
-    "function converted(value: Word) returns (Bool) { let first: Bool = value; let second: Bool = value; return second; }",
-    "function accepts(value: Bool) returns (Word) { if (value) { return 13; } return 17; }",
-    "function indirect(value: Word) returns (Word) { let f: function(Bool) returns (Word) = accepts; return f(value); }"
+    "function isZero(value: word) returns (bool) { return value == 0; }",
+    "impl Coerce<word, bool> { function coerce(value: word) returns (bool) { let flag: bool = isZero(value); let roundtrip: word = flag; return flag; } }",
+    "impl Coerce<bool, word> { function coerce(value: bool) returns (word) { if (value) { return 7; } return 3; } }",
+    "function converted(value: word) returns (bool) { let first: bool = value; let second: bool = value; return second; }",
+    "function accepts(value: bool) returns (word) { if (value) { return 13; } return 17; }",
+    "function indirect(value: word) returns (word) { let f: function(bool) returns (word) = accepts; return f(value); }"
   ]}] }
 
 private def audit (entry : SourceCompilerFeatureSupport.Entry) (indirect : Bool) : IO Unit := do
@@ -1886,24 +1886,24 @@ end Accepted
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Box { Box(Bool) }", "enum Final { Final(Box) }", "enum Broken { Broken(Box) }",
-    "trait Marker<T> {}", "impl Marker<Word> {}", "impl Marker<Bool> {}", "impl Marker<Box> {}",
-    "trait Witness<T> {}", "impl Witness<Word> {}", "impl Witness<Bool> {}", "impl Witness<Box> {}",
+    "enum Box { Box(bool) }", "enum Final { Final(Box) }", "enum Broken { Broken(Box) }",
+    "trait Marker<T> {}", "impl Marker<word> {}", "impl Marker<bool> {}", "impl Marker<Box> {}",
+    "trait Witness<T> {}", "impl Witness<word> {}", "impl Witness<bool> {}", "impl Witness<Box> {}",
     "trait Coerce<From, To> where From: Marker { function coerce(value: From) returns (To) where From: Witness; }",
-    "impl Coerce<Word, Bool> where Word: Marker { function coerce(value: Word) returns (Bool) where Word: Witness { let saved: Word = value; if (value == 0) { let firstGap: Bool; return firstGap; } return value == 1; } }",
-    "impl Coerce<Bool, Box> where Bool: Marker { function coerce(value: Bool) returns (Box) where Bool: Witness { let m: mapping(Bool => Word); let touched = m[value]; if (value) { return Box(value); } let secondGap: Box; return secondGap; } }",
-    "impl Coerce<Box, Final> where Box: Marker { function coerce(value: Box) returns (Final) where Box: Witness { let reached: Word = 31; return Final(value); } }",
-    "impl Coerce<Box, Broken> where Box: Marker { function coerce(value: Box) returns (Broken) where Box: Witness { let reached: Word = 37; let lastGap: Broken; return lastGap; } }",
-    "function identity(value: Word) returns (Word) { let rawEffect: Word = 19; return value; }",
-    "function rawFail() returns (Word) { let rawEffect: Word = 23; let rawGap: Word; return rawGap; }",
-    "function direct(value: Word) returns (Final) where Word: Marker, Bool: Marker, Box: Marker { let result: Final = identity(value); return result; }",
-    "function emptySelected(value: Word) returns (Word) where Word: Marker { return identity(value); }",
-    "function bypass(value: Word) returns (Word) { return identity(value); }",
-    "function path(value: Word) returns (Final) where Word: Marker, Word: Marker, Bool: Marker, Box: Marker { let result: Final = value + 0; return result; }",
-    "function late(value: Word) returns (Broken) where Word: Marker, Bool: Marker, Box: Marker { let result: Broken = value + 0; return result; }",
-    "function early() returns (Final) where Word: Marker, Bool: Marker, Box: Marker { let result: Final = rawFail(); return result; }",
-    "function operand() returns (Final) where Word: Marker, Bool: Marker, Box: Marker { let missing: Word; let result: Final = missing + 0; return result; }",
-    "function empty(value: Word) returns (Word) { return value; }"
+    "impl Coerce<word, bool> where word: Marker { function coerce(value: word) returns (bool) where word: Witness { let saved: word = value; if (value == 0) { let firstGap: bool; return firstGap; } return value == 1; } }",
+    "impl Coerce<bool, Box> where bool: Marker { function coerce(value: bool) returns (Box) where bool: Witness { let m: mapping(bool => word); let touched = m[value]; if (value) { return Box(value); } let secondGap: Box; return secondGap; } }",
+    "impl Coerce<Box, Final> where Box: Marker { function coerce(value: Box) returns (Final) where Box: Witness { let reached: word = 31; return Final(value); } }",
+    "impl Coerce<Box, Broken> where Box: Marker { function coerce(value: Box) returns (Broken) where Box: Witness { let reached: word = 37; let lastGap: Broken; return lastGap; } }",
+    "function identity(value: word) returns (word) { let rawEffect: word = 19; return value; }",
+    "function rawFail() returns (word) { let rawEffect: word = 23; let rawGap: word; return rawGap; }",
+    "function direct(value: word) returns (Final) where word: Marker, bool: Marker, Box: Marker { let result: Final = identity(value); return result; }",
+    "function emptySelected(value: word) returns (word) where word: Marker { return identity(value); }",
+    "function bypass(value: word) returns (word) { return identity(value); }",
+    "function path(value: word) returns (Final) where word: Marker, word: Marker, bool: Marker, Box: Marker { let result: Final = value + 0; return result; }",
+    "function late(value: word) returns (Broken) where word: Marker, bool: Marker, Box: Marker { let result: Broken = value + 0; return result; }",
+    "function early() returns (Final) where word: Marker, bool: Marker, Box: Marker { let result: Final = rawFail(); return result; }",
+    "function operand() returns (Final) where word: Marker, bool: Marker, Box: Marker { let missing: word; let result: Final = missing + 0; return result; }",
+    "function empty(value: word) returns (word) { return value; }"
   ]}] }
 
 
@@ -2250,18 +2250,18 @@ end OpenScope
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Marker<T> {}", "impl Marker<Word> {}",
+    "trait Marker<T> {}", "impl Marker<word> {}",
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
-    "impl Coerce<Word, Bool> { function coerce(value: Word) returns (Bool) { let seen = value; if (value == 0) { let coercionGap: Bool; return coercionGap; } return value == 1; } }",
+    "impl Coerce<word, bool> { function coerce(value: word) returns (bool) { let seen = value; if (value == 0) { let coercionGap: bool; return coercionGap; } return value == 1; } }",
     "function choose<A, B>(left: A, right: B) returns (B) { return right; }",
     "function relay<T>(value: T) returns (T) { return value; }",
-    "function fixed(value: Word) returns (Word) { return choose(true, value); }",
-    "function fixedRelay(value: Word) returns (Word) { return choose(true, relay(value)); }",
-    "function fixedFail() returns (Word) { let before: Word = 61; let rawGap: Word; return rawGap; }",
-    "function convert(value: Word) returns (Bool) { return fixed(value); }",
-    "function nested(value: Word) returns (Bool) { return fixedRelay(value); }",
-    "function early() returns (Bool) { return fixedFail(); }",
-    "function emptySelected(value: Word) returns (Word) where Word: Marker { return fixed(value); }"
+    "function fixed(value: word) returns (word) { return choose(true, value); }",
+    "function fixedRelay(value: word) returns (word) { return choose(true, relay(value)); }",
+    "function fixedFail() returns (word) { let before: word = 61; let rawGap: word; return rawGap; }",
+    "function convert(value: word) returns (bool) { return fixed(value); }",
+    "function nested(value: word) returns (bool) { return fixedRelay(value); }",
+    "function early() returns (bool) { return fixedFail(); }",
+    "function emptySelected(value: word) returns (word) where word: Marker { return fixed(value); }"
   ]}] }
 private def require := SourceCompilerFeatureSupport.require
 private def word (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
@@ -2567,26 +2567,26 @@ end Accepted
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Marker<T> {}", "impl Marker<Word> {}", "enum Box<T> { Box(T) }",
+    "trait Marker<T> {}", "impl Marker<word> {}", "enum Box<T> { Box(T) }",
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
-    "impl Coerce<Word, integer> { function coerce(value: Word) returns (integer) { let seen = value; if (value == 0) { let coercionGap: integer; return coercionGap; } return wordToInteger(value); } }",
+    "impl Coerce<word, integer> { function coerce(value: word) returns (integer) { let seen = value; if (value == 0) { let coercionGap: integer; return coercionGap; } return wordToInteger(value); } }",
     "function choose<A, B>(unused: A, value: B) returns (B) { return value; }",
     "function relay<T>(value: T) returns (T) { return value; }",
-    "function last(a: Word, b: Word, c: Word) returns (Word) { return c; }",
-    "function one() returns (Word) { return 1; }",
-    "function converted(value: Word) returns (integer) { return choose(integerEq(wordToInteger(value), wordToInteger(1)), wordFromInteger(wordToInteger(value))); }",
-    "function lazy(value: Word) returns (integer) { let rawGap: Word; return choose(!false, value == 1 ? (value + 0) : rawGap); }",
-    "function first(value: Word) returns (integer) { let firstGap: Bool; let secondGap: Word; return choose(firstGap, wordFromInteger(wordToInteger(secondGap))); }",
-    "function second(value: Word) returns (integer) { let secondGap: Word; return choose(integerEq(wordToInteger(value), wordToInteger(1)), wordFromInteger(wordToInteger(secondGap))); }",
-    "function paired(value: Word) returns (integer) { return choose((wordFromInteger(wordToInteger(value)), true), wordFromInteger(wordToInteger(value))); }",
-    "function empty(value: Word) returns (integer) where Word: Marker { return choose(false, wordToInteger(value + 1)); }",
-    "function repeated(value: Word) returns (integer) { return last(wordFromInteger(wordToInteger(value)), wordFromInteger(wordToInteger(value)), wordFromInteger(wordToInteger(value))); }",
+    "function last(a: word, b: word, c: word) returns (word) { return c; }",
+    "function one() returns (word) { return 1; }",
+    "function converted(value: word) returns (integer) { return choose(integerEq(wordToInteger(value), wordToInteger(1)), wordFromInteger(wordToInteger(value))); }",
+    "function lazy(value: word) returns (integer) { let rawGap: word; return choose(!false, value == 1 ? (value + 0) : rawGap); }",
+    "function first(value: word) returns (integer) { let firstGap: bool; let secondGap: word; return choose(firstGap, wordFromInteger(wordToInteger(secondGap))); }",
+    "function second(value: word) returns (integer) { let secondGap: word; return choose(integerEq(wordToInteger(value), wordToInteger(1)), wordFromInteger(wordToInteger(secondGap))); }",
+    "function paired(value: word) returns (integer) { return choose((wordFromInteger(wordToInteger(value)), true), wordFromInteger(wordToInteger(value))); }",
+    "function empty(value: word) returns (integer) where word: Marker { return choose(false, wordToInteger(value + 1)); }",
+    "function repeated(value: word) returns (integer) { return last(wordFromInteger(wordToInteger(value)), wordFromInteger(wordToInteger(value)), wordFromInteger(wordToInteger(value))); }",
     "function zero() returns (integer) { return one(); }",
-    "function single(value: Word) returns (integer) { return relay(wordFromInteger(wordToInteger(value))); }",
-    "function boxed(value: Word) returns (integer) { return choose(Box(wordToInteger(value)), wordFromInteger(wordToInteger(value))); }",
-    "function indexed(m: mapping(Bool => Word), value: Word) returns (integer) { return choose(integerEq(wordToInteger(value), wordToInteger(1)), m[integerEq(wordToInteger(value), wordToInteger(1))]); }",
-    "function dataFault(value: Word) returns (integer) { let payloadGap: Word; return choose(Box(wordToInteger(payloadGap)), value); }",
-    "function keyFault(m: mapping(Bool => Word)) returns (integer) { let keyGap: Bool; return choose(false, m[keyGap]); }"
+    "function single(value: word) returns (integer) { return relay(wordFromInteger(wordToInteger(value))); }",
+    "function boxed(value: word) returns (integer) { return choose(Box(wordToInteger(value)), wordFromInteger(wordToInteger(value))); }",
+    "function indexed(m: mapping(bool => word), value: word) returns (integer) { return choose(integerEq(wordToInteger(value), wordToInteger(1)), m[integerEq(wordToInteger(value), wordToInteger(1))]); }",
+    "function dataFault(value: word) returns (integer) { let payloadGap: word; return choose(Box(wordToInteger(payloadGap)), value); }",
+    "function keyFault(m: mapping(bool => word)) returns (integer) { let keyGap: bool; return choose(false, m[keyGap]); }"
   ]}] }
 private def require := SourceCompilerFeatureSupport.require
 private def get {α ε : Type} [Repr ε] := @SourceCompilerFeatureSupport.get α ε _
@@ -2992,22 +2992,22 @@ end Accepted
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Marker<T> {}", "impl Marker<Word> {}",
+    "trait Marker<T> {}", "impl Marker<word> {}",
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
-    "impl Coerce<Word, Bool> { function coerce(value: Word) returns (Bool) { let seen = value; if (value == 0) { let coercionGap: Bool; return coercionGap; } return value == 1; } }",
+    "impl Coerce<word, bool> { function coerce(value: word) returns (bool) { let seen = value; if (value == 0) { let coercionGap: bool; return coercionGap; } return value == 1; } }",
     "function choose<A, B>(unused: A, value: B) returns (B) { return value; }",
     "function relay<T>(value: T) returns (T) { return value; }",
-    "function last(a: Word, b: Word, c: Word) returns (Word) { return c; }",
-    "function one() returns (Word) { return 1; }",
-    "function converted(value: Word) returns (Bool) { return choose((value == 1), (value + 0)); }",
-    "function lazy(value: Word) returns (Bool) { let rawGap: Word; return choose(!false, value == 1 ? (value + 0) : rawGap); }",
-    "function first(value: Word) returns (Bool) { let firstGap: Bool; let secondGap: Word; return choose(firstGap, secondGap); }",
-    "function second(value: Word) returns (Bool) { let secondGap: Word; return choose(value == 1, secondGap); }",
-    "function paired(value: Word) returns (Bool) { return choose((value, true), value); }",
-    "function empty(value: Word) returns (Word) where Word: Marker { return choose(false, value + 1); }",
-    "function repeated(value: Word) returns (Bool) { return last(value, value, value); }",
-    "function zero() returns (Bool) { return one(); }",
-    "function single(value: Word) returns (Bool) { return relay(value); }"
+    "function last(a: word, b: word, c: word) returns (word) { return c; }",
+    "function one() returns (word) { return 1; }",
+    "function converted(value: word) returns (bool) { return choose((value == 1), (value + 0)); }",
+    "function lazy(value: word) returns (bool) { let rawGap: word; return choose(!false, value == 1 ? (value + 0) : rawGap); }",
+    "function first(value: word) returns (bool) { let firstGap: bool; let secondGap: word; return choose(firstGap, secondGap); }",
+    "function second(value: word) returns (bool) { let secondGap: word; return choose(value == 1, secondGap); }",
+    "function paired(value: word) returns (bool) { return choose((value, true), value); }",
+    "function empty(value: word) returns (word) where word: Marker { return choose(false, value + 1); }",
+    "function repeated(value: word) returns (bool) { return last(value, value, value); }",
+    "function zero() returns (bool) { return one(); }",
+    "function single(value: word) returns (bool) { return relay(value); }"
   ]}] }
 private def require := SourceCompilerFeatureSupport.require
 private def get {α ε : Type} [Repr ε] := @SourceCompilerFeatureSupport.get α ε _
@@ -3342,29 +3342,29 @@ end Accepted
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Box { Box(Bool) }", "enum Final { Final(Box) }", "enum Broken { Broken(Box) }",
-    "trait Marker<T> {}", "impl Marker<Word> {}", "impl Marker<Bool> {}", "impl Marker<Box> {}",
-    "trait Witness<T> {}", "impl Witness<Word> {}", "impl Witness<Bool> {}", "impl Witness<Box> {}",
+    "enum Box { Box(bool) }", "enum Final { Final(Box) }", "enum Broken { Broken(Box) }",
+    "trait Marker<T> {}", "impl Marker<word> {}", "impl Marker<bool> {}", "impl Marker<Box> {}",
+    "trait Witness<T> {}", "impl Witness<word> {}", "impl Witness<bool> {}", "impl Witness<Box> {}",
     "trait Coerce<From, To> where From: Marker { function coerce(value: From) returns (To) where From: Witness; }",
-    "impl Coerce<Word, Bool> where Word: Marker { function coerce(value: Word) returns (Bool) where Word: Witness { let saved: Word = value; if (value == 0) { let firstGap: Bool; return firstGap; } return value == 1; } }",
-    "impl Coerce<Bool, Box> where Bool: Marker { function coerce(value: Bool) returns (Box) where Bool: Witness { let m: mapping(Bool => Word); let touched = m[value]; if (value) { return Box(value); } let secondGap: Box; return secondGap; } }",
-    "impl Coerce<Box, Final> where Box: Marker { function coerce(value: Box) returns (Final) where Box: Witness { let reached: Word = 31; return Final(value); } }",
-    "impl Coerce<Box, Broken> where Box: Marker { function coerce(value: Box) returns (Broken) where Box: Witness { let reached: Word = 37; let lastGap: Broken; return lastGap; } }",
-    "function identity(value: Word) returns (Word) { let rawEffect: Word = 19; return value; }",
-    "function rawFail() returns (Word) { let rawEffect: Word = 23; let rawGap: Word; return rawGap; }",
-    "function first(value: Word) returns (Word) { let firstEffect: Word = 41; return value; }",
-    "function second(value: Word) returns (Word) { let secondEffect: Word = 43; return value; }",
-    "function combine(left: Word, right: Word) returns (Word) { let bodyEffect: Word = 47; return right; }",
-    "function failBody(left: Word, right: Word) returns (Word) { let bodyEffect: Word = 53; let bodyGap: Word; return bodyGap; }",
-    "function recurse(value: Word, depth: Word) returns (Word) { if (depth == 0) { return value; } return recurse(value, depth - 1); }",
-    "function direct(value: Word) returns (Final) where Word: Marker, Bool: Marker, Box: Marker { let result: Final = combine(first(7), second(value)); return result; }",
-    "function late(value: Word) returns (Broken) where Word: Marker, Bool: Marker, Box: Marker { let result: Broken = combine(first(7), second(value)); return result; }",
-    "function recursive(value: Word) returns (Final) where Word: Marker, Bool: Marker, Box: Marker { let result: Final = recurse(value, 2); return result; }",
-    "function early() returns (Final) where Word: Marker, Bool: Marker, Box: Marker { let result: Final = combine(rawFail(), second(1)); return result; }",
-    "function secondFault() returns (Final) where Word: Marker, Bool: Marker, Box: Marker { let result: Final = combine(first(7), rawFail()); return result; }",
-    "function bodyFault() returns (Final) where Word: Marker, Bool: Marker, Box: Marker { let result: Final = failBody(first(7), second(1)); return result; }",
-    "function emptySelected(value: Word) returns (Word) where Word: Marker { return identity(value); }",
-    "function bypass(value: Word) returns (Word) { return identity(value); }"
+    "impl Coerce<word, bool> where word: Marker { function coerce(value: word) returns (bool) where word: Witness { let saved: word = value; if (value == 0) { let firstGap: bool; return firstGap; } return value == 1; } }",
+    "impl Coerce<bool, Box> where bool: Marker { function coerce(value: bool) returns (Box) where bool: Witness { let m: mapping(bool => word); let touched = m[value]; if (value) { return Box(value); } let secondGap: Box; return secondGap; } }",
+    "impl Coerce<Box, Final> where Box: Marker { function coerce(value: Box) returns (Final) where Box: Witness { let reached: word = 31; return Final(value); } }",
+    "impl Coerce<Box, Broken> where Box: Marker { function coerce(value: Box) returns (Broken) where Box: Witness { let reached: word = 37; let lastGap: Broken; return lastGap; } }",
+    "function identity(value: word) returns (word) { let rawEffect: word = 19; return value; }",
+    "function rawFail() returns (word) { let rawEffect: word = 23; let rawGap: word; return rawGap; }",
+    "function first(value: word) returns (word) { let firstEffect: word = 41; return value; }",
+    "function second(value: word) returns (word) { let secondEffect: word = 43; return value; }",
+    "function combine(left: word, right: word) returns (word) { let bodyEffect: word = 47; return right; }",
+    "function failBody(left: word, right: word) returns (word) { let bodyEffect: word = 53; let bodyGap: word; return bodyGap; }",
+    "function recurse(value: word, depth: word) returns (word) { if (depth == 0) { return value; } return recurse(value, depth - 1); }",
+    "function direct(value: word) returns (Final) where word: Marker, bool: Marker, Box: Marker { let result: Final = combine(first(7), second(value)); return result; }",
+    "function late(value: word) returns (Broken) where word: Marker, bool: Marker, Box: Marker { let result: Broken = combine(first(7), second(value)); return result; }",
+    "function recursive(value: word) returns (Final) where word: Marker, bool: Marker, Box: Marker { let result: Final = recurse(value, 2); return result; }",
+    "function early() returns (Final) where word: Marker, bool: Marker, Box: Marker { let result: Final = combine(rawFail(), second(1)); return result; }",
+    "function secondFault() returns (Final) where word: Marker, bool: Marker, Box: Marker { let result: Final = combine(first(7), rawFail()); return result; }",
+    "function bodyFault() returns (Final) where word: Marker, bool: Marker, Box: Marker { let result: Final = failBody(first(7), second(1)); return result; }",
+    "function emptySelected(value: word) returns (word) where word: Marker { return identity(value); }",
+    "function bypass(value: word) returns (word) { return identity(value); }"
   ]}] }
 
 private def word (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
@@ -3758,12 +3758,12 @@ theorem arbitrary_selection_reflects [FunctionCalls.FaultTokens faults] {selecte
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
-    "impl<B, A> Coerce<(A, B), Bool> { function coerce(value: (A, B)) returns (Bool) { let visited: Word = 7; return true; } }",
-    "impl<B, A> Coerce<(A, B), Word> { function coerce(value: (A, B)) returns (Word) { let visited: Word = 9; let gap: Word; return gap; } }",
-    "function converted(left: Word, right: Bool) returns (Bool) { let value: (Word, Bool) = (left, right); return value; }",
-    "function failed(left: Word, right: Bool) returns (Word) { let value: (Word, Bool) = (left, right); return value; }",
-    "function later(left: Word, right: Bool) returns (Word) { let value: (Word, Bool) = (left, right); let chosen: Bool = value; let gap: Word; return gap; }",
-    "function early() returns (Bool) { let missing: Word; let value: (Word, Bool) = (missing, false); return value; }"
+    "impl<B, A> Coerce<(A, B), bool> { function coerce(value: (A, B)) returns (bool) { let visited: word = 7; return true; } }",
+    "impl<B, A> Coerce<(A, B), word> { function coerce(value: (A, B)) returns (word) { let visited: word = 9; let gap: word; return gap; } }",
+    "function converted(left: word, right: bool) returns (bool) { let value: (word, bool) = (left, right); return value; }",
+    "function failed(left: word, right: bool) returns (word) { let value: (word, bool) = (left, right); return value; }",
+    "function later(left: word, right: bool) returns (word) { let value: (word, bool) = (left, right); let chosen: bool = value; let gap: word; return gap; }",
+    "function early() returns (bool) { let missing: word; let value: (word, bool) = (missing, false); return value; }"
   ]}] }
 
 private def inspect (entry : SourceCompilerFeatureSupport.Entry) : IO ExecutableImplMethods.CheckedMethod := do
@@ -4039,18 +4039,18 @@ theorem repeated_requirement_safe {compiler : CheckedProgram} {caller : SourceSp
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Box { Box(Bool) }", "enum Final { Final(Box) }", "enum Broken { Broken(Box) }",
-    "trait Marker<T> {}", "impl Marker<Word> {}", "impl Marker<Bool> {}", "impl Marker<Box> {}",
-    "trait Witness<T> {}", "impl Witness<Word> {}", "impl Witness<Bool> {}", "impl Witness<Box> {}",
+    "enum Box { Box(bool) }", "enum Final { Final(Box) }", "enum Broken { Broken(Box) }",
+    "trait Marker<T> {}", "impl Marker<word> {}", "impl Marker<bool> {}", "impl Marker<Box> {}",
+    "trait Witness<T> {}", "impl Witness<word> {}", "impl Witness<bool> {}", "impl Witness<Box> {}",
     "trait Coerce<From, To> where From: Marker { function coerce(value: From) returns (To) where From: Witness; }",
-    "impl Coerce<Word, Bool> where Word: Marker { function coerce(value: Word) returns (Bool) where Word: Witness { let saved: Word = value; if (value == 0) { let firstGap: Bool; return firstGap; } return value == 1; } }",
-    "impl Coerce<Bool, Box> where Bool: Marker { function coerce(value: Bool) returns (Box) where Bool: Witness { let m: mapping(Bool => Word); let touched = m[value]; if (value) { return Box(value); } let secondGap: Box; return secondGap; } }",
-    "impl Coerce<Box, Final> where Box: Marker { function coerce(value: Box) returns (Final) where Box: Witness { let reached: Word = 31; return Final(value); } }",
-    "impl Coerce<Box, Broken> where Box: Marker { function coerce(value: Box) returns (Broken) where Box: Witness { let reached: Word = 37; let lastGap: Broken; return lastGap; } }",
-    "function path(value: Word) returns (Final) where Word: Marker, Word: Marker, Bool: Marker, Box: Marker { let result: Final = value; return result; }",
-    "function late(value: Word) returns (Broken) where Word: Marker, Bool: Marker, Box: Marker { let result: Broken = value; return result; }",
-    "function early() returns (Final) where Word: Marker, Bool: Marker, Box: Marker { let missing: Word; let result: Final = missing; return result; }",
-    "function empty(value: Word) returns (Word) { return value; }"
+    "impl Coerce<word, bool> where word: Marker { function coerce(value: word) returns (bool) where word: Witness { let saved: word = value; if (value == 0) { let firstGap: bool; return firstGap; } return value == 1; } }",
+    "impl Coerce<bool, Box> where bool: Marker { function coerce(value: bool) returns (Box) where bool: Witness { let m: mapping(bool => word); let touched = m[value]; if (value) { return Box(value); } let secondGap: Box; return secondGap; } }",
+    "impl Coerce<Box, Final> where Box: Marker { function coerce(value: Box) returns (Final) where Box: Witness { let reached: word = 31; return Final(value); } }",
+    "impl Coerce<Box, Broken> where Box: Marker { function coerce(value: Box) returns (Broken) where Box: Witness { let reached: word = 37; let lastGap: Broken; return lastGap; } }",
+    "function path(value: word) returns (Final) where word: Marker, word: Marker, bool: Marker, Box: Marker { let result: Final = value; return result; }",
+    "function late(value: word) returns (Broken) where word: Marker, bool: Marker, Box: Marker { let result: Broken = value; return result; }",
+    "function early() returns (Final) where word: Marker, bool: Marker, Box: Marker { let missing: word; let result: Final = missing; return result; }",
+    "function empty(value: word) returns (word) { return value; }"
   ]}] }
 
 private def word (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
@@ -4310,18 +4310,18 @@ theorem ground_is_not_range (owner : Resolved.DeclarationId) (parameter : TypePa
 private def reorderedWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
-    "impl<B, A> Coerce<(A, B), Bool> { function coerce(value: (A, B)) returns (Bool) { let visited: Word = 7; return true; } }",
-    "function converted(left: Word, right: Bool) returns (Bool) { let value: (Word, Bool) = (left, right); return value; }"
+    "impl<B, A> Coerce<(A, B), bool> { function coerce(value: (A, B)) returns (bool) { let visited: word = 7; return true; } }",
+    "function converted(left: word, right: bool) returns (bool) { let value: (word, bool) = (left, right); return value; }"
   ]}] }
 
 private def coveredWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Marker<T> {}", "impl Marker<Bool> {}",
-    "trait Witness<T> {}", "impl Witness<Bool> {}",
+    "trait Marker<T> {}", "impl Marker<bool> {}",
+    "trait Witness<T> {}", "impl Witness<bool> {}",
     "trait Coerce<From, To> where From: Marker { function coerce(value: From) returns (To) where From: Witness; }",
-    "impl Coerce<Bool, Word> where Bool: Marker { function coerce(value: Bool) returns (Word) where Bool: Witness { return value ? 17 : 4; } }",
-    "function covered(flag: Bool) returns (Word) where Bool: Marker, Bool: Marker { return flag; }",
-    "function uncovered(flag: Bool) returns (Word) { return flag; }"
+    "impl Coerce<bool, word> where bool: Marker { function coerce(value: bool) returns (word) where bool: Witness { return value ? 17 : 4; } }",
+    "function covered(flag: bool) returns (word) where bool: Marker, bool: Marker { return flag; }",
+    "function uncovered(flag: bool) returns (word) { return flag; }"
   ]}] }
 
 private def audit (entry : SourceCompilerFeatureSupport.Entry) (reordered expectedCovered : Bool) : IO Unit := do
@@ -4504,10 +4504,10 @@ theorem duplicate_call_order (key : Key) :
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
-    "impl Coerce<Bool, Word> { function coerce(value: Bool) returns (Word) { let table: mapping(Word => Word); table[0] = 7; if (value) { table[0] += 2; return table[0]; } let absent: Word; return absent; } }",
-    "function converted(flag: Bool) returns (Word) { return flag; }",
-    "function failed() returns (Word) { let result: Word = false; let skipped: mapping(Word => Word); skipped[8] = 90; return result; }",
-    "function captured() returns (function() returns (Word)) { let result: Word = true; return lam() { return result; }; }"
+    "impl Coerce<bool, word> { function coerce(value: bool) returns (word) { let table: mapping(word => word); table[0] = 7; if (value) { table[0] += 2; return table[0]; } let absent: word; return absent; } }",
+    "function converted(flag: bool) returns (word) { return flag; }",
+    "function failed() returns (word) { let result: word = false; let skipped: mapping(word => word); skipped[8] = 90; return result; }",
+    "function captured() returns (function() returns (word)) { let result: word = true; return lam() { return result; }; }"
   ]}] }
 
 /-- Re-enter the actual compiler helper on reached checked coercion lists. Its

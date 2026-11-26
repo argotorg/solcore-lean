@@ -347,7 +347,7 @@ theorem FactoryShape.statementTyping
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function make(seed: Word) returns (function(Bool, Word, Bool) returns (Word)) { return lam(running: Bool, next: Word, done: Bool) { let previous: Word = seed; for (let flag: Bool = running; flag; flag = done) { seed = next; } return previous; }; }"}] }
+    "function make(seed: word) returns (function(bool, word, bool) returns (word)) { return lam(running: bool, next: word, done: bool) { let previous: word = seed; for (let flag: bool = running; flag; flag = done) { seed = next; } return previous; }; }"}] }
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)
 def observeRead (source : TypedSource) (binder : TypedBinder) (node : ExpressionNode) (expected : TypeSystem.Ty) : IO (Read source binder expected) := do
@@ -2662,7 +2662,7 @@ theorem FactoryShape.statementTyping
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function make(seed: Word) returns (function(Bool, Word, Bool) returns (Word)) { return lam(flag: Bool, next: Word, stop: Bool) { while (flag) { seed = next; flag = stop; } return seed; }; }"}] }
+    "function make(seed: word) returns (function(bool, word, bool) returns (word)) { return lam(flag: bool, next: word, stop: bool) { while (flag) { seed = next; flag = stop; } return seed; }; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)

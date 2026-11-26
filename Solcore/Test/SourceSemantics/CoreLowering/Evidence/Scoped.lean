@@ -694,11 +694,11 @@ def observeRelay (function : CheckedFunction) (signature generic : ProgramFuncti
   return {first, second, flag, localBinder, firstRead, secondRead, call, initialized, conditionRead, savedRead, loopSecondRead, loopCall, assignment, resolution, stop, flagAssignment, flagResolution, loop, finalRead, finalSecondRead, finalCall, statement, callRequired, loopRequired, finalRequired, noTemplates, inputs, firstScheme, secondScheme, flagScheme, localScheme, firstRequirements, secondRequirements, flagRequirements, localRequirements, firstClosed, flagOwner, localOwner, localOrdinary, different, flagFirst, flagSecond, localFirst, localSecond, localFlag, roots, initializedFound, initializedForm, initializedType, assignmentFound, assignmentForm, assignmentType, targetRoot, targetType, targetBare, assignmentRequirements, stopForm, flagAssignmentFound, flagAssignmentForm, flagAssignmentType, flagTargetRoot, flagTargetType, flagTargetBare, flagAssignmentRequirements, loopFound, loopForm, loopType, statementFound, statementForm, statementType}
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
+    "trait Mark<T> {}", "impl Mark<word> {}", "impl Mark<bool> {}",
     "function choose<A, B>(a: A, b: B) returns (A) where A: Mark { return a; }",
-    "function relay<A, B>(a: A, b: B, flag: Bool) returns (A) where A: Mark { let saved: A = choose(a, b); while (flag) { saved = choose(saved, b); flag = false; } return choose(saved, b); }",
-    "function wordRoot(value: Word, other: Bool, flag: Bool) returns (Word) { return relay(value, other, flag); }",
-    "function boolRoot(value: Bool, other: Word, flag: Bool) returns (Bool) { return relay(value, other, flag); }"]}] }
+    "function relay<A, B>(a: A, b: B, flag: bool) returns (A) where A: Mark { let saved: A = choose(a, b); while (flag) { saved = choose(saved, b); flag = false; } return choose(saved, b); }",
+    "function wordRoot(value: word, other: bool, flag: bool) returns (word) { return relay(value, other, flag); }",
+    "function boolRoot(value: bool, other: word, flag: bool) returns (bool) { return relay(value, other, flag); }"]}] }
 
 structure CheckedFixture where
   program : CheckedProgram

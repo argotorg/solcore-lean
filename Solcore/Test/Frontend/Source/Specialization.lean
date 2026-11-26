@@ -60,9 +60,9 @@ private def testTwoArgumentsBothCoerced : IO Unit := do
   let checked ← check (String.intercalate "\n" [
     "trait Coerce<From, To> {}",
     "enum Box { Only }",
-    "impl Coerce<Word, Box> {}",
+    "impl Coerce<word, Box> {}",
     "function accept(left: Box, right: Box) returns (Box) { return left; }",
-    "function convert(left: Word, right: Word) returns (Box) {",
+    "function convert(left: word, right: word) returns (Box) {",
     "  return accept(left, right);",
     "}"
   ])
@@ -74,9 +74,9 @@ private def testOneExactOneCoerced : IO Unit := do
   let checked ← check (String.intercalate "\n" [
     "trait Coerce<From, To> {}",
     "enum Box { Only }",
-    "impl Coerce<Word, Box> {}",
-    "function accept(left: Word, right: Box) returns (Box) { return right; }",
-    "function convert(left: Word, right: Word) returns (Box) {",
+    "impl Coerce<word, Box> {}",
+    "function accept(left: word, right: Box) returns (Box) { return right; }",
+    "function convert(left: word, right: word) returns (Box) {",
     "  return accept(left, right);",
     "}"
   ])
@@ -88,9 +88,9 @@ private def testTupleArgumentStaysWhole : IO Unit := do
   let source := String.intercalate "\n" [
     "trait Coerce<From, To> {}",
     "enum Box { Only }",
-    "impl Coerce<Word, Box> {}",
+    "impl Coerce<word, Box> {}",
     "function accept(value: (Box, Box)) returns ((Box, Box)) { return value; }",
-    "function reject(left: Word, right: Word) returns ((Box, Box)) {",
+    "function reject(left: word, right: word) returns ((Box, Box)) {",
     "  return accept((left, right));",
     "}"
   ]
@@ -110,10 +110,10 @@ private def testExactOverloadRefused : IO Unit := do
   match SourceInference.loadAndCheckProgram (workspace (String.intercalate "\n" [
     "trait Coerce<From, To> {}",
     "enum Box { Only }",
-    "impl Coerce<Word, Box> {}",
-    "function choose(value: Box) returns (Bool) { return true; }",
-    "function choose(value: Word) returns (Word) { return value; }",
-    "function select(value: Word) returns (Word) { return choose(value); }"
+    "impl Coerce<word, Box> {}",
+    "function choose(value: Box) returns (bool) { return true; }",
+    "function choose(value: word) returns (word) { return value; }",
+    "function select(value: word) returns (word) { return choose(value); }"
   ])) with
   | .error errors =>
       assertTrue (errors.any (duplicateFunction "choose"))
@@ -125,9 +125,9 @@ private def testMissingPerArgumentCoercion : IO Unit := do
     "trait Coerce<From, To> {}",
     "enum Box { Only }",
     "enum Flag { Only }",
-    "impl Coerce<Word, Box> {}",
+    "impl Coerce<word, Box> {}",
     "function accept(left: Box, right: Flag) returns (Box) { return left; }",
-    "function reject(left: Word, right: Word) returns (Box) {",
+    "function reject(left: word, right: word) returns (Box) {",
     "  return accept(left, right);",
     "}"
   ]
@@ -169,9 +169,9 @@ private def testMethodProofCountDoesNotDistortEdgeCost : IO Unit := do
     "  function coerce(value: Mid) returns (C)",
     "      where Mid: Ready, Mid: Stable { return value; }",
     "}",
-    "function chooseB(value: B) returns (Word) { return 1; }",
-    "function chooseC(value: C) returns (Word) { return 2; }",
-    "function run(value: A) returns (Word) { return chooseB(value); }"
+    "function chooseB(value: B) returns (word) { return 1; }",
+    "function chooseC(value: C) returns (word) { return 2; }",
+    "function run(value: A) returns (word) { return chooseB(value); }"
   ]
   let loaded ← match loadProgram (workspace source) with
     | .ok loaded => pure loaded
@@ -317,33 +317,33 @@ inapplicable `Bool` candidate, an open generic one, a cheaper deferred one, a ne
 and a `let`-bound literal. -/
 private def testLiteralOverloadsRefused : IO Unit := do
   let fixtures : List (List String) := [
-    ["function choose(value: Word) returns (Bool) { return true; }",
-      "function choose(value: integer) returns (Bool) { return false; }",
-      "function run() returns (Bool) { return choose(1); }"],
-    ["function choose(value: Word) returns (Word) { return value; }",
+    ["function choose(value: word) returns (bool) { return true; }",
+      "function choose(value: integer) returns (bool) { return false; }",
+      "function run() returns (bool) { return choose(1); }"],
+    ["function choose(value: word) returns (word) { return value; }",
       "function choose(value: integer) returns (integer) { return value; }",
-      "function run() returns (Word) { return choose(1); }"],
-    ["function choose(value: Word) returns (Word) { return value; }",
+      "function run() returns (word) { return choose(1); }"],
+    ["function choose(value: word) returns (word) { return value; }",
       "function choose(value: integer) returns (integer) { return value; }",
       "function run() returns (integer) { return choose(1); }"],
-    ["function choose(value: Bool) returns (Bool) { return value; }",
-      "function choose(value: Word) returns (Bool) { return true; }",
-      "function run() returns (Bool) { return choose(1); }"],
-    ["function choose<T>(value: T) returns (Bool) { return true; }",
-      "function choose(value: Word) returns (Bool) { return true; }",
-      "function run() returns (Bool) { return choose(1); }"],
-    ["trait Coerce<From, To> {}", "impl Coerce<Bool, Word> {}",
-      "function choose(value: Word) returns (Bool) { return true; }",
-      "function choose<T>(value: T) returns (Word) { return 0; }",
-      "function run() returns (Word) { return choose(1); }"],
-    ["trait Eq<T> {}", "impl Eq<Word> {}",
+    ["function choose(value: bool) returns (bool) { return value; }",
+      "function choose(value: word) returns (bool) { return true; }",
+      "function run() returns (bool) { return choose(1); }"],
+    ["function choose<T>(value: T) returns (bool) { return true; }",
+      "function choose(value: word) returns (bool) { return true; }",
+      "function run() returns (bool) { return choose(1); }"],
+    ["trait Coerce<From, To> {}", "impl Coerce<bool, word> {}",
+      "function choose(value: word) returns (bool) { return true; }",
+      "function choose<T>(value: T) returns (word) { return 0; }",
+      "function run() returns (word) { return choose(1); }"],
+    ["trait Eq<T> {}", "impl Eq<word> {}",
       "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
-      "function choose(value: Word) returns (Bool) { return true; }",
-      "function choose(value: integer) returns (Bool) { return false; }",
-      "function run() returns (Bool) { return choose(keep(1)); }"],
-    ["function choose<T>(value: T) returns (Bool) { return true; }",
-      "function choose(value: Word) returns (Bool) { return true; }",
-      "function run() returns (Bool) {", "  let value = 1;", "  return choose(value);", "}"]]
+      "function choose(value: word) returns (bool) { return true; }",
+      "function choose(value: integer) returns (bool) { return false; }",
+      "function run() returns (bool) { return choose(keep(1)); }"],
+    ["function choose<T>(value: T) returns (bool) { return true; }",
+      "function choose(value: word) returns (bool) { return true; }",
+      "function run() returns (bool) {", "  let value = 1;", "  return choose(value);", "}"]]
   for lines in fixtures do
     match SourceInference.loadAndCheckProgram (rawWorkspace lines) with
     | .error errors =>
@@ -704,22 +704,22 @@ private def testMethodPredicateFailureFallsBackToTwoSteps : IO Unit := do
     "trait Coerce<From, To> {",
     "  function coerce(value: From) returns (To) where From: Allowed<To>;",
     "}",
-    "impl Allowed<Bool, Unit> {}",
-    "impl Allowed<Unit, Word> {}",
-    "impl Coerce<Bool, Word> {",
-    "  function coerce(value: Bool) returns (Word)",
-    "      where Bool: Allowed<Word> { return 99; }",
+    "impl Allowed<bool, ()> {}",
+    "impl Allowed<(), word> {}",
+    "impl Coerce<bool, word> {",
+    "  function coerce(value: bool) returns (word)",
+    "      where bool: Allowed<word> { return 99; }",
     "}",
-    "impl Coerce<Bool, Unit> {",
-    "  function coerce(value: Bool) returns (Unit)",
-    "      where Bool: Allowed<Unit> { return; }",
+    "impl Coerce<bool, ()> {",
+    "  function coerce(value: bool) returns (())",
+    "      where bool: Allowed<()> { return; }",
     "}",
-    "impl Coerce<Unit, Word> {",
-    "  function coerce(value: Unit) returns (Word)",
-    "      where Unit: Allowed<Word> { return 7; }",
+    "impl Coerce<(), word> {",
+    "  function coerce(value: ()) returns (word)",
+    "      where (): Allowed<word> { return 7; }",
     "}",
-    "function accept(value: Word) returns (Word) { return value; }",
-    "function convert(value: Bool) returns (Word) { return accept(value); }"
+    "function accept(value: word) returns (word) { return value; }",
+    "function convert(value: bool) returns (word) { return accept(value); }"
   ])
   let convert ← checkedNamed fixture "convert"
   let allowed ← namedTrait fixture.environment "Allowed"
@@ -957,7 +957,7 @@ private def expectInferenceError (label content : String)
 private def testPatternDefaultAndLateConstraint : IO Unit := do
   let program ← checkedProgram (String.intercalate "\n" [
     "function acceptInteger(value: integer) returns (integer) { return value; }",
-    "function defaulted() returns (Word) {",
+    "function defaulted() returns (word) {",
     "  match (1) {",
     "    case (((1))) { return 11; }",
     "    default { return 22; }",
@@ -970,7 +970,7 @@ private def testPatternDefaultAndLateConstraint : IO Unit := do
     "    default { return value; }",
     "  }",
     "}",
-    "function generic<T>(tag: Word, value: T) returns (T) {",
+    "function generic<T>(tag: word, value: T) returns (T) {",
     "  match (tag) {",
     "    case ((0)) { return value; }",
     "    default { return value; }",
@@ -1077,7 +1077,7 @@ private def testWildcardOnlyLiteralDefault : IO Unit := do
         s!"a wildcard-only literal scrutinee was rejected otherwise: {reprStr errors}"
   | .ok _ => throw (IO.userError "a wildcard-only literal scrutinee was accepted")
   let source :=
-    "function wildcardOnly() { let one: Word = 1; match (one) { case _ { return; } } }"
+    "function wildcardOnly() { let one: word = 1; match (one) { case _ { return; } } }"
   let limits : Limits := {
     checkingFuel := 1024
     specializationBudget := 16
@@ -1097,7 +1097,7 @@ private def testWildcardOnlyLiteralDefault : IO Unit := do
 private def testPatternInferenceRejections : IO Unit := do
   expectInferenceError "unreachable arm static checking"
     (String.intercalate "\n" [
-      "function bad(tag: Word) returns (Word) {",
+      "function bad(tag: word) returns (word) {",
       "  match (tag) {",
       "    case _ { return 1; }",
       "    case 0 { return missing; }",
@@ -1106,22 +1106,22 @@ private def testPatternInferenceRejections : IO Unit := do
     ]) fun error => error matches .unknownVariable "missing"
   expectInferenceError "match branch scope isolation"
     (String.intercalate "\n" [
-      "function bad(tag: Word) returns (Word) {",
+      "function bad(tag: word) returns (word) {",
       "  match (tag) {",
-      "    case 0 { let local: Word = 1; return local; }",
+      "    case 0 { let local: word = 1; return local; }",
       "    default { return local; }",
       "  }",
       "}"
     ]) fun error => error matches .unknownVariable "local"
   expectInferenceError "Bool numeric pattern"
-    "function bad(tag: Bool) returns (Word) { match (tag) { case 0 { return 1; } default { return 2; } } }"
+    "function bad(tag: bool) returns (word) { match (tag) { case 0 { return 1; } default { return 2; } } }"
     fun error => match error with
       | .nonNumericPatternType _ type => type == Ty.bool
       | _ => false
   expectInferenceError "nominal numeric pattern"
     (String.intercalate "\n" [
       "enum Box { Only }",
-      "function bad(tag: Box) returns (Word) {",
+      "function bad(tag: Box) returns (word) {",
       "  match (tag) { case 0 { return 1; } default { return 2; } }",
       "}"
     ]) fun error => match error with
@@ -1130,7 +1130,7 @@ private def testPatternInferenceRejections : IO Unit := do
   expectInferenceError "rigid generic numeric pattern"
     (String.intercalate "\n" [
       "trait Int<T> {}",
-      "function bad<T>(tag: T) returns (Word) where T: Int {",
+      "function bad<T>(tag: T) returns (word) where T: Int {",
       "  match (tag) { case 0 { return 1; } default { return 2; } }",
       "}"
     ]) fun error => error matches .nonNumericPatternType _ (.parameter _)
@@ -1142,7 +1142,7 @@ private def testPatternInferenceRejections : IO Unit := do
     expectInferenceError label
       (String.intercalate "\n" [
         "enum Box { Only }",
-        "function bad(tag: Word) returns (Word) {",
+        "function bad(tag: word) returns (word) {",
         "  match (tag) {",
         "    " ++ arm,
         "    default { return 2; }",
@@ -1152,13 +1152,13 @@ private def testPatternInferenceRejections : IO Unit := do
         | .unsupportedPattern _ actual => actual == kind
         | _ => false
   expectInferenceError "uncovered literal match"
-    "function bad(tag: Word) returns (Word) { match (tag) { case 0 { return 1; } } }"
+    "function bad(tag: word) returns (word) { match (tag) { case 0 { return 1; } } }"
     fun error => error matches .nonExhaustiveMatch _
   expectInferenceError "fallthrough case"
-    "function bad(tag: Word) returns (Word) { match (tag) { case _ { let value: Word = 1; } } }"
+    "function bad(tag: word) returns (word) { match (tag) { case _ { let value: word = 1; } } }"
     fun error => error matches .unification _
   expectInferenceError "fallthrough default"
-    "function bad(tag: Word) returns (Word) { match (tag) { case 0 { return 1; } default { let value: Word = 2; } } }"
+    "function bad(tag: word) returns (word) { match (tag) { case 0 { return 1; } default { let value: word = 2; } } }"
     fun error => error matches .unification _
 
 private def guardWords : Resolved.Expr → List Core.Word
@@ -1194,7 +1194,7 @@ private def testModuloOrderingAndPublicExecution : IO Unit := do
   let modulus := toString Core.wordModulus
   let successor := toString (Core.wordModulus + 1)
   let source := String.intercalate "\n" [
-    "function route(tag: Word) returns (Word) {",
+    "function route(tag: word) returns (word) {",
     "  match (tag) {",
     "    case " ++ modulus ++ " { return 10; }",
     "    case 0 { return 20; }",
@@ -1231,8 +1231,8 @@ private def testModuloOrderingAndPublicExecution : IO Unit := do
 
 private def testDirectCallHiddenLocalCollision : IO Unit := do
   let source := String.intercalate "\n" [
-    "function identity(value: Word) returns (Word) { return value; }",
-    "function routed(value: Word) returns (Word) {",
+    "function identity(value: word) returns (word) { return value; }",
+    "function routed(value: word) returns (word) {",
     "  match (identity(value)) {",
     "    case 0 { return 7; }",
     "    default { return 9; }",
@@ -1257,8 +1257,8 @@ private def testDirectCallHiddenLocalCollision : IO Unit := do
 
 private def testDiscardedTailStillLowers : IO Unit := do
   let source := String.intercalate "\n" [
-    "function helper(value: Word) returns (Word) { return value; }",
-    "function early(tag: Word) returns (Word) {",
+    "function helper(value: word) returns (word) { return value; }",
+    "function early(tag: word) returns (word) {",
     "  match (tag) {",
     "    case _ { return 7; }",
     "    case 0 { return helper(8); }",
@@ -1312,7 +1312,7 @@ private def workspace (content : String) : Workspace.RawWorkspace := {
 
 private def checkedFunction : IO CheckedFunction := do
   let checked ← match checkProgram (workspace (String.intercalate "\n" [
-      "function choose(tag: Word, zero: Word, other: Word) returns (Word) {",
+      "function choose(tag: word, zero: word, other: word) returns (word) {",
       "  match (tag) {",
       "    case 0 { return zero; }",
       "    case _ { return other; }",
@@ -1658,7 +1658,7 @@ private def checkedProgram : IO CheckedProgram := do
     "function stagedIdentity<T>(comptime value: T) returns (comptime<T>) { return value; }",
     "function phantom<T, U>(value: T) returns (T) { return value; }",
     "function apply<T>(f: function(T) returns (T), value: T) returns (T) { return f(value); }",
-    "function localPoly(flag: Bool) returns (Word, Bool) {",
+    "function localPoly(flag: bool) returns (word, bool) {",
     "  let id = lam(value) { return value; };",
     "  return (id(1), id(flag));",
     "}"
@@ -2088,7 +2088,7 @@ private def testIntegerLiteralMetadataSpecialization
   assertTrue (decide (Core.runStateful 16
       (.initial elaborated.core [.word (word 99)]) =
         .done (.word (word 9)) []))
-    "specialized integer literal did not execute through builtin Int<Word>"
+    "specialized integer literal did not execute through builtin Int<word>"
   let unknown : TypeParameterId := ⟨signature.id, 99⟩
   let hidden := replaceExpression function expression fun node => {
     node with form := .integerLiteral (.decimal "9") {
@@ -2229,14 +2229,14 @@ private def workspace : Workspace.RawWorkspace := {
     path := "main.solc"
     content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "trait Eq<T> {}",
-      "impl Eq<Word> {}",
-      "impl Eq<Bool> {}",
+      "impl Eq<word> {}",
+      "impl Eq<bool> {}",
       "trait Coerce<From, To> {",
       "  function coerce(value: From) returns (To);",
       "}",
-      "function coercionClosureHelper() returns (function(Word) returns (Word)) { return identity; }",
-      "impl Coerce<Word, Bool> {",
-      "  function coerce(value: Word) returns (Bool) {",
+      "function coercionClosureHelper() returns (function(word) returns (word)) { return identity; }",
+      "impl Coerce<word, bool> {",
+      "  function coerce(value: word) returns (bool) {",
       "    coercionClosureHelper();",
       "    return true;",
       "  }",
@@ -2245,30 +2245,30 @@ private def workspace : Workspace.RawWorkspace := {
       "function globalIdentity<T>(value: T) returns (T) { return value; }",
       "function choose3<A, B, C>(first: A, second: B, third: C) returns (C) { return third; }",
       "function twice<T>(value: T) returns (T) { return identity(identity(value)); }",
-      "function contextualLocal(flag: Bool) returns (Word, Bool) {",
+      "function contextualLocal(flag: bool) returns (word, bool) {",
       "  let f = lam(value) { return identity(value); };",
-      "  let two: Word = 2;", "  f(two);",
+      "  let two: word = 2;", "  f(two);",
       "  return (f(1), f(flag));",
       "}",
-      "function unusedContextualLocal() returns (Word) {",
+      "function unusedContextualLocal() returns (word) {",
       "  let f = lam(value) { return identity(value); };",
       "  return 9;",
       "}",
-      "function nestedContextualLocal(flag: Bool) returns (Word, Bool) {",
+      "function nestedContextualLocal(flag: bool) returns (word, bool) {",
       "  let outer = lam(value) {",
       "    let inner = lam(nestedValue) { return identity(nestedValue); };",
       "    return inner(value);",
       "  };",
       "  return (outer(1), outer(flag));",
       "}",
-      "function groundInnerUnderPolymorphicOuter(flag: Bool) returns (Word, Word) {",
+      "function groundInnerUnderPolymorphicOuter(flag: bool) returns (word, word) {",
       "  let outer = lam(value) {",
       "    let inner = lam(item) { return globalIdentity(item); };",
       "    return inner(1);",
       "  };",
-      "  let one: Word = 1;", "  return (outer(one), outer(flag));",
+      "  let one: word = 1;", "  return (outer(one), outer(flag));",
       "}",
-      "function siblingContextualLocal(flag: Bool) returns (Word, Bool) {",
+      "function siblingContextualLocal(flag: bool) returns (word, bool) {",
       "  let outer = lam(value) {",
       "    let left = lam(item) { return identity(item); };",
       "    let right = lam(item) { return identity(item); };",
@@ -2277,7 +2277,7 @@ private def workspace : Workspace.RawWorkspace := {
       "  };",
       "  return (outer(1), outer(flag));",
       "}",
-      "function depthThreeContextualLocal(flag: Bool) returns (Word, Bool) {",
+      "function depthThreeContextualLocal(flag: bool) returns (word, bool) {",
       "  let outer = lam(value) {",
       "    let middle = lam(item) {",
       "      let inner = lam(nestedValue) { return identity(nestedValue); };",
@@ -2287,7 +2287,7 @@ private def workspace : Workspace.RawWorkspace := {
       "  };",
       "  return (outer(1), outer(flag));",
       "}",
-      "function scopeAwareRecursiveContextualLocal(flag: Bool) returns (Word, Bool) {",
+      "function scopeAwareRecursiveContextualLocal(flag: bool) returns (word, bool) {",
       "  let outer = lam(value) {",
       "    let middle = lam(item) {",
       "      let inner = lam(nestedValue) {",
@@ -2299,7 +2299,7 @@ private def workspace : Workspace.RawWorkspace := {
       "  };",
       "  return (outer(1), outer(flag));",
       "}",
-      "function mixedScopeDepthThreeContextualLocal(flag: Bool) returns (Word) {",
+      "function mixedScopeDepthThreeContextualLocal(flag: bool) returns (word) {",
       "  let outer = lam(value) {",
       "    let middle = lam(item) {",
       "      let inner = lam(pair) { return identity(pair); };",
@@ -2307,29 +2307,29 @@ private def workspace : Workspace.RawWorkspace := {
       "    };",
       "    return middle(value);",
       "  };",
-      "  let one: Word = 1;", "  outer(one);",
+      "  let one: word = 1;", "  outer(one);",
       "  outer(flag);",
       "  return 9;",
       "}",
-      "function reusedBinderMixedScopeContextualLocal(flag: Bool) returns (Word) {",
+      "function reusedBinderMixedScopeContextualLocal(flag: bool) returns (word) {",
       "  let outer = lam(value) {",
       "    let adapter = lam(item) { return identity(item); };",
       "    adapter(value);",
       "    let middle = lam(item) { return adapter((value, item)); };",
       "    return middle(value);",
       "  };",
-      "  let one: Word = 1;", "  outer(one);",
+      "  let one: word = 1;", "  outer(one);",
       "  outer(flag);",
       "  return 9;",
       "}",
-      "function monomorphicLambdaWrapper() returns (Word) {",
+      "function monomorphicLambdaWrapper() returns (word) {",
       "  let outer = lam() {",
       "    let f = lam(item) { return identity(item); };",
       "    return f(1);",
       "  };",
       "  return outer();",
       "}",
-      "function unusedNestedContextualLocal() returns (Word) {",
+      "function unusedNestedContextualLocal() returns (word) {",
       "  let outer = lam(value) {",
       "    let inner = lam(item) { return identity(item); };",
       "    return inner(value);",
@@ -2338,38 +2338,38 @@ private def workspace : Workspace.RawWorkspace := {
       "}",
       "function first<T>(value: T) returns (T) { return value; }",
       "function second<T>(value: T) returns (T) { return value; }",
-      "function nested(value: Word) returns (Word) { return first(second(value)); }",
+      "function nested(value: word) returns (word) { return first(second(value)); }",
       "function pick<A, B>(left: A, right: B) returns (A) { return left; }",
-      "function select(left: Word, right: Bool) returns (Word) { return pick(left, right); }",
+      "function select(left: word, right: bool) returns (word) { return pick(left, right); }",
       "function loop<T>(value: T) returns (T) { return loop(value); }",
       "function cycleLeft<T>(value: T) returns (T) { return cycleRight(value); }",
       "function cycleRight<U>(value: U) returns (U) { return cycleLeft(value); }",
       "function grow<T>(value: T) { grow((value, value)); return; }",
       "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
-      "function qualifiedLocal(flag: Bool) returns (Word, Bool) {",
+      "function qualifiedLocal(flag: bool) returns (word, bool) {",
       "  let f = lam(value) { return keep(value); };",
       "  return (f(1), f(flag));",
       "}",
-      "function guarded<T>(guard: T) returns (Word) where T: Eq { return 1; }",
-      "function requireBool(value: Bool) returns (Bool) { return value; }",
-      "function qualifiedLocalCoerced(flag: Bool) returns (Bool, Bool) {",
+      "function guarded<T>(guard: T) returns (word) where T: Eq { return 1; }",
+      "function requireBool(value: bool) returns (bool) { return value; }",
+      "function qualifiedLocalCoerced(flag: bool) returns (bool, bool) {",
       "  let f = lam(value) { return requireBool(guarded(value)); };",
-      "  let one: Word = 1;", "  return (f(one), f(flag));",
+      "  let one: word = 1;", "  return (f(one), f(flag));",
       "}",
-      "function qualifiedLocalResultCoerced(flag: Bool) returns (Bool, Bool) {",
-      "  let f = lam(value) -> Bool { return guarded(value); };",
-      "  let one: Word = 1;", "  return (f(one), f(flag));",
+      "function qualifiedLocalResultCoerced(flag: bool) returns (bool, bool) {",
+      "  let f = lam(value) -> bool { return guarded(value); };",
+      "  let one: word = 1;", "  return (f(one), f(flag));",
       "}",
-      "function constrained(value: Word) returns (Word) { return keep(value); }",
+      "function constrained(value: word) returns (word) { return keep(value); }",
       "function keepAs<T, U>(guard: T, value: U) returns (U) where T: Eq { return value; }",
-      "function localProof(flag: Bool) returns (Word, Bool) {",
-      "  let f = lam(value) { let one: Word = 1; return keepAs(one, value); };",
+      "function localProof(flag: bool) returns (word, bool) {",
+      "  let f = lam(value) { let one: word = 1; return keepAs(one, value); };",
       "  return (f(2), f(flag));",
       "}",
-      "function asValue() returns (function(Word) returns (Word)) { return identity; }",
-      "function apply(f: function(Word) returns (Word), value: Word) returns (Word) { return f(value); }",
-      "function applyProduct(f: function((Word, Bool)) returns (Word), pair: (Word, Bool)) returns (Word) { return f(pair); }",
-      "function applySplit(f: function(Word, Bool) returns (Word), left: Word, right: Bool) returns (Word) { return f(left, right); }"
+      "function asValue() returns (function(word) returns (word)) { return identity; }",
+      "function apply(f: function(word) returns (word), value: word) returns (word) { return f(value); }",
+      "function applyProduct(f: function((word, bool)) returns (word), pair: (word, bool)) returns (word) { return f(pair); }",
+      "function applySplit(f: function(word, bool) returns (word), left: word, right: bool) returns (word) { return f(left, right); }"
     ]
   }]
   externalLibraries := []
@@ -3450,7 +3450,7 @@ private def testAssumptionPreservation (program : CheckedProgram) : IO Unit := d
               callee.assumptions.length = 1) && hasImplementationEvidence)
             "where predicate or solved caller evidence was consumed during discovery"
       | _, _ => throw (IO.userError
-          "constrained: caller or keep<Word> specialization was not discovered")
+          "constrained: caller or keep<word> specialization was not discovered")
   | outcome => throw (IO.userError
       s!"constrained: expected a complete plan, found {reprStr outcome}")
 
@@ -3482,7 +3482,7 @@ private def testContextualLocalProofCalls
     arguments := []
   }
   assertTrue (decide (instantiation.predicates = [predicate]))
-    "localProof keepAs metadata lost its ground Eq<Word> predicate"
+    "localProof keepAs metadata lost its ground Eq<word> predicate"
 
   let entryKey : SourceSpecialization.SpecializationKey := {
     declaration := localProof.id
@@ -4344,10 +4344,10 @@ private def workspace (content : String) : Workspace.RawWorkspace := {
 }
 
 private def fixtureSource : String := String.intercalate "\n" [
-  "function plain(value: Word) returns (Word) { return value; }",
-  "function staged(comptime required: Bool, flexible: Word) returns (comptime<Word>) { return flexible; }",
-  "function integerResult(value: Word) returns (integer) { return 1; }",
-  "function classify(comptime fixed: Word, runtime: Word, flag: Bool) returns (Word) {",
+  "function plain(value: word) returns (word) { return value; }",
+  "function staged(comptime required: bool, flexible: word) returns (comptime<word>) { return flexible; }",
+  "function integerResult(value: word) returns (integer) { return 1; }",
+  "function classify(comptime fixed: word, runtime: word, flag: bool) returns (word) {",
   "  let ct = 1;",
   "  let ctAlias = fixed;",
   "  let runtimeAlias = runtime;",
@@ -4358,10 +4358,10 @@ private def fixtureSource : String := String.intercalate "\n" [
   "  let stagedDeferred = staged(true, runtime);",
   "  let implicitCt = integerResult(ct);",
   "  let implicitDeferred = integerResult(runtime);",
-  "  let groupRuntime: Word = (runtime);",
-  "  let unaryCt: Word = ~ct;",
-  "  let binaryCt: Word = ct + 1;",
-  "  let binaryRuntime: Word = runtime + 1;",
+  "  let groupRuntime: word = (runtime);",
+  "  let unaryCt: word = ~ct;",
+  "  let binaryCt: word = ct + 1;",
+  "  let binaryRuntime: word = runtime + 1;",
   "  let tupleCt = (ct, stagedCt);",
   "  let tupleDeferred = (ct, deferred);",
   "  let tupleRuntime = (deferred, runtimeAlias);",
@@ -4371,12 +4371,12 @@ private def fixtureSource : String := String.intercalate "\n" [
   "  let runtimeGuard = flag ? ct : stagedCt;",
   "  return runtimeAlias2;",
   "}",
-  "function lambdaStages() returns (Word) {",
-  "  let stagedLambda = lam(comptime value: Word) -> Word { return value; };",
-  "  let runtimeLambda = lam(value: Word) -> Word { return value; };",
+  "function lambdaStages() returns (word) {",
+  "  let stagedLambda = lam(comptime value: word) -> word { return value; };",
+  "  let runtimeLambda = lam(value: word) -> word { return value; };",
   "  return 0;",
   "}",
-  "function matchStages(tag: Word, zero: Word, other: Word) returns (Word) {",
+  "function matchStages(tag: word, zero: word, other: word) returns (word) {",
   "  match (tag) {",
   "    case 0 { return zero; }",
   "    case _ { return other; }",
@@ -4728,7 +4728,7 @@ private def hasBodyError (content : String)
 
 private def testProxyValuesResolveSourceTypes : IO Unit := do
   let checked ← check (String.intercalate "\n" [
-    "function concrete() returns (@Word) { return @Word; }",
+    "function concrete() returns (@word) { return @word; }",
     "function generic<T>() returns (@T) { return @T; }"
   ])
   match checked with
@@ -4744,10 +4744,10 @@ private def testProxyValuesResolveSourceTypes : IO Unit := do
 
 private def testMappingIndexInfersValue : IO Unit := do
   let checked ← check (String.intercalate "\n" [
-    "function read(values: mapping(Word => Bool), key: Word) returns (Bool) {",
+    "function read(values: mapping(word => bool), key: word) returns (bool) {",
     "  return values[key];",
     "}",
-    "function readLiteral(values: mapping(Word => Bool)) returns (Bool) {",
+    "function readLiteral(values: mapping(word => bool)) returns (bool) {",
     "  return values[1];",
     "}"
   ])
@@ -4760,15 +4760,15 @@ private def testMappingIndexInfersValue : IO Unit := do
           readLiteral.predicates = [
             ProgramSignatures.builtinIntPredicate .word
           ]))
-        "literal mapping key lost its sole builtin Int<Word> obligation"
+        "literal mapping key lost its sole builtin Int<word> obligation"
   | functions => throw (IO.userError
       s!"mapping fixture checked {functions.length} functions")
 
 private def testMappingKeyUsesCoercion : IO Unit := do
   let checked ← check (String.intercalate "\n" [
     "trait Coerce<From, To> {}",
-    "impl Coerce<Bool, Word> {}",
-    "function read(values: mapping(Word => Bool), key: Bool) returns (Bool) {",
+    "impl Coerce<bool, word> {}",
+    "function read(values: mapping(word => bool), key: bool) returns (bool) {",
     "  return values[key];",
     "}"
   ])
@@ -4783,7 +4783,7 @@ private def testMappingKeyUsesCoercion : IO Unit := do
 
 private def testNonMappingBaseIsRejected : IO Unit := do
   let rejected ← hasBodyError
-    "function bad(value: Word) returns (Word) { return value[0]; }"
+    "function bad(value: word) returns (word) { return value[0]; }"
     fun error => match error with
       | .unification (.mismatch _ (.mapping _ _)) => true
       | _ => false
@@ -4791,7 +4791,7 @@ private def testNonMappingBaseIsRejected : IO Unit := do
 
 private def testWrongMappingKeyIsRejected : IO Unit := do
   let rejected ← hasBodyError (String.intercalate "\n" [
-    "function bad(values: mapping(Word => Bool)) returns (Bool) {",
+    "function bad(values: mapping(word => bool)) returns (bool) {",
     "  return values[true];",
     "}"
   ]) fun error => match error with
@@ -4802,7 +4802,7 @@ private def testWrongMappingKeyIsRejected : IO Unit := do
 
 private def testUnknownProxyTypeIsRejected : IO Unit := do
   let rejected ← hasBodyError
-    "function bad() returns (@Word) { return @Missing; }"
+    "function bad() returns (@word) { return @Missing; }"
     fun error => match error with
       | .typeResolution (.unknownTypeName ["Missing"]) => true
       | _ => false

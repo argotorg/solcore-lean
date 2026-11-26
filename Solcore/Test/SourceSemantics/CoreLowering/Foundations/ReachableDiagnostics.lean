@@ -276,9 +276,9 @@ end ActualFlow
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function nested(seed: Word) returns (integer) { let result = seed; for (let i = seed; integerLt(wordToInteger(i), 3); i = wordFromInteger(integerAdd(wordToInteger(i), 1))) { match ((i, 7)) { case (0, x) { continue; } case (1, x) { let inner = x; while (integerLt(wordToInteger(inner), 9)) { inner += 1; match (inner) { case 8 { result += inner; } default { break; } } } } default { result += 1; } } } return wordToInteger(result); }",
-    "function defaults(seed: Word) returns (integer) { let result = seed; match (seed) { case 0 {} default { let result = 9; match (result) { case 9 { result += 1; } default {} } } } return wordToInteger(result); }",
-    "function failed(seed: Word) returns (integer) { let missing: Word; let seen: mapping(Bool => Word); for (let i = seed; true; let never: Word = 99) { match (i) { case 0 { let first = wordFromInteger(wordToInteger(seen[false])); let dead = wordToInteger(missing); return dead; } default { return wordToInteger(i); } } } return wordToInteger(seed); }" ]}] }
+    "function nested(seed: word) returns (integer) { let result = seed; for (let i = seed; integerLt(wordToInteger(i), 3); i = wordFromInteger(integerAdd(wordToInteger(i), 1))) { match ((i, 7)) { case (0, x) { continue; } case (1, x) { let inner = x; while (integerLt(wordToInteger(inner), 9)) { inner += 1; match (inner) { case 8 { result += inner; } default { break; } } } } default { result += 1; } } } return wordToInteger(result); }",
+    "function defaults(seed: word) returns (integer) { let result = seed; match (seed) { case 0 {} default { let result = 9; match (result) { case 9 { result += 1; } default {} } } } return wordToInteger(result); }",
+    "function failed(seed: word) returns (integer) { let missing: word; let seen: mapping(bool => word); for (let i = seed; true; let never: word = 99) { match (i) { case 0 { let first = wordFromInteger(wordToInteger(seen[false])); let dead = wordToInteger(missing); return dead; } default { return wordToInteger(i); } } } return wordToInteger(seed); }" ]}] }
 
 def run : IO Unit := do
   let program ← SourceCompilerFeatureSupport.get "generic imperative match checker" (checkProgram workspace)
@@ -523,9 +523,9 @@ theorem actual_policy_ledger (solved : List SolvedRequirement)
 
 private def extractionWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Choice { Left(Word), Right(Word) }",
-    "function sharedArms(seed: Word) returns (integer) { for (let i = 0; integerLt(wordToInteger(i), 2); i += 1) { match (Choice.Left(seed)) { case .Left(x) {} case .Right(y) {} default {} } } return wordToInteger(seed); }",
-    "function scoped(seed: Word) returns (integer) { let total = seed; for (let i = 0; integerLt(wordToInteger(i), 2); i += 1) { match (Choice.Left(i)) { case .Left(0) { let x = 7; total += x; continue; } case .Left(x) { let y = x; total += y; } case .Right(y) {} default {} } } return wordToInteger(total); }"
+    "enum Choice { Left(word), Right(word) }",
+    "function sharedArms(seed: word) returns (integer) { for (let i = 0; integerLt(wordToInteger(i), 2); i += 1) { match (Choice.Left(seed)) { case .Left(x) {} case .Right(y) {} default {} } } return wordToInteger(seed); }",
+    "function scoped(seed: word) returns (integer) { let total = seed; for (let i = 0; integerLt(wordToInteger(i), 2); i += 1) { match (Choice.Left(i)) { case .Left(0) { let x = 7; total += x; continue; } case .Left(x) { let y = x; total += y; } case .Right(y) {} default {} } } return wordToInteger(total); }"
   ]}] }
 
 def run : IO Unit := do
@@ -1512,14 +1512,14 @@ end Receipt
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function copied(value: Word) returns (Word) { let local = value; return local; }",
-    "function bad(value: Word) returns (Word) { let local = value; let gap: Word; return gap; }",
-    "function equalLoops(seed: Word) returns (Word) { let result = 0; for (let outer: Word, outer = copied(0); outer < 1; let post: Word, post = copied(outer + 1), outer = post) { let inner: Word = 0; while (inner < 1) { result = copied(seed); inner = inner + 1; if (inner < 1) { continue; } break; } } return result; }",
-    "function builtinEqual(seed: Word) returns (integer) { let root = wordFromInteger(wordToInteger(seed)); for (root = wordFromInteger(wordToInteger(seed)); integerEq(wordToInteger(root), wordToInteger(seed)); root = 99) { break; } return wordToInteger(root); }",
-    "function returnSkipsPost(seed: Word) returns (Word) { let root = 0; for (let index: Word = 0; true; root = bad(seed)) { while (true) { root = copied(seed); return root; } } return 99; }",
-    "function bodyRhsFault(seed: Word) returns (Word) { let root = 1; for (let index: Word = 0; true; root = 99) { while (true) { root = copied(seed); root = bad(seed); } } return 99; }",
-    "function bodyCompound(seed: Word) returns (Word) { let root: Word; for (let index = 0; true; index = 99) { while (true) { index = copied(1); root += copied(seed); } } return 99; }",
-    "function postRhsFault(seed: Word) returns (Word) { let root = 0; for (let index: Word = 0; true; let post: Word, post = bad(seed), root = 99) { root = copied(seed); continue; } return 99; }"
+    "function copied(value: word) returns (word) { let local = value; return local; }",
+    "function bad(value: word) returns (word) { let local = value; let gap: word; return gap; }",
+    "function equalLoops(seed: word) returns (word) { let result = 0; for (let outer: word, outer = copied(0); outer < 1; let post: word, post = copied(outer + 1), outer = post) { let inner: word = 0; while (inner < 1) { result = copied(seed); inner = inner + 1; if (inner < 1) { continue; } break; } } return result; }",
+    "function builtinEqual(seed: word) returns (integer) { let root = wordFromInteger(wordToInteger(seed)); for (root = wordFromInteger(wordToInteger(seed)); integerEq(wordToInteger(root), wordToInteger(seed)); root = 99) { break; } return wordToInteger(root); }",
+    "function returnSkipsPost(seed: word) returns (word) { let root = 0; for (let index: word = 0; true; root = bad(seed)) { while (true) { root = copied(seed); return root; } } return 99; }",
+    "function bodyRhsFault(seed: word) returns (word) { let root = 1; for (let index: word = 0; true; root = 99) { while (true) { root = copied(seed); root = bad(seed); } } return 99; }",
+    "function bodyCompound(seed: word) returns (word) { let root: word; for (let index = 0; true; index = 99) { while (true) { index = copied(1); root += copied(seed); } } return 99; }",
+    "function postRhsFault(seed: word) returns (word) { let root = 0; for (let index: word = 0; true; let post: word, post = bad(seed), root = 99) { root = copied(seed); continue; } return 99; }"
   ]}]
 }
 
@@ -1735,7 +1735,7 @@ theorem wrong_callback_rejected :
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function make(seed: Word) returns (function() returns (Word)) { return lam() -> Word { let value: Word = seed; for (let i: Word = 0; i < 3; i += 1) { value += 1; } while (value < 6) { value += 1; } return value; }; }"}] }
+    "function make(seed: word) returns (function() returns (word)) { return lam() -> word { let value: word = seed; for (let i: word = 0; i < 3; i += 1) { value += 1; } while (value < 6) { value += 1; } return value; }; }"}] }
 
 def run : IO Unit := do
   let code ← SourceCompilerFeatureSupport.get "imperative native compiler fixture" action
@@ -2038,12 +2038,12 @@ end Receipt
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "enum Choice { Left(Word), Right(Word) }",
-    "function equalMatch(seed: Word) returns (integer) { let result = 0; for (let i = 0; i < 2; i = i + 1) { match (Choice.Left(i)) { case .Left(0) { result = seed; continue; } case .Left(x) { result = result + x; } case .Right(y) {} default {} } } return wordToInteger(result); }",
-    "function sharedArms(seed: Word) returns (integer) { match (Choice.Left(seed)) { case .Left(x) {} case .Right(y) {} default {} } return wordToInteger(seed); }",
-    "function earlyReturn(seed: Word) returns (integer) { let result = 0; let gap: Word; for (let i: Word = 0; true; result = gap) { match (seed) { case x { result = x; return wordToInteger(result); } default {} } } return 99; }",
-    "function rhsFault(seed: Word) returns (integer) { let root = 1; let seen: mapping(Bool => Word); let gap: Word; match (seed) { case x { root = seen[false] + gap; root = 99; } default {} } return wordToInteger(root); }",
-    "function compoundFault(seed: Word) returns (integer) { let root: Word; let seen: mapping(Bool => Word); match (seed) { case x { root += seen[false] + x; root = 99; } default {} } return wordToInteger(root); }"
+    "enum Choice { Left(word), Right(word) }",
+    "function equalMatch(seed: word) returns (integer) { let result = 0; for (let i = 0; i < 2; i = i + 1) { match (Choice.Left(i)) { case .Left(0) { result = seed; continue; } case .Left(x) { result = result + x; } case .Right(y) {} default {} } } return wordToInteger(result); }",
+    "function sharedArms(seed: word) returns (integer) { match (Choice.Left(seed)) { case .Left(x) {} case .Right(y) {} default {} } return wordToInteger(seed); }",
+    "function earlyReturn(seed: word) returns (integer) { let result = 0; let gap: word; for (let i: word = 0; true; result = gap) { match (seed) { case x { result = x; return wordToInteger(result); } default {} } } return 99; }",
+    "function rhsFault(seed: word) returns (integer) { let root = 1; let seen: mapping(bool => word); let gap: word; match (seed) { case x { root = seen[false] + gap; root = 99; } default {} } return wordToInteger(root); }",
+    "function compoundFault(seed: word) returns (integer) { let root: word; let seen: mapping(bool => word); match (seed) { case x { root += seen[false] + x; root = 99; } default {} } return wordToInteger(root); }"
   ]}]
 }
 
@@ -2332,16 +2332,16 @@ end CompilerConsumers
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function compound(seed: Word) returns (Word) { let result = seed; for (result += 1, result += 2; result < 9; result += 1) { if (result == 6) { continue; } if (result == 7) { break; } } return result; }",
-    "function next(value: Word) returns (Word) { return value + 1; }",
-    "function less(value: Word, bound: Word) returns (Bool) { return value < bound; }",
-    "function bad() returns (Word) { let absent: Word; return absent; }",
-    "function equalBody(seed: Word) returns (Word) { let result = seed; for (result = next(seed); less(result, 5); result = next(result)) { let inner = 0; while (less(inner, 2)) { inner = next(inner); } if (result == 3) { continue; } if (result == 4) { break; } } return result; }",
-    "function unitBody(seed: Word) { let result = seed; for (result = next(seed); less(result, 3); result = next(result)) { } }",
-    "function initialFault(seed: Word) returns (Word) { let result = seed; for (result = bad(); false; result = next(result)) { result = next(result); } return result; }",
-    "function postFault(seed: Word) returns (Word) { let result = seed; for (result = next(seed); true; result = bad()) { result = next(result); } return result; }",
-    "function bodyFault(seed: Word) returns (Word) { let result = seed; let seen: mapping(Bool => Word); for (result = next(seed); true; result = next(result)) { seen[false] = next(result); result = bad(); } return result; }",
-    "function self(n: Word) returns (Word) { let result = 1; for (let i = 0; i < n; i = next(i)) { result = result + self(n - 1); } return result; }"
+    "function compound(seed: word) returns (word) { let result = seed; for (result += 1, result += 2; result < 9; result += 1) { if (result == 6) { continue; } if (result == 7) { break; } } return result; }",
+    "function next(value: word) returns (word) { return value + 1; }",
+    "function less(value: word, bound: word) returns (bool) { return value < bound; }",
+    "function bad() returns (word) { let absent: word; return absent; }",
+    "function equalBody(seed: word) returns (word) { let result = seed; for (result = next(seed); less(result, 5); result = next(result)) { let inner = 0; while (less(inner, 2)) { inner = next(inner); } if (result == 3) { continue; } if (result == 4) { break; } } return result; }",
+    "function unitBody(seed: word) { let result = seed; for (result = next(seed); less(result, 3); result = next(result)) { } }",
+    "function initialFault(seed: word) returns (word) { let result = seed; for (result = bad(); false; result = next(result)) { result = next(result); } return result; }",
+    "function postFault(seed: word) returns (word) { let result = seed; for (result = next(seed); true; result = bad()) { result = next(result); } return result; }",
+    "function bodyFault(seed: word) returns (word) { let result = seed; let seen: mapping(bool => word); for (result = next(seed); true; result = next(result)) { seen[false] = next(result); result = bad(); } return result; }",
+    "function self(n: word) returns (word) { let result = 1; for (let i = 0; i < n; i = next(i)) { result = result + self(n - 1); } return result; }"
   ]}]
 }
 open Tests.SourceCompilerFeatureSupport in
@@ -2560,10 +2560,10 @@ end Origins
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function headers(seed: Word) returns (Word) { let out = seed; for (out += 1, out += 2; out < 9; out += 1) { match (out) { case 6 { continue; } default { if (out == 7) { break; } } } } return out; }",
-    "function equalHeaders(seed: Word) returns (Word) { let out = seed; for (out = seed; out < seed + 2; out = out + 1) { match(out) { case x {} default {} } } return out; }",
-    "function initialFault(seed: Word) returns (Word) { let root: Word; let seen: mapping(Bool => Word); for (root += seen[false]; false; root += seed) {} return root; }",
-    "function postFault(seed: Word) returns (Word) { let root: Word; let seen: mapping(Bool => Word); for (let i = 0; i < 1; root += seen[false]) { match (seed) { case x {} default {} } } return root; }"
+    "function headers(seed: word) returns (word) { let out = seed; for (out += 1, out += 2; out < 9; out += 1) { match (out) { case 6 { continue; } default { if (out == 7) { break; } } } } return out; }",
+    "function equalHeaders(seed: word) returns (word) { let out = seed; for (out = seed; out < seed + 2; out = out + 1) { match(out) { case x {} default {} } } return out; }",
+    "function initialFault(seed: word) returns (word) { let root: word; let seen: mapping(bool => word); for (root += seen[false]; false; root += seed) {} return root; }",
+    "function postFault(seed: word) returns (word) { let root: word; let seen: mapping(bool => word); for (let i = 0; i < 1; root += seen[false]) { match (seed) { case x {} default {} } } return root; }"
   ]}]
 }
 
@@ -3033,15 +3033,15 @@ theorem terminal_if_reflects_at [FunctionCalls.FaultTokens faults] (budget size 
 end Concrete
 
 private def content : String := String.intercalate "\n" [
-  "function both(flag: Bool) returns (Word) { if (flag) { for (let i: Word = 0; i < 1; i += 1) {} return 7; } else { while (false) {} return 9; } }",
-  "function block() returns (Word) { { for (let i: Word = 0; i < 1; i += 1) {} return 11; } }",
-  "function nested(flag: Bool) returns (Word) { let saved = 13; { if (flag) { for (; true; ) { break; } return saved; } else { while (true) { break; } return 17; } } }",
-  "function inFor(flag: Bool) returns (Word) { for (; true; ) { if (flag) { return 43; } else { return 47; } let gap: Word; gap; } return 99; }",
-  "function inWhile(flag: Bool) returns (Word) { while (true) { { if (flag) { return 53; } else { return 59; } } let gap: Word; gap; } return 99; }",
-  "function reachable(flag: Bool) returns (Word) { if (flag) { return 19; } return 23; }",
-  "function dead(flag: Bool) returns (Word) { if (flag) { for (; true; ) { break; } return 29; } else { while (false) {} return 31; } let gap: Word; gap; }",
-  "function failed(flag: Bool) returns (Word) { let prior: Word = 37; if (flag) { for (; false; ) {} let gap: Word; return gap; } else { while (false) {} return 41; } let skipped = 99; return skipped; }",
-  "function unit() returns (Unit) { { for (; true; ) { break; } return; } let gap: Word; gap; }"
+  "function both(flag: bool) returns (word) { if (flag) { for (let i: word = 0; i < 1; i += 1) {} return 7; } else { while (false) {} return 9; } }",
+  "function block() returns (word) { { for (let i: word = 0; i < 1; i += 1) {} return 11; } }",
+  "function nested(flag: bool) returns (word) { let saved = 13; { if (flag) { for (; true; ) { break; } return saved; } else { while (true) { break; } return 17; } } }",
+  "function inFor(flag: bool) returns (word) { for (; true; ) { if (flag) { return 43; } else { return 47; } let gap: word; gap; } return 99; }",
+  "function inWhile(flag: bool) returns (word) { while (true) { { if (flag) { return 53; } else { return 59; } } let gap: word; gap; } return 99; }",
+  "function reachable(flag: bool) returns (word) { if (flag) { return 19; } return 23; }",
+  "function dead(flag: bool) returns (word) { if (flag) { for (; true; ) { break; } return 29; } else { while (false) {} return 31; } let gap: word; gap; }",
+  "function failed(flag: bool) returns (word) { let prior: word = 37; if (flag) { for (; false; ) {} let gap: word; return gap; } else { while (false) {} return 41; } let skipped = 99; return skipped; }",
+  "function unit() returns (()) { { for (; true; ) { break; } return; } let gap: word; gap; }"
 ]
 private def w (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
@@ -3561,16 +3561,16 @@ theorem actual_compiler_body_reflects [FunctionCalls.FaultTokens faults]
 end CompilerConsumers
 
 private def content : String := String.intercalate "\n" [
-  "function both(flag: Bool) returns (Word) { if (flag) { match (1) { case 1 {} default {} } return 7; } else { match (2) { case 2 {} default {} } return 9; } }",
-  "function block() returns (Word) { { match (3) { case 3 {} default {} } return 11; } }",
-  "function arms(seed: Word) returns (Word) { match (seed) { case 0 { if (true) { return 13; } else { return 17; } let gap: Word; gap; } default { { return 19; } let gap: Word; gap; } } return 99; }",
-  "function inFor() returns (Word) { for (; true; ) { if (true) { match (4) { case 4 {} default {} } return 23; } else { return 29; } let gap: Word; gap; } return 99; }",
-  "function inWhile() returns (Word) { while (true) { { match (5) { case 5 {} default {} } return 31; } let gap: Word; gap; } return 99; }",
-  "function failed(flag: Bool) returns (Word) { let prior: Word = 37; if (flag) { match (6) { case 6 {} default {} } let gap: Word; return gap; } else { match (7) { case 7 {} default {} } return 41; } let skipped = 99; return skipped; }",
-  "function unit() returns (Unit) { { match (8) { case 8 {} default {} } return; } let gap: Word; gap; }",
-  "function directMatch(seed: Word) returns (Word) { match (seed) { case 0 { return 43; } default { return 47; } } }",
-  "function pattern(seed: Word) returns (Word) { match ((seed, 11)) { case (0, x) { { return x; } let gap: Word; gap; } default { if (true) { return seed; } else { return 61; } let gap: Word; gap; } } return 99; }",
-  "function reachable(flag: Bool) returns (Word) { if (flag) { return 53; } match (9) { case 9 {} default {} } return 59; }"
+  "function both(flag: bool) returns (word) { if (flag) { match (1) { case 1 {} default {} } return 7; } else { match (2) { case 2 {} default {} } return 9; } }",
+  "function block() returns (word) { { match (3) { case 3 {} default {} } return 11; } }",
+  "function arms(seed: word) returns (word) { match (seed) { case 0 { if (true) { return 13; } else { return 17; } let gap: word; gap; } default { { return 19; } let gap: word; gap; } } return 99; }",
+  "function inFor() returns (word) { for (; true; ) { if (true) { match (4) { case 4 {} default {} } return 23; } else { return 29; } let gap: word; gap; } return 99; }",
+  "function inWhile() returns (word) { while (true) { { match (5) { case 5 {} default {} } return 31; } let gap: word; gap; } return 99; }",
+  "function failed(flag: bool) returns (word) { let prior: word = 37; if (flag) { match (6) { case 6 {} default {} } let gap: word; return gap; } else { match (7) { case 7 {} default {} } return 41; } let skipped = 99; return skipped; }",
+  "function unit() returns (()) { { match (8) { case 8 {} default {} } return; } let gap: word; gap; }",
+  "function directMatch(seed: word) returns (word) { match (seed) { case 0 { return 43; } default { return 47; } } }",
+  "function pattern(seed: word) returns (word) { match ((seed, 11)) { case (0, x) { { return x; } let gap: word; gap; } default { if (true) { return seed; } else { return 61; } let gap: word; gap; } } return 99; }",
+  "function reachable(flag: bool) returns (word) { if (flag) { return 53; } match (9) { case 9 {} default {} } return 59; }"
 ]
 private def w (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
@@ -4001,13 +4001,13 @@ theorem terminal_if_reflects_at [FunctionCalls.FaultTokens faults] (budget size 
 end Concrete
 
 private def content : String := String.intercalate "\n" [
-  "function both(flag: Bool) returns (Word) { if (flag) { return 7; } else { return 9; } }",
-  "function block() returns (Word) { { return 11; } }",
-  "function nested(flag: Bool) returns (Word) { let saved = 13; { if (flag) { return saved; } else { return 17; } } }",
-  "function reachable(flag: Bool) returns (Word) { if (flag) { return 19; } return 23; }",
-  "function dead(flag: Bool) returns (Word) { if (flag) { return 29; } else { return 31; } let gap: Word; gap; }",
-  "function failed(flag: Bool) returns (Word) { let prior: Word = 37; if (flag) { let gap: Word; return gap; } else { return 41; } let skipped = 99; return skipped; }",
-  "function unit() returns (Unit) { { return; } let gap: Word; gap; }"
+  "function both(flag: bool) returns (word) { if (flag) { return 7; } else { return 9; } }",
+  "function block() returns (word) { { return 11; } }",
+  "function nested(flag: bool) returns (word) { let saved = 13; { if (flag) { return saved; } else { return 17; } } }",
+  "function reachable(flag: bool) returns (word) { if (flag) { return 19; } return 23; }",
+  "function dead(flag: bool) returns (word) { if (flag) { return 29; } else { return 31; } let gap: word; gap; }",
+  "function failed(flag: bool) returns (word) { let prior: word = 37; if (flag) { let gap: word; return gap; } else { return 41; } let skipped = 99; return skipped; }",
+  "function unit() returns (()) { { return; } let gap: word; gap; }"
 ]
 private def w (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
@@ -4313,16 +4313,16 @@ theorem concrete_native_fault {size : Nat} {native : Core.Environment} {initial 
   exact ⟨same, storeEq, child, smaller, actual⟩
 
 private def content : String := String.intercalate "\n" [
-  "enum Choice { Left(Word), Right(Word) }",
-  "function direct(seed: Word) returns (Word) { match (seed) { case 0 { return 43; } default { return 47; } } }",
-  "function dead(seed: Word) returns (Word) { match (seed) { case 0 { if (true) { return 13; } else { return 17; } } default { { return 19; } } } let gap: Word; gap; }",
-  "function pattern(seed: Word) returns (Word) { match ((seed, 11)) { case (0, x) { { return x; } let skipped: Word = 99; } default { if (true) { return seed; } else { return 61; } let skipped: Word = 99; } } return 99; }",
-  "function same(seed: Word) returns (Word) { match (seed) { case 0 { return 23; } case 1 { return 23; } default { return 23; } } return 99; }",
-  "function reachable(seed: Word) returns (Word) { match (seed) { case 0 {} default { return 31; } } return 29; }",
-  "function failed(seed: Word) returns (Word) { match (seed) { case 0 { let prior: Word = 37; let gap: Word; return gap; } default { return 41; } } let skipped = 99; return skipped; }",
-  "function scrutineeFault() returns (Word) { let gap: Word; match (gap) { case 0 { return 1; } default { return 2; } } let skipped = 99; return skipped; }",
-  "function nominalLeft(value: Choice) returns (Word) { match (value) { case .Left(x) { return x; } case .Right(y) { return y; } } }",
-  "function nominalRight(value: Choice) returns (Word) { match (value) { case .Left(x) { return x; } case .Right(y) { return y; } } }"
+  "enum Choice { Left(word), Right(word) }",
+  "function direct(seed: word) returns (word) { match (seed) { case 0 { return 43; } default { return 47; } } }",
+  "function dead(seed: word) returns (word) { match (seed) { case 0 { if (true) { return 13; } else { return 17; } } default { { return 19; } } } let gap: word; gap; }",
+  "function pattern(seed: word) returns (word) { match ((seed, 11)) { case (0, x) { { return x; } let skipped: word = 99; } default { if (true) { return seed; } else { return 61; } let skipped: word = 99; } } return 99; }",
+  "function same(seed: word) returns (word) { match (seed) { case 0 { return 23; } case 1 { return 23; } default { return 23; } } return 99; }",
+  "function reachable(seed: word) returns (word) { match (seed) { case 0 {} default { return 31; } } return 29; }",
+  "function failed(seed: word) returns (word) { match (seed) { case 0 { let prior: word = 37; let gap: word; return gap; } default { return 41; } } let skipped = 99; return skipped; }",
+  "function scrutineeFault() returns (word) { let gap: word; match (gap) { case 0 { return 1; } default { return 2; } } let skipped = 99; return skipped; }",
+  "function nominalLeft(value: Choice) returns (word) { match (value) { case .Left(x) { return x; } case .Right(y) { return y; } } }",
+  "function nominalRight(value: Choice) returns (word) { match (value) { case .Left(x) { return x; } case .Right(y) { return y; } } }"
 ]
 private def w (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
@@ -4596,13 +4596,13 @@ theorem concrete_fault_stops {size : Nat} {native : Core.Environment} {initial f
   exact ⟨same, storeEq, child, smaller, actual⟩
 
 private def content : String := String.intercalate "\n" [
-  "function both(flag: Bool) returns (Word) { if (flag) { return 7; } else { return 9; } }",
-  "function block() returns (Word) { { return 11; } }",
-  "function nested(flag: Bool) returns (Word) { let saved = 13; { if (flag) { return saved; } else { return 17; } } }",
-  "function reachable(flag: Bool) returns (Word) { if (flag) { return 19; } return 23; }",
-  "function dead(flag: Bool) returns (Word) { if (flag) { return 29; } else { return 31; } let gap: Word; gap; }",
-  "function failed(flag: Bool) returns (Word) { let prior: Word = 37; if (flag) { let gap: Word; return gap; } else { return 41; } let skipped = 99; return skipped; }",
-  "function unit() returns (Unit) { { return; } let gap: Word; gap; }"
+  "function both(flag: bool) returns (word) { if (flag) { return 7; } else { return 9; } }",
+  "function block() returns (word) { { return 11; } }",
+  "function nested(flag: bool) returns (word) { let saved = 13; { if (flag) { return saved; } else { return 17; } } }",
+  "function reachable(flag: bool) returns (word) { if (flag) { return 19; } return 23; }",
+  "function dead(flag: bool) returns (word) { if (flag) { return 29; } else { return 31; } let gap: word; gap; }",
+  "function failed(flag: bool) returns (word) { let prior: word = 37; if (flag) { let gap: word; return gap; } else { return 41; } let skipped = 99; return skipped; }",
+  "function unit() returns (()) { { return; } let gap: word; gap; }"
 ]
 private def w (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
@@ -5057,20 +5057,20 @@ theorem actual_compiler_body_reflects [FunctionCalls.FaultTokens faults]
 end CompilerConsumers
 
 private def content : String := String.intercalate "\n" [
-  "enum Choice { Left(Word), Right(Word) }",
-  "function direct(seed: Word) returns (Word) { match (seed) { case 0 { return 43; } default { return 47; } } }",
-  "function dead(seed: Word) returns (Word) { match (seed) { case 0 { if (true) { return 13; } else { return 17; } } default { { return 19; } } } let gap: Word; gap; }",
-  "function pattern(seed: Word) returns (Word) { match ((seed, 11)) { case (0, x) { { return x; } let skipped: Word = 99; } default { if (true) { return seed; } else { return 61; } let skipped: Word = 99; } } return 99; }",
-  "function same(seed: Word) returns (Word) { match (seed) { case 0 { return 23; } case 1 { return 23; } default { return 23; } } return 99; }",
-  "function reachable(seed: Word) returns (Word) { match (seed) { case 0 {} default { return 31; } } return 29; }",
-  "function failed(seed: Word) returns (Word) { match (seed) { case 0 { let prior: Word = 37; let gap: Word; return gap; } default { return 41; } } let skipped = 99; return skipped; }",
-  "function scrutineeFault() returns (Word) { let gap: Word; match (gap) { case 0 { return 1; } default { return 2; } } let skipped = 99; return skipped; }",
-  "function inFor() returns (Word) { for (; true; ) { match (4) { case 4 { return 23; } default { return 29; } } let gap: Word; gap; } return 99; }",
-  "function inWhile() returns (Word) { while (true) { match (5) { case 5 { return 31; } default { return 37; } } let gap: Word; gap; } return 99; }",
-  "function inBlock() returns (Word) { { match (6) { case 6 { return 41; } default { return 43; } } let gap: Word; gap; } let skipped = 99; return skipped; }",
-  "function inIf(flag: Bool) returns (Word) { if (flag) { match (7) { case 7 { return 47; } default { return 53; } } let gap: Word; gap; } else { match (8) { case 8 { return 59; } default { return 61; } } let gap: Word; gap; } }",
-  "function nominalLeft(value: Choice) returns (Word) { match (value) { case .Left(x) { return x; } case .Right(y) { return y; } } }",
-  "function nominalRight(value: Choice) returns (Word) { match (value) { case .Left(x) { return x; } case .Right(y) { return y; } } }"
+  "enum Choice { Left(word), Right(word) }",
+  "function direct(seed: word) returns (word) { match (seed) { case 0 { return 43; } default { return 47; } } }",
+  "function dead(seed: word) returns (word) { match (seed) { case 0 { if (true) { return 13; } else { return 17; } } default { { return 19; } } } let gap: word; gap; }",
+  "function pattern(seed: word) returns (word) { match ((seed, 11)) { case (0, x) { { return x; } let skipped: word = 99; } default { if (true) { return seed; } else { return 61; } let skipped: word = 99; } } return 99; }",
+  "function same(seed: word) returns (word) { match (seed) { case 0 { return 23; } case 1 { return 23; } default { return 23; } } return 99; }",
+  "function reachable(seed: word) returns (word) { match (seed) { case 0 {} default { return 31; } } return 29; }",
+  "function failed(seed: word) returns (word) { match (seed) { case 0 { let prior: word = 37; let gap: word; return gap; } default { return 41; } } let skipped = 99; return skipped; }",
+  "function scrutineeFault() returns (word) { let gap: word; match (gap) { case 0 { return 1; } default { return 2; } } let skipped = 99; return skipped; }",
+  "function inFor() returns (word) { for (; true; ) { match (4) { case 4 { return 23; } default { return 29; } } let gap: word; gap; } return 99; }",
+  "function inWhile() returns (word) { while (true) { match (5) { case 5 { return 31; } default { return 37; } } let gap: word; gap; } return 99; }",
+  "function inBlock() returns (word) { { match (6) { case 6 { return 41; } default { return 43; } } let gap: word; gap; } let skipped = 99; return skipped; }",
+  "function inIf(flag: bool) returns (word) { if (flag) { match (7) { case 7 { return 47; } default { return 53; } } let gap: word; gap; } else { match (8) { case 8 { return 59; } default { return 61; } } let gap: word; gap; } }",
+  "function nominalLeft(value: Choice) returns (word) { match (value) { case .Left(x) { return x; } case .Right(y) { return y; } } }",
+  "function nominalRight(value: Choice) returns (word) { match (value) { case .Left(x) { return x; } case .Right(y) { return y; } } }"
 ]
 private def w (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
@@ -5403,13 +5403,13 @@ abbrev actual_body_extraction := @RecursiveNamedImperativeMatchSyntaxFactory.ext
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
 private def content : String := String.intercalate "\n" [
- "function partialIf(seed: Word) returns (Word) { if (seed == 0) { return 17; } return 23; }",
- "function partialBoth(seed: Word) returns (Word) { if (seed == 0) { if (seed == 1) { return 29; } } else { if (seed == 2) { return 31; } } return 37; }",
- "function totalIf(seed: Word) returns (Word) { if (seed == 0) { return 41; } else { return 43; } }",
- "function blockFalls(seed: Word) returns (Word) { { if (seed == 0) { return 47; } } return 53; }",
- "function sixtyOne() returns (Word) { return 61; }",
- "function scopedValue() returns (Word) { { sixtyOne(); } return 67; }",
- "function faultBefore(seed: Word) returns (Word) { if (seed == 0) { let gap: Word; return gap; } return 97; }"
+ "function partialIf(seed: word) returns (word) { if (seed == 0) { return 17; } return 23; }",
+ "function partialBoth(seed: word) returns (word) { if (seed == 0) { if (seed == 1) { return 29; } } else { if (seed == 2) { return 31; } } return 37; }",
+ "function totalIf(seed: word) returns (word) { if (seed == 0) { return 41; } else { return 43; } }",
+ "function blockFalls(seed: word) returns (word) { { if (seed == 0) { return 47; } } return 53; }",
+ "function sixtyOne() returns (word) { return 61; }",
+ "function scopedValue() returns (word) { { sixtyOne(); } return 67; }",
+ "function faultBefore(seed: word) returns (word) { if (seed == 0) { let gap: word; return gap; } return 97; }"
 ]
 private def finish (compiled : SourceCoreUnifiedCompilation.Compiled) (name : String)
     (arguments : List SourceTypedRuntime.Value) (fuel : Nat) (initial : SourceTypedRuntime.RuntimeState) : IO SourceTypedRuntime.RunResult := do

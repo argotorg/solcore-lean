@@ -228,7 +228,7 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function make(seed: Word) returns (function(Word) returns (Word)) { return lam(next: Word) { let previous: Word = seed; seed = next; return previous; }; }"}] }
+    "function make(seed: word) returns (function(word) returns (word)) { return lam(next: word) { let previous: word = seed; seed = next; return previous; }; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)
@@ -2119,7 +2119,7 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function make(seed: Word) returns (function() returns (Word)) { return lam() { let copy: Word = seed; return copy; }; }"}] }
+    "function make(seed: word) returns (function() returns (word)) { return lam() { let copy: word = seed; return copy; }; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)
@@ -3945,7 +3945,7 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   externalLibraries := []
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function make(seed: Word) returns (function(Word) returns (Word)) { return lam(x: Word) { return seed; }; }"}] }
+    "function make(seed: word) returns (function(word) returns (word)) { return lam(x: word) { return seed; }; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)

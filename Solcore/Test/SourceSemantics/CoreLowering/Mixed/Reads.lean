@@ -30,9 +30,9 @@ open Tests.SourceCompilerFeatureSupport (get require boot word)
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function mixedIndexRead(flag: Bool) returns (Word, Bool) {",
+    "function mixedIndexRead(flag: bool) returns (word, bool) {",
     "  let f = lam(value) { return value; };",
-    "  let table: mapping(Word => Word);",
+    "  let table: mapping(word => word);",
     "  let active = flag;",
     "  table[3] = f(10);",
     "  for (table[3] += 1; active; table[3] += 2) {",
@@ -1655,9 +1655,9 @@ open Tests.SourceCompilerFeatureSupport (get require boot word)
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
-    "function mixedProjected(flag: Bool) returns (mapping(Word => Word), Bool) {",
+    "function mixedProjected(flag: bool) returns (mapping(word => word), bool) {",
     "  let f = lam(value) { return value; };",
-    "  let table: mapping(Word => Word);",
+    "  let table: mapping(word => word);",
     "  let active = flag;",
     "  table[3] = f(10);",
     "  for (table[3] += 1; active; table[3] += 2) {",

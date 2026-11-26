@@ -19,7 +19,7 @@ private def workspace : Workspace.RawWorkspace := {
     path := "main.solc"
     content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "trait Eq<T> {",
-      "  function eq(left: T, right: T) returns (Bool);",
+      "  function eq(left: T, right: T) returns (bool);",
       "}",
       "trait Add<T> {",
       "  function add(left: T, right: T) returns (T);",
@@ -28,66 +28,66 @@ private def workspace : Workspace.RawWorkspace := {
       "trait Coerce<From, To> {",
       "  function coerce(value: From) returns (To);",
       "}",
-      "impl Eq<Word> {",
-      "  function eq(left: Word, right: Word) returns (Bool) {",
+      "impl Eq<word> {",
+      "  function eq(left: word, right: word) returns (bool) {",
       "    return left < right || right < left;",
       "  }",
       "}",
-      "impl Add<Word> {",
-      "  function add(left: Word, right: Word) returns (Word) {",
+      "impl Add<word> {",
+      "  function add(left: word, right: word) returns (word) {",
       "    return left - right;",
       "  }",
       "}",
-      "impl Marker<Bool> {}",
-      "impl Coerce<Bool, Word> {",
-      "  function coerce(value: Bool) returns (Word) {",
+      "impl Marker<bool> {}",
+      "impl Coerce<bool, word> {",
+      "  function coerce(value: bool) returns (word) {",
       "    return value ? 41 : 7;",
       "  }",
       "}",
-      "function ne<T>(left: T, right: T) returns (Bool) where T: Eq {",
+      "function ne<T>(left: T, right: T) returns (bool) where T: Eq {",
       "  return !(left == right);",
       "}",
       "function identity<T>(value: T) returns (T) { return value; }",
       "function wrap<U>(value: U) returns (U) { return identity(value); }",
       "function select<A, B>(left: A, right: B) returns (A) { return left; }",
-      "function entry(value: Word, flag: Bool) returns (Word) {",
+      "function entry(value: word, flag: bool) returns (word) {",
       "  return flag ? wrap(value) : select(value, flag);",
       "}",
       "function loop<T>(value: T) returns (T) { return loop(value); }",
       "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
-      "function constrained(value: Word) returns (Word) { return keep(value); }",
+      "function constrained(value: word) returns (word) { return keep(value); }",
       "function relay<T>(value: T) returns (T) where T: Eq { return keep(value); }",
-      "function nestedConstrained(value: Word) returns (Word) { return relay(value); }",
+      "function nestedConstrained(value: word) returns (word) { return relay(value); }",
       "function keepBoth<T>(value: T) returns (T) where T: Eq, T: Add { return value; }",
-      "function bothConstrained(value: Word) returns (Word) { return keepBoth(value); }",
+      "function bothConstrained(value: word) returns (word) { return keepBoth(value); }",
       "function addWithEvidence<T>(left: T, right: T) returns (T) where T: Add {",
       "  return left + right;",
       "}",
-      "function operatorConstrained(left: Word, right: Word) returns (Word) {",
+      "function operatorConstrained(left: word, right: word) returns (word) {",
       "  return addWithEvidence(left, right);",
       "}",
-      "function equalWithEvidence<T>(left: T, right: T) returns (Bool) where T: Eq {",
+      "function equalWithEvidence<T>(left: T, right: T) returns (bool) where T: Eq {",
       "  return left == right;",
       "}",
-      "function equalityConstrained(left: Word, right: Word) returns (Bool) {",
+      "function equalityConstrained(left: word, right: word) returns (bool) {",
       "  return equalWithEvidence(left, right);",
       "}",
-      "function notEqualWithEvidence<T>(left: T, right: T) returns (Bool) where T: Eq {",
+      "function notEqualWithEvidence<T>(left: T, right: T) returns (bool) where T: Eq {",
       "  return left != right;",
       "}",
-      "function inequalityConstrained(left: Word, right: Word) returns (Bool) {",
+      "function inequalityConstrained(left: word, right: word) returns (bool) {",
       "  return notEqualWithEvidence(left, right);",
       "}",
-      "function acceptWord(value: Word) returns (Word) { return value; }",
-      "function coercionCall(value: Bool) returns (Word) { return acceptWord(value); }",
-      "function coerceWithEvidence<T>(value: T) returns (Word) where T: Coerce<Word> {",
+      "function acceptWord(value: word) returns (word) { return value; }",
+      "function coercionCall(value: bool) returns (word) { return acceptWord(value); }",
+      "function coerceWithEvidence<T>(value: T) returns (word) where T: Coerce<word> {",
       "  return acceptWord(value);",
       "}",
-      "function genericCoercion(value: Bool) returns (Word) {",
+      "function genericCoercion(value: bool) returns (word) {",
       "  return coerceWithEvidence(value);",
       "}",
       "function keepMarker<T>(value: T) returns (T) where T: Marker { return value; }",
-      "function resultCoercion(value: Bool) returns (Word) {",
+      "function resultCoercion(value: bool) returns (word) {",
       "  return keepMarker(value);",
       "}"
     ]
@@ -580,16 +580,16 @@ private def testImplementationMethodDirectCall : IO Unit := do
     "trait Add<T> {",
     "  function add(left: T, right: T) returns (T);",
     "}",
-    "impl Add<Word> {",
-    "  function add(left: Word, right: Word) returns (Word) {",
+    "impl Add<word> {",
+    "  function add(left: word, right: word) returns (word) {",
     "    return helper(left);",
     "  }",
     "}",
-    "function helper(value: Word) returns (Word) { return value; }",
+    "function helper(value: word) returns (word) { return value; }",
     "function addWithEvidence<T>(left: T, right: T) returns (T) where T: Add {",
     "  return left + right;",
     "}",
-    "function entry(left: Word, right: Word) returns (Word) {",
+    "function entry(left: word, right: word) returns (word) {",
     "  return addWithEvidence(left, right);",
     "}"
   ])
@@ -622,16 +622,16 @@ private def testMultiMethodImplementationSelection : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Add<T> {",
     "  function add(left: T, right: T) returns (T);",
-    "  function tag(value: T) returns (Bool);",
+    "  function tag(value: T) returns (bool);",
     "}",
-    "impl Add<Word> {",
-    "  function add(left: Word, right: Word) returns (Word) { return 91; }",
-    "  function tag(value: Word) returns (Bool) { return true; }",
+    "impl Add<word> {",
+    "  function add(left: word, right: word) returns (word) { return 91; }",
+    "  function tag(value: word) returns (bool) { return true; }",
     "}",
     "function addWithEvidence<T>(left: T, right: T) returns (T) where T: Add {",
     "  return left + right;",
     "}",
-    "function entry(left: Word, right: Word) returns (Word) {",
+    "function entry(left: word, right: word) returns (word) {",
     "  return addWithEvidence(left, right);",
     "}"
   ])
@@ -658,16 +658,16 @@ private def testImplementationMethodCallCycle : IO Unit := do
     "trait Add<T> {",
     "  function add(left: T, right: T) returns (T);",
     "}",
-    "impl Add<Word> {",
-    "  function add(left: Word, right: Word) returns (Word) {",
+    "impl Add<word> {",
+    "  function add(left: word, right: word) returns (word) {",
     "    return helper(left);",
     "  }",
     "}",
-    "function helper(value: Word) returns (Word) { return helper(value); }",
+    "function helper(value: word) returns (word) { return helper(value); }",
     "function addWithEvidence<T>(left: T, right: T) returns (T) where T: Add {",
     "  return left + right;",
     "}",
-    "function entry(left: Word, right: Word) returns (Word) {",
+    "function entry(left: word, right: word) returns (word) {",
     "  return addWithEvidence(left, right);",
     "}"
   ])
@@ -705,38 +705,38 @@ private def testStrictRuntimeBinaryEvidence : IO Unit := do
     "trait BitOr<T> {",
     "  function bor(left: T, right: T) returns (T);",
     "}",
-    "impl Sub<Word> {",
-    "  function sub(left: Word, right: Word) returns (Word) {",
+    "impl Sub<word> {",
+    "  function sub(left: word, right: word) returns (word) {",
     "    return left;",
     "  }",
     "}",
-    "impl Mul<Word> {",
-    "  function mul(left: Word, right: Word) returns (Word) {",
+    "impl Mul<word> {",
+    "  function mul(left: word, right: word) returns (word) {",
     "    return 91;",
     "  }",
     "}",
-    "impl Div<Word> {",
-    "  function div(left: Word, right: Word) returns (Word) {",
+    "impl Div<word> {",
+    "  function div(left: word, right: word) returns (word) {",
     "    return 92;",
     "  }",
     "}",
-    "impl Mod<Word> {",
-    "  function mod(left: Word, right: Word) returns (Word) {",
+    "impl Mod<word> {",
+    "  function mod(left: word, right: word) returns (word) {",
     "    return 93;",
     "  }",
     "}",
-    "impl BitAnd<Word> {",
-    "  function band(left: Word, right: Word) returns (Word) {",
+    "impl BitAnd<word> {",
+    "  function band(left: word, right: word) returns (word) {",
     "    return 94;",
     "  }",
     "}",
-    "impl BitXor<Word> {",
-    "  function bxor(left: Word, right: Word) returns (Word) {",
+    "impl BitXor<word> {",
+    "  function bxor(left: word, right: word) returns (word) {",
     "    return 95;",
     "  }",
     "}",
-    "impl BitOr<Word> {",
-    "  function bor(left: Word, right: Word) returns (Word) {",
+    "impl BitOr<word> {",
+    "  function bor(left: word, right: word) returns (word) {",
     "    return 96;",
     "  }",
     "}",
@@ -761,25 +761,25 @@ private def testStrictRuntimeBinaryEvidence : IO Unit := do
     "function bitOrWithEvidence<T>(left: T, right: T) returns (T) where T: BitOr {",
     "  return left | right;",
     "}",
-    "function subtractEntry(left: Word, right: Word) returns (Word) {",
+    "function subtractEntry(left: word, right: word) returns (word) {",
     "  return subtractWithEvidence(left, right);",
     "}",
-    "function multiplyEntry(left: Word, right: Word) returns (Word) {",
+    "function multiplyEntry(left: word, right: word) returns (word) {",
     "  return multiplyWithEvidence(left, right);",
     "}",
-    "function divideEntry(left: Word, right: Word) returns (Word) {",
+    "function divideEntry(left: word, right: word) returns (word) {",
     "  return divideWithEvidence(left, right);",
     "}",
-    "function moduloEntry(left: Word, right: Word) returns (Word) {",
+    "function moduloEntry(left: word, right: word) returns (word) {",
     "  return moduloWithEvidence(left, right);",
     "}",
-    "function bitAndEntry(left: Word, right: Word) returns (Word) {",
+    "function bitAndEntry(left: word, right: word) returns (word) {",
     "  return bitAndWithEvidence(left, right);",
     "}",
-    "function bitXorEntry(left: Word, right: Word) returns (Word) {",
+    "function bitXorEntry(left: word, right: word) returns (word) {",
     "  return bitXorWithEvidence(left, right);",
     "}",
-    "function bitOrEntry(left: Word, right: Word) returns (Word) {",
+    "function bitOrEntry(left: word, right: word) returns (word) {",
     "  return bitOrWithEvidence(left, right);",
     "}"
   ])
@@ -813,13 +813,13 @@ private def bitNotEvidenceSource : List String := [
     "trait BitNot<T> {",
     "  function bnot(value: T) returns (T);",
     "}",
-    "impl BitNot<Word> {",
-    "  function bnot(value: Word) returns (Word) { return 91; }",
+    "impl BitNot<word> {",
+    "  function bnot(value: word) returns (word) { return 91; }",
     "}",
     "function bitNotWithEvidence<T>(value: T) returns (T) where T: BitNot {",
     "  return ~value;",
     "}",
-    "function evidenceEntry(value: Word) returns (Word) {",
+    "function evidenceEntry(value: word) returns (word) {",
     "  return bitNotWithEvidence(value);",
     "}"]
 
@@ -880,7 +880,7 @@ private def testRuntimeBitNotEvidence : IO Unit := do
     entry := "main.solc"
     mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++
       String.intercalate "\n" (bitNotEvidenceSource ++
-        ["function builtinEntry(value: Word) returns (Word) { return ~value; }"]) }]
+        ["function builtinEntry(value: word) returns (word) { return ~value; }"]) }]
     externalLibraries := []
   }
   match checkProgram concrete with
@@ -891,8 +891,8 @@ private def testRuntimeBitNotEvidence : IO Unit := do
             "concrete Word ~ was refused for another trait or type"
       | error => throw (IO.userError s!"concrete Word ~ was refused for {reprStr error}")
   | .error errors => throw (IO.userError
-      s!"concrete Word ~ beside BitNot<Word> was refused otherwise: {reprStr errors}")
-  | .ok _ => throw (IO.userError "concrete Word ~ beside BitNot<Word> was accepted")
+      s!"concrete Word ~ beside BitNot<word> was refused otherwise: {reprStr errors}")
+  | .ok _ => throw (IO.userError "concrete Word ~ beside BitNot<word> was accepted")
 
 private structure NamedOperatorCase where
   entryName : String
@@ -1017,56 +1017,56 @@ private def testBuiltinLogicalEntry (program : CheckedProgram) (entryName : Stri
 private def testNamedOperatorFunctionsAndOrd : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Eq<T> {",
-    "  function eq(left: T, right: T) returns (Bool);",
+    "  function eq(left: T, right: T) returns (bool);",
     "}",
     "trait Ord<T> where T: Eq {",
-    "  function gt(left: T, right: T) returns (Bool);",
+    "  function gt(left: T, right: T) returns (bool);",
     "}",
-    "impl Eq<Word> {",
-    "  function eq(left: Word, right: Word) returns (Bool) { return true; }",
+    "impl Eq<word> {",
+    "  function eq(left: word, right: word) returns (bool) { return true; }",
     "}",
-    "impl Ord<Word> where Word: Eq {",
-    "  function gt(left: Word, right: Word) returns (Bool) { return true; }",
+    "impl Ord<word> where word: Eq {",
+    "  function gt(left: word, right: word) returns (bool) { return true; }",
     "}",
-    "function ne<T>(left: T, right: T) returns (Bool) where T: Eq {",
+    "function ne<T>(left: T, right: T) returns (bool) where T: Eq {",
     "  return true;",
     "}",
-    "function lt<T>(left: T, right: T) returns (Bool) where T: Ord {",
+    "function lt<T>(left: T, right: T) returns (bool) where T: Ord {",
     "  return false;",
     "}",
-    "function ltWord(left: Word, right: Word) returns (Word) { return 77; }",
-    "function le<T>(left: T, right: T) returns (Bool) where T: Ord {",
+    "function ltWord(left: word, right: word) returns (word) { return 77; }",
+    "function le<T>(left: T, right: T) returns (bool) where T: Ord {",
     "  return true;",
     "}",
-    "function ge<T>(left: T, right: T) returns (Bool) where T: Ord {",
+    "function ge<T>(left: T, right: T) returns (bool) where T: Ord {",
     "  return true;",
     "}",
-    "function and(left: Bool, right: Bool) returns (Bool) { return false; }",
-    "function or(left: Bool, right: Bool) returns (Bool) { return false; }",
-    "function gt(left: Word, right: Word) returns (Bool) { return false; }",
-    "function notEqualEntry(left: Word, right: Word) returns (Bool) {",
+    "function and(left: bool, right: bool) returns (bool) { return false; }",
+    "function or(left: bool, right: bool) returns (bool) { return false; }",
+    "function gt(left: word, right: word) returns (bool) { return false; }",
+    "function notEqualEntry(left: word, right: word) returns (bool) {",
     "  return left != right;",
     "}",
-    "function lessEntry(left: Word, right: Word) returns (Bool) {",
+    "function lessEntry(left: word, right: word) returns (bool) {",
     "  let selected = left < right;",
     "  return selected;",
     "}",
-    "function lessEqualEntry(left: Word, right: Word) returns (Bool) {",
+    "function lessEqualEntry(left: word, right: word) returns (bool) {",
     "  return left <= right;",
     "}",
-    "function greaterEqualEntry(left: Word, right: Word) returns (Bool) {",
+    "function greaterEqualEntry(left: word, right: word) returns (bool) {",
     "  return left >= right;",
     "}",
-    "function logicalAndEntry(left: Bool, right: Bool) returns (Bool) {",
+    "function logicalAndEntry(left: bool, right: bool) returns (bool) {",
     "  return left && right;",
     "}",
-    "function logicalOrEntry(left: Bool, right: Bool) returns (Bool) {",
+    "function logicalOrEntry(left: bool, right: bool) returns (bool) {",
     "  return left || right;",
     "}",
-    "function greaterWithEvidence<T>(left: T, right: T) returns (Bool) where T: Ord {",
+    "function greaterWithEvidence<T>(left: T, right: T) returns (bool) where T: Ord {",
     "  return left > right;",
     "}",
-    "function greaterEntry(left: Word, right: Word) returns (Bool) {",
+    "function greaterEntry(left: word, right: word) returns (bool) {",
     "  return greaterWithEvidence(left, right);",
     "}",
     "pragma no-patterson-condition;"
@@ -1192,21 +1192,21 @@ private def testNamedOperatorFunctionsAndOrd : IO Unit := do
 private def testTraitPredicateIsStaticMethodAssumption : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Eq<T> {",
-    "  function eq(left: T, right: T) returns (Bool);",
+    "  function eq(left: T, right: T) returns (bool);",
     "}",
     "trait Ord<T> where T: Eq {",
-    "  function gt(left: T, right: T) returns (Bool);",
+    "  function gt(left: T, right: T) returns (bool);",
     "}",
-    "impl Eq<Word> {",
-    "  function eq(left: Word, right: Word) returns (Bool) { return true; }",
+    "impl Eq<word> {",
+    "  function eq(left: word, right: word) returns (bool) { return true; }",
     "}",
-    "impl Ord<Word> where Word: Eq {",
-    "  function gt(left: Word, right: Word) returns (Bool) { return true; }",
+    "impl Ord<word> where word: Eq {",
+    "  function gt(left: word, right: word) returns (bool) { return true; }",
     "}",
-    "function greaterWithEvidence<T>(left: T, right: T) returns (Bool) where T: Ord {",
+    "function greaterWithEvidence<T>(left: T, right: T) returns (bool) where T: Ord {",
     "  return left > right;",
     "}",
-    "function entry(left: Word, right: Word) returns (Bool) {",
+    "function entry(left: word, right: word) returns (bool) {",
     "  return greaterWithEvidence(left, right);",
     "}",
     "pragma no-patterson-condition;"
@@ -1251,7 +1251,7 @@ private def testTraitPredicateIsStaticMethodAssumption : IO Unit := do
   -- `T: Ord`'s superclass `T: Eq` is a given too, which the caller proves.
   assertTrue (specializedGreater.any fun specialized =>
       decide (specialized.assumptions = [implementation.head, eqWord]))
-    "Ord specialization lost its explicit Ord<Word> assumption and its Eq<Word> superclass"
+    "Ord specialization lost its explicit Ord<word> assumption and its Eq<word> superclass"
   let linked ← linkOrThrow "static trait predicate assumption" program outcome
   let key : SourceSpecialization.SpecializationKey := {
     declaration := entry.id
@@ -1269,22 +1269,22 @@ private def testTraitPredicateIsStaticMethodAssumption : IO Unit := do
 private def testMissingConsumedTraitPredicateEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Eq<T> {",
-    "  function eq(left: T, right: T) returns (Bool);",
+    "  function eq(left: T, right: T) returns (bool);",
     "}",
     "trait Ord<T> where T: Eq {",
-    "  function gt(left: T, right: T) returns (Bool);",
+    "  function gt(left: T, right: T) returns (bool);",
     "}",
-    "impl Eq<Word> {",
-    "  function eq(left: Word, right: Word) returns (Bool) { return true; }",
+    "impl Eq<word> {",
+    "  function eq(left: word, right: word) returns (bool) { return true; }",
     "}",
-    "function consumeEq<T>(value: T) returns (Bool) where T: Eq { return true; }",
-    "impl Ord<Word> where Word: Eq {",
-    "  function gt(left: Word, right: Word) returns (Bool) { return consumeEq(left); }",
+    "function consumeEq<T>(value: T) returns (bool) where T: Eq { return true; }",
+    "impl Ord<word> where word: Eq {",
+    "  function gt(left: word, right: word) returns (bool) { return consumeEq(left); }",
     "}",
-    "function greaterWithEvidence<T>(left: T, right: T) returns (Bool) where T: Ord {",
+    "function greaterWithEvidence<T>(left: T, right: T) returns (bool) where T: Ord {",
     "  return left > right;",
     "}",
-    "function entry(left: Word, right: Word) returns (Bool) {",
+    "function entry(left: word, right: word) returns (bool) {",
     "  return greaterWithEvidence(left, right);",
     "}",
     "pragma no-patterson-condition;"
@@ -1338,26 +1338,26 @@ private def testMissingConsumedTraitPredicateEvidence : IO Unit := do
 private def testConsumedTraitPredicateEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Eq<T> {",
-    "  function eq(left: T, right: T) returns (Bool);",
+    "  function eq(left: T, right: T) returns (bool);",
     "}",
     "trait Ord<T> where T: Eq {",
-    "  function gt(left: T, right: T) returns (Bool);",
+    "  function gt(left: T, right: T) returns (bool);",
     "}",
-    "impl Eq<Word> {",
-    "  function eq(left: Word, right: Word) returns (Bool) { return false; }",
+    "impl Eq<word> {",
+    "  function eq(left: word, right: word) returns (bool) { return false; }",
     "}",
-    "function equalWithEvidence<T>(left: T, right: T) returns (Bool) where T: Eq {",
+    "function equalWithEvidence<T>(left: T, right: T) returns (bool) where T: Eq {",
     "  return left == right;",
     "}",
-    "impl Ord<Word> where Word: Eq {",
-    "  function gt(left: Word, right: Word) returns (Bool) {",
+    "impl Ord<word> where word: Eq {",
+    "  function gt(left: word, right: word) returns (bool) {",
     "    return equalWithEvidence(left, right);",
     "  }",
     "}",
-    "function greaterWithEvidence<T>(left: T, right: T) returns (Bool) where T: Ord {",
+    "function greaterWithEvidence<T>(left: T, right: T) returns (bool) where T: Ord {",
     "  return left > right;",
     "}",
-    "function entry(left: Word, right: Word) returns (Bool) {",
+    "function entry(left: word, right: word) returns (bool) {",
     "  return greaterWithEvidence(left, right);",
     "}",
     "pragma no-patterson-condition;"
@@ -1390,23 +1390,23 @@ private def testConsumedTraitPredicateEvidence : IO Unit := do
 private def testGenericTraitPredicateEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Eq<T> {",
-    "  function eq(left: T, right: T) returns (Bool);",
+    "  function eq(left: T, right: T) returns (bool);",
     "}",
     "trait Ord<T> where T: Eq {",
-    "  function gt(left: T, right: T) returns (Bool);",
+    "  function gt(left: T, right: T) returns (bool);",
     "}",
-    "impl Eq<Word> {",
-    "  function eq(left: Word, right: Word) returns (Bool) { return false; }",
+    "impl Eq<word> {",
+    "  function eq(left: word, right: word) returns (bool) { return false; }",
     "}",
     "impl<T> Ord<T> where T: Eq {",
-    "  function gt(left: T, right: T) returns (Bool) {",
+    "  function gt(left: T, right: T) returns (bool) {",
     "    return left == right;",
     "  }",
     "}",
-    "function greaterWithEvidence<T>(left: T, right: T) returns (Bool) where T: Ord {",
+    "function greaterWithEvidence<T>(left: T, right: T) returns (bool) where T: Ord {",
     "  return left > right;",
     "}",
-    "function entry(left: Word, right: Word) returns (Bool) {",
+    "function entry(left: word, right: word) returns (bool) {",
     "  return greaterWithEvidence(left, right);",
     "}",
     "pragma no-patterson-condition;"
@@ -1431,26 +1431,26 @@ private def testGenericTraitPredicateEvidence : IO Unit := do
 private def testImplementationPredicateEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Eq<T> {",
-    "  function eq(left: T, right: T) returns (Bool);",
+    "  function eq(left: T, right: T) returns (bool);",
     "}",
     "trait Add<T> {",
     "  function add(left: T, right: T) returns (T);",
     "}",
-    "impl Eq<Word> {",
-    "  function eq(left: Word, right: Word) returns (Bool) { return false; }",
+    "impl Eq<word> {",
+    "  function eq(left: word, right: word) returns (bool) { return false; }",
     "}",
-    "function equalWithEvidence<T>(left: T, right: T) returns (Bool) where T: Eq {",
+    "function equalWithEvidence<T>(left: T, right: T) returns (bool) where T: Eq {",
     "  return left == right;",
     "}",
-    "impl Add<Word> where Word: Eq {",
-    "  function add(left: Word, right: Word) returns (Word) {",
+    "impl Add<word> where word: Eq {",
+    "  function add(left: word, right: word) returns (word) {",
     "    return equalWithEvidence(left, right) ? 91 : 92;",
     "  }",
     "}",
     "function addWithEvidence<T>(left: T, right: T) returns (T) where T: Add {",
     "  return left + right;",
     "}",
-    "function entry(left: Word, right: Word) returns (Word) {",
+    "function entry(left: word, right: word) returns (word) {",
     "  return addWithEvidence(left, right);",
     "}",
     "pragma no-patterson-condition;"
@@ -1483,15 +1483,15 @@ private def testImplementationPredicateEvidence : IO Unit := do
 private def testGenericImplementationPredicateEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Eq<T> {",
-    "  function eq(left: T, right: T) returns (Bool);",
+    "  function eq(left: T, right: T) returns (bool);",
     "}",
     "trait Add<T> where T: Eq {",
     "  function add(left: T, right: T) returns (T);",
     "}",
-    "impl Eq<Word> {",
-    "  function eq(left: Word, right: Word) returns (Bool) { return false; }",
+    "impl Eq<word> {",
+    "  function eq(left: word, right: word) returns (bool) { return false; }",
     "}",
-    "function equalWithEvidence<T>(left: T, right: T) returns (Bool) where T: Eq {",
+    "function equalWithEvidence<T>(left: T, right: T) returns (bool) where T: Eq {",
     "  return left == right;",
     "}",
     "impl<T> Add<T> where T: Eq {",
@@ -1502,7 +1502,7 @@ private def testGenericImplementationPredicateEvidence : IO Unit := do
     "function addWithEvidence<T>(left: T, right: T) returns (T) where T: Add {",
     "  return left + right;",
     "}",
-    "function entry(left: Word, right: Word) returns (Word) {",
+    "function entry(left: word, right: word) returns (word) {",
     "  return addWithEvidence(left, right);",
     "}",
     "pragma no-patterson-condition;"
@@ -1540,19 +1540,19 @@ private def testGenericImplementationPredicateEvidence : IO Unit := do
 private def testBinaryMethodPredicateEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Eq<T> {",
-    "  function eq(left: T, right: T) returns (Bool);",
+    "  function eq(left: T, right: T) returns (bool);",
     "}",
     "trait Add<T> {",
     "  function add(left: T, right: T) returns (T) where T: Eq;",
     "}",
-    "impl Eq<Word> {",
-    "  function eq(left: Word, right: Word) returns (Bool) { return false; }",
+    "impl Eq<word> {",
+    "  function eq(left: word, right: word) returns (bool) { return false; }",
     "}",
-    "function equalWithEvidence<T>(left: T, right: T) returns (Bool) where T: Eq {",
+    "function equalWithEvidence<T>(left: T, right: T) returns (bool) where T: Eq {",
     "  return left == right;",
     "}",
-    "impl Add<Word> {",
-    "  function add(left: Word, right: Word) returns (Word) where Word: Eq {",
+    "impl Add<word> {",
+    "  function add(left: word, right: word) returns (word) where word: Eq {",
     "    return equalWithEvidence(left, right) ? 91 : 92;",
     "  }",
     "}",
@@ -1560,7 +1560,7 @@ private def testBinaryMethodPredicateEvidence : IO Unit := do
     "    where T: Add, T: Eq {",
     "  return left + right;",
     "}",
-    "function entry(left: Word, right: Word) returns (Word) {",
+    "function entry(left: word, right: word) returns (word) {",
     "  return addWithEvidence(left, right);",
     "}"
   ])
@@ -1670,19 +1670,19 @@ private def testBinaryMethodPredicateEvidence : IO Unit := do
 private def testUnaryMethodPredicateEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Eq<T> {",
-    "  function eq(left: T, right: T) returns (Bool);",
+    "  function eq(left: T, right: T) returns (bool);",
     "}",
     "trait BitNot<T> {",
     "  function bnot(value: T) returns (T) where T: Eq;",
     "}",
-    "impl Eq<Word> {",
-    "  function eq(left: Word, right: Word) returns (Bool) { return false; }",
+    "impl Eq<word> {",
+    "  function eq(left: word, right: word) returns (bool) { return false; }",
     "}",
-    "function equalWithEvidence<T>(left: T, right: T) returns (Bool) where T: Eq {",
+    "function equalWithEvidence<T>(left: T, right: T) returns (bool) where T: Eq {",
     "  return left == right;",
     "}",
-    "impl BitNot<Word> {",
-    "  function bnot(value: Word) returns (Word) where Word: Eq {",
+    "impl BitNot<word> {",
+    "  function bnot(value: word) returns (word) where word: Eq {",
     "    return equalWithEvidence(value, value) ? 93 : 94;",
     "  }",
     "}",
@@ -1690,7 +1690,7 @@ private def testUnaryMethodPredicateEvidence : IO Unit := do
     "    where T: BitNot, T: Eq {",
     "  return ~value;",
     "}",
-    "function entry(value: Word) returns (Word) {",
+    "function entry(value: word) returns (word) {",
     "  return bitNotWithEvidence(value);",
     "}"
   ])
@@ -1763,14 +1763,14 @@ private def testUnaryMethodPredicateEvidence : IO Unit := do
 private def testNamedLogicalNotWithEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Marker<T> {}",
-    "impl Marker<Bool> {}",
-    "function not<T>(value: T) returns (Bool) where T: Marker {",
+    "impl Marker<bool> {}",
+    "function not<T>(value: T) returns (bool) where T: Marker {",
     "  return true;",
     "}",
-    "function negateWithEvidence<T>(value: T) returns (Bool) where T: Marker {",
+    "function negateWithEvidence<T>(value: T) returns (bool) where T: Marker {",
     "  return !value;",
     "}",
-    "function logicalNotEntry(value: Bool) returns (Bool) {",
+    "function logicalNotEntry(value: bool) returns (bool) {",
     "  return negateWithEvidence(value);",
     "}"
   ])
@@ -1874,8 +1874,8 @@ private def testNamedLogicalNotWithEvidence : IO Unit := do
 
 private def testNamedLogicalNotExpectedType : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
-    "function not(value: Word) returns (Word) { return 91; }",
-    "function entry(value: Word) returns (Word) { return !value; }"
+    "function not(value: word) returns (word) { return 91; }",
+    "function entry(value: word) returns (word) { return !value; }"
   ])
   let not ← signatureNamed program "not"
   let entry ← signatureNamed program "entry"
@@ -1928,8 +1928,8 @@ private def testNamedLogicalNotMismatchDoesNotFallback : IO Unit := do
     mainSources := [{
       path := "main.solc"
       content := "pragma solcore;\n" ++ String.intercalate "\n" [
-        "function not(value: Word) returns (Bool) { return false; }",
-        "function entry(value: Bool) returns (Bool) { return !value; }"
+        "function not(value: word) returns (bool) { return false; }",
+        "function entry(value: bool) returns (bool) { return !value; }"
       ]
     }]
     externalLibraries := []
@@ -1946,7 +1946,7 @@ private def testNamedLogicalNotMismatchDoesNotFallback : IO Unit := do
 
 private def testBuiltinLogicalNotFallback : IO Unit := do
   let program ← checkedProgramOf
-    "function entry(value: Bool) returns (Bool) { return !value; }"
+    "function entry(value: bool) returns (bool) { return !value; }"
   let entry ← signatureNamed program "entry"
   let function ← functionFor program entry
   let unary ← match firstUnaryNode? function.typedBody.nodes with
@@ -1995,8 +1995,8 @@ private def testNamedOperatorMismatchDoesNotFallback : IO Unit := do
     externalLibraries := []
   }
   match checkProgram (raw [
-      "function lt(left: Bool, right: Bool) returns (Bool) { return false; }",
-      "function entry(left: Word, right: Word) returns (Bool) {",
+      "function lt(left: bool, right: bool) returns (bool) { return false; }",
+      "function entry(left: word, right: word) returns (bool) {",
       "  return left < right;",
       "}"]) with
   | .error errors =>
@@ -2008,8 +2008,8 @@ private def testNamedOperatorMismatchDoesNotFallback : IO Unit := do
   | .ok _ => throw (IO.userError
       "an inapplicable visible lt overload silently used builtin fallback")
   match checkProgram (raw [
-      "function and(left: Word, right: Word) returns (Bool) { return false; }",
-      "function entry(left: Bool, right: Bool) returns (Bool) {",
+      "function and(left: word, right: word) returns (bool) { return false; }",
+      "function entry(left: bool, right: bool) returns (bool) {",
       "  return left && right;",
       "}"]) with
   | .ok _ => pure ()
@@ -2018,8 +2018,8 @@ private def testNamedOperatorMismatchDoesNotFallback : IO Unit := do
 
 private def testHeterogeneousNamedOperator : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
-    "function lt(left: Word, right: Bool) returns (Bool) { return right; }",
-    "function entry(left: Word, right: Bool) returns (Bool) {",
+    "function lt(left: word, right: bool) returns (bool) { return right; }",
+    "function entry(left: word, right: bool) returns (bool) {",
     "  return left < right;",
     "}"
   ])
@@ -2058,26 +2058,26 @@ private def testHeterogeneousNamedOperator : IO Unit := do
 private def testNamedOperatorResultCoercionChain : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Ord<T> {",
-    "  function gt(left: T, right: T) returns (Bool);",
+    "  function gt(left: T, right: T) returns (bool);",
     "}",
     "trait Coerce<From, To> {",
     "  function coerce(value: From) returns (To);",
     "}",
-    "impl Ord<Word> {",
-    "  function gt(left: Word, right: Word) returns (Bool) { return true; }",
+    "impl Ord<word> {",
+    "  function gt(left: word, right: word) returns (bool) { return true; }",
     "}",
-    "impl Coerce<Word, Bool> {",
-    "  function coerce(value: Word) returns (Bool) { return false; }",
+    "impl Coerce<word, bool> {",
+    "  function coerce(value: word) returns (bool) { return false; }",
     "}",
-    "impl Coerce<Bool, Word> {",
-    "  function coerce(value: Bool) returns (Word) {",
+    "impl Coerce<bool, word> {",
+    "  function coerce(value: bool) returns (word) {",
     "    return value ? 91 : 92;",
     "  }",
     "}",
-    "function lt<T>(left: T, right: T) returns (Word) where T: Ord {",
+    "function lt<T>(left: T, right: T) returns (word) where T: Ord {",
     "  return 5;",
     "}",
-    "function entry(left: Word, right: Word) returns (Word) {",
+    "function entry(left: word, right: word) returns (word) {",
     "  return left < right;",
     "}"
   ])
@@ -2131,25 +2131,25 @@ private structure BuiltinOperatorCase where
 
 private def testBuiltinOperatorFallback : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
-    "function builtinNotEqual(left: Word, right: Word) returns (Bool) {",
+    "function builtinNotEqual(left: word, right: word) returns (bool) {",
     "  return left != right;",
     "}",
-    "function builtinLess(left: Word, right: Word) returns (Bool) {",
+    "function builtinLess(left: word, right: word) returns (bool) {",
     "  return left < right;",
     "}",
-    "function builtinLessEqual(left: Word, right: Word) returns (Bool) {",
+    "function builtinLessEqual(left: word, right: word) returns (bool) {",
     "  return left <= right;",
     "}",
-    "function builtinGreaterEqual(left: Word, right: Word) returns (Bool) {",
+    "function builtinGreaterEqual(left: word, right: word) returns (bool) {",
     "  return left >= right;",
     "}",
-    "function builtinAnd(left: Bool, right: Bool) returns (Bool) {",
+    "function builtinAnd(left: bool, right: bool) returns (bool) {",
     "  return left && right;",
     "}",
-    "function builtinOr(left: Bool, right: Bool) returns (Bool) {",
+    "function builtinOr(left: bool, right: bool) returns (bool) {",
     "  return left || right;",
     "}",
-    "function builtinGreater(left: Word, right: Word) returns (Bool) {",
+    "function builtinGreater(left: word, right: word) returns (bool) {",
     "  return left > right;",
     "}"
   ])
@@ -2238,20 +2238,20 @@ private def testMultiStepRuntimeCoercion : IO Unit := do
     "trait Coerce<From, To> {",
     "  function coerce(value: From) returns (To);",
     "}",
-    "impl Coerce<Bool, Word> {",
-    "  function coerce(value: Bool) returns (Word) {",
+    "impl Coerce<bool, word> {",
+    "  function coerce(value: bool) returns (word) {",
     "    return value ? 41 : 7;",
     "  }",
     "}",
-    "impl Coerce<Word, (Bool, Bool)> {",
-    "  function coerce(value: Word) returns ((Bool, Bool)) {",
+    "impl Coerce<word, (bool, bool)> {",
+    "  function coerce(value: word) returns ((bool, bool)) {",
     "    return (value == 41, value == 7);",
     "  }",
     "}",
-    "function acceptPair(value: (Bool, Bool)) returns ((Bool, Bool)) {",
+    "function acceptPair(value: (bool, bool)) returns ((bool, bool)) {",
     "  return value;",
     "}",
-    "function entry(value: Bool) returns ((Bool, Bool)) {",
+    "function entry(value: bool) returns ((bool, bool)) {",
     "  return acceptPair(value);",
     "}"
   ])
@@ -2275,33 +2275,33 @@ private def testMultiStepRuntimeCoercion : IO Unit := do
 private def testCoercionMethodPredicateEvidence : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Eq<T> {",
-    "  function eq(left: T, right: T) returns (Bool);",
+    "  function eq(left: T, right: T) returns (bool);",
     "}",
     "trait Marker<T> {}",
     "trait Coerce<From, To> {",
     "  function coerce(value: From) returns (To)",
     "      where From: Eq, From: Marker;",
     "}",
-    "impl Eq<Bool> {",
-    "  function eq(left: Bool, right: Bool) returns (Bool) { return left; }",
+    "impl Eq<bool> {",
+    "  function eq(left: bool, right: bool) returns (bool) { return left; }",
     "}",
-    "impl Marker<Bool> {}",
-    "function equalWithEvidence<T>(left: T, right: T) returns (Bool)",
+    "impl Marker<bool> {}",
+    "function equalWithEvidence<T>(left: T, right: T) returns (bool)",
     "    where T: Eq {",
     "  return left == right;",
     "}",
-    "impl Coerce<Bool, Word> {",
-    "  function coerce(value: Bool) returns (Word)",
-    "      where Bool: Eq, Bool: Marker {",
+    "impl Coerce<bool, word> {",
+    "  function coerce(value: bool) returns (word)",
+    "      where bool: Eq, bool: Marker {",
     "    return equalWithEvidence(value, value) ? 41 : 7;",
     "  }",
     "}",
-    "function acceptWord(value: Word) returns (Word) { return value; }",
-    "function coerceWithEvidence<T>(value: T) returns (Word)",
-    "    where T: Coerce<Word>, T: Eq, T: Marker {",
+    "function acceptWord(value: word) returns (word) { return value; }",
+    "function coerceWithEvidence<T>(value: T) returns (word)",
+    "    where T: Coerce<word>, T: Eq, T: Marker {",
     "  return acceptWord(value);",
     "}",
-    "function entry(value: Bool) returns (Word) {",
+    "function entry(value: bool) returns (word) {",
     "  return coerceWithEvidence(value);",
     "}"
   ])
@@ -2619,7 +2619,7 @@ private def testBuiltinIntegerLiteralLinking : IO Unit := do
   let spelling :=
     "115792089237316195423570985008687907853269984665640564039457584007913129639937"
   let program ← checkedProgramOf
-    ("function literal() returns (Word) { return " ++ spelling ++ "; }")
+    ("function literal() returns (word) { return " ++ spelling ++ "; }")
   let signature ← signatureNamed program "literal"
   let function ← functionFor program signature
   let expression ← match function.typedBody.roots with
@@ -2652,7 +2652,7 @@ private def testBuiltinIntegerLiteralLinking : IO Unit := do
       evidence := .implementation
         (.byImpl resolution.predicate (.builtin .intWord) [])
     }])
-    "linked integer fixture lost its exact builtin Int<Word> solution"
+    "linked integer fixture lost its exact builtin Int<word> solution"
   let outcome ← runOrThrow "builtin integer literal" program
     [monomorphicRequest signature] 1
   let linked ← linkOrThrow "builtin integer literal" program outcome
@@ -2666,18 +2666,18 @@ private def testBuiltinIntegerLiteralLinking : IO Unit := do
         "builtin integer literal lost its linked entry")
   assertTrue (decide (entry.run? [] 16 =
       some (.done (.word (word 1)) [])))
-    "direct linking bypassed or changed builtin Int<Word> modulo lowering"
+    "direct linking bypassed or changed builtin Int<word> modulo lowering"
 
 private def testDeferredIntegerOperatorLinking : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
-    "function accept(value: Word) returns (Word) { return value; }",
-    "function nestedAdd() returns (Word) { return accept(1 + 1); }",
-    "function nestedNot() returns (Word) { return accept(~1); }",
-    "function letAdd() returns (Word) {",
+    "function accept(value: word) returns (word) { return value; }",
+    "function nestedAdd() returns (word) { return accept(1 + 1); }",
+    "function nestedNot() returns (word) { return accept(~1); }",
+    "function letAdd() returns (word) {",
     "  let value = 1 + 1;",
     "  return accept(value);",
     "}",
-    "function letNot() returns (Word) {",
+    "function letNot() returns (word) {",
     "  let value = ~1;",
     "  return accept(value);",
     "}"

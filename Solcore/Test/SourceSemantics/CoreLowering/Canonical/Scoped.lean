@@ -498,7 +498,7 @@ def observeFactory (function : CheckedFunction) (signature identity relay : Prog
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
-    "function identity(value: Word) returns (Word) { return value; } function relay(value: Word) returns (Word) { let local: Word = identity(value); return local; } function make(seed: Word) returns (function(Word, Bool, Bool) returns (Word)) { return lam(next: Word, flag: Bool, stop: Bool) { let previous: Word = relay(seed); while (flag) { seed = relay(next); flag = stop; } return identity(previous); }; }"}] }
+    "function identity(value: word) returns (word) { return value; } function relay(value: word) returns (word) { let local: word = identity(value); return local; } function make(seed: word) returns (function(word, bool, bool) returns (word)) { return lam(next: word, flag: bool, stop: bool) { let previous: word = relay(seed); while (flag) { seed = relay(next); flag = stop; } return identity(previous); }; }"}] }
 
 structure CheckedFixture where
   program : CheckedProgram
