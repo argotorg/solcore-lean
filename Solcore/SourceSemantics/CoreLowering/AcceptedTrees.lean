@@ -6,6 +6,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Statements.GenericAssignmen
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.MatchSelection
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.IndexedLambdaValues
 import Solcore.SourceSemantics.CoreLowering.Internal.OwnedPrepared.MixedBodyCompiler
+import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ElementReceipts
 
 /-!
 # Accepted compiler trees
@@ -20,7 +21,8 @@ Main declarations:
 - `AcceptedNamedMatchFlow.Receipt`, one accepted match;
 - `AcceptedBareAssignmentReceipt.Receipt`, `AcceptedProjectedAssignmentReceipt.Receipt`,
   `AcceptedBareBitNotReceipt.Receipt` and `AcceptedProjectedBitNotReceipt.Receipt`,
-  the write heads.
+  the write heads, and the element writes' `AcceptedElementAssignmentReceipt.Receipt` and
+  `AcceptedElementBitNotReceipt.Receipt`.
 -/
 
 section
@@ -471,6 +473,48 @@ def ProjectedBitNotAssignable (source : TypedSource) (assignment : AssignmentRes
 
 def UnaryAssignable (source : TypedSource) (assignment : AssignmentResolution) : Prop :=
   BitNotAssignable source assignment ∨ ProjectedBitNotAssignable source assignment
+
+/-- Writes to one element of a local memory array: the compiler's profile and the place `root[key]`. -/
+def ElementAssignable (assignment : AssignmentResolution) (operator : Solcore.Syntax.ValueAssignOp) : Prop :=
+  ((operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) ∧
+    ∃ key, assignment.target.projections = [.element key]
+
+/-- In-place `~` at one element of a local memory array, of a `Word` or fixed-width element. -/
+def ElementBitNotAssignable (assignment : AssignmentResolution) : Prop :=
+  (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) ∧
+    ∃ key, assignment.target.projections = [.element key]
+
+/-- An accepted write to an element is neither a bare nor a projected write: its root has a binder and its place
+is `root[key]`, which no mapping route reaches. -/
+theorem element_not_value {policy : SourceCoreLoops.Policy} {fuel : Nat} {source : TypedSource}
+    {scope : SourceCoreLocalCell.Scope} {site : SourceCoreElaboration.ErrorSite} {assignment : AssignmentResolution}
+    {operator : Solcore.Syntax.ValueAssignOp} {rhs : ExpressionId} {output : Ty} {next code : Expr}
+    {reasonAt : ExpressionId → Word}
+    (receipt : AcceptedElementAssignmentReceipt.Receipt policy fuel source scope site assignment operator rhs output
+      next reasonAt code)
+    (eligible : ValueAssignable source assignment operator) : False := by
+  obtain ⟨binder, found⟩ := SourceCoreCompatibleDataPlaces.rootBinder_of_lower receipt.lowered
+  rcases eligible with ⟨_, bare, _⟩ | ⟨_, _, routed⟩
+  · rw [receipt.single] at bare
+    cases bare
+  · have plain := SourceCoreCompatibleDataPlaces.takesElement_of_free (routed binder found).elementFree
+    rw [receipt.single] at plain
+    simp [SourceCoreCompatibleDataPlaces.takesElement] at plain
+
+/-- An accepted in-place `~` at an element is neither a bare nor a projected one. -/
+theorem element_not_unary {policy : SourceCoreLoops.Policy} {fuel : Nat} {source : TypedSource}
+    {scope : SourceCoreLocalCell.Scope} {site : SourceCoreElaboration.ErrorSite} {assignment : AssignmentResolution}
+    {output : Ty} {next code : Expr} {reasonAt : ExpressionId → Word}
+    (receipt : AcceptedElementBitNotReceipt.Receipt policy fuel source scope site assignment output next reasonAt
+      code)
+    (eligible : UnaryAssignable source assignment) : False := by
+  obtain ⟨binder, found⟩ := SourceCoreCompatibleDataPlaces.rootBinder_of_lower receipt.lowered
+  rcases eligible with ⟨_, bare, _⟩ | ⟨_, _, routed⟩
+  · rw [receipt.single] at bare
+    cases bare
+  · have plain := SourceCoreCompatibleDataPlaces.takesElement_of_free (routed binder found).elementFree
+    rw [receipt.single] at plain
+    simp [SourceCoreCompatibleDataPlaces.takesElement] at plain
 
 /-- Every current header form has a raw compiler receipt. Target eligibility
 is checked separately when that receipt is refined. -/
@@ -969,6 +1013,14 @@ inductive Tree (policy : SourceCoreLoops.Policy) (source : TypedSource)
       (route : AcceptedProjectedAssignmentRoute.Route source receipt.binder.scheme.body
         assignment.target.projections assignment.target.type) :
       Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest) code
+  | elementAssigned {mode escaped fuel scope id rest node stored assignment operator expression tail code}
+      (read : policy.readStatement source id = .ok (node, stored))
+      (form : node.form = .assignValue assignment operator expression)
+      (statementType : SourceCoreBasic.ensureType (.occurrence id.occurrence) .unit stored = .ok ())
+      (remaining : Tree policy source result reasonAt mode escaped fuel scope rest tail)
+      (receipt : AcceptedElementAssignmentReceipt.Receipt policy fuel source scope (.occurrence id.occurrence)
+        assignment operator expression (LocalLoop.controlType result) tail reasonAt code) :
+      Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest) code
   | bitNotting {mode escaped fuel scope id rest node stored assignment tail code}
       (read : policy.readStatement source id = .ok (node, stored))
       (form : node.form = .assignBitNot assignment)
@@ -995,6 +1047,14 @@ inductive Tree (policy : SourceCoreLoops.Policy) (source : TypedSource)
         assignment (LocalLoop.controlType result) tail reasonAt code)
       (route : AcceptedProjectedAssignmentRoute.Route source receipt.binder.scheme.body
         assignment.target.projections assignment.target.type) :
+      Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest) code
+  | elementBitNotted {mode escaped fuel scope id rest node stored assignment tail code}
+      (read : policy.readStatement source id = .ok (node, stored))
+      (form : node.form = .assignBitNot assignment)
+      (statementType : SourceCoreBasic.ensureType (.occurrence id.occurrence) .unit stored = .ok ())
+      (remaining : Tree policy source result reasonAt mode escaped fuel scope rest tail)
+      (receipt : AcceptedElementBitNotReceipt.Receipt policy fuel source scope (.occurrence id.occurrence)
+        assignment (LocalLoop.controlType result) tail reasonAt code) :
       Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest) code
   | discard {mode escaped fuel scope id rest node stored expression tail}
       (read : policy.readStatement source id = .ok (node, stored))
@@ -1350,6 +1410,7 @@ def Tree.closed {mode : Bool} {escaped : Word} {fuel scope statements code}
   match tree with
   | .nil => !mode
   | .boundary .. | .assigning .. | .bitNotting .. | .forBoundary .. | .matching .. | .tailValue .. => false
+  | .elementAssigned .. | .elementBitNotted .. => false
   | .returning .. | .returnUnit .. | .breaking .. | .continuing .. => true
   | .initialized _ _ _ _ _ _ _ tail _ | .absent _ _ _ _ tail _ => tail.closed
   | .assigned _ _ _ tail _ _ | .projectedAssigned _ _ _ tail _ _ | .bitNotted _ _ _ tail _ _ | .projectedBitNotted _ _ _ tail _ _ | .discard _ _ _ _ _ tail => tail.closed
@@ -1396,6 +1457,11 @@ def Tree.children {mode : Bool} {escaped : Word} {fuel scope statements code}
       initial.children ++ (⟨fuel, loopScope, condition, child, generated⟩ :: (inner.children ++ after.children ++ tail.children))
   | @Tree.projectedBitNotted _ _ _ _ _ _ fuel scope _ _ _ _ _ _ _ _ _ _ tail receipt _route =>
       keyChildren fuel scope receipt.place.keys receipt.keys receipt.keysGenerated ++ tail.children
+  | @Tree.elementAssigned _ _ _ _ _ _ fuel scope _ _ _ _ _ _ expression _ _ _ _ _ tail receipt =>
+      ⟨fuel, scope, receipt.key, receipt.keyCode, receipt.keyGenerated⟩ ::
+        (⟨fuel, scope, expression, receipt.child, receipt.rhsGenerated⟩ :: tail.children)
+  | @Tree.elementBitNotted _ _ _ _ _ _ fuel scope _ _ _ _ _ _ _ _ _ _ tail receipt =>
+      ⟨fuel, scope, receipt.key, receipt.keyCode, receipt.keyGenerated⟩ :: tail.children
 
 def Tree.bindings {mode : Bool} {escaped : Word} {fuel scope statements code}
     (tree : Tree policy source result reasonAt mode escaped fuel scope statements code) :
@@ -1407,6 +1473,7 @@ def Tree.bindings {mode : Bool} {escaped : Word} {fuel scope statements code}
   | @Tree.absent _ _ _ _ _ _ _ scope _ _ _ _ binder payload _ _ _ _ _ projected tail _ =>
       ⟨scope, binder, payload, projected⟩ :: tail.bindings
   | .assigning _ _ _ tail _ | .assigned _ _ _ tail _ _ | .projectedAssigned _ _ _ tail _ _ | .bitNotting _ _ _ tail _ | .bitNotted _ _ _ tail _ _ | .projectedBitNotted _ _ _ tail _ _ | .discard _ _ _ _ _ tail | .valueDiscard _ _ _ _ _ _ tail | .matching _ _ _ _ tail => tail.bindings
+  | .elementAssigned _ _ _ tail _ | .elementBitNotted _ _ _ tail _ => tail.bindings
   | .block _ _ inner tail => inner.bindings ++ tail.bindings
   | .conditional _ _ _ _ _ left right tail => left.bindings ++ right.bindings ++ tail.bindings
   | .matched _ _ receipt branches tail =>
@@ -1420,10 +1487,11 @@ def Tree.Ready {mode : Bool} {escaped : Word} {fuel scope statements code}
   match tree with
   | .nil | .returning .. | .returnUnit .. | .boundary .. | .forBoundary .. | .breaking .. | .continuing .. | .tailValue .. => True
   | .initialized _ _ _ _ _ _ _ tail _ | .absent _ _ _ _ tail _ | .assigned _ _ _ tail _ _ | .projectedAssigned _ _ _ tail _ _ | .bitNotted _ _ _ tail _ _ | .projectedBitNotted _ _ _ tail _ _ => tail.Ready
+  | .elementAssigned _ _ _ tail _ | .elementBitNotted _ _ _ tail _ => tail.Ready
   | @Tree.assigning _ _ _ _ _ _ _ _ _ _ _ _ assignment operator _ _ _ _ _ _ tail _ =>
-      ¬ ValueAssignable source assignment operator ∧ tail.Ready
+      ¬ ValueAssignable source assignment operator ∧ ¬ ElementAssignable assignment operator ∧ tail.Ready
   | @Tree.bitNotting _ _ _ _ _ _ _ _ _ _ _ _ assignment _ _ _ _ _ tail _ =>
-      ¬ UnaryAssignable source assignment ∧ tail.Ready
+      ¬ UnaryAssignable source assignment ∧ ¬ ElementBitNotAssignable assignment ∧ tail.Ready
   | .discard _ _ _ _ _ tail | .valueDiscard _ _ _ _ _ _ tail => tail.Ready
   | .block _ _ inner tail => inner.Ready ∧ tail.Ready
   | .conditional _ _ _ _ _ left right tail => left.Ready ∧ right.Ready ∧ tail.Ready
@@ -1443,6 +1511,7 @@ def Tree.MatchContexts (admitted : SourceCoreCompatibleDataMatches.Context → P
     | .projectedAssigned _ _ _ tail _ _ | .bitNotting _ _ _ tail _ | .bitNotted _ _ _ tail _ _
     | .projectedBitNotted _ _ _ tail _ _ | .discard _ _ _ _ _ tail | .valueDiscard _ _ _ _ _ _ tail
     | .matching _ _ _ _ tail => tail.MatchContexts admitted
+  | .elementAssigned _ _ _ tail _ | .elementBitNotted _ _ _ tail _ => tail.MatchContexts admitted
   | .block _ _ inner tail | .whileLoop _ _ _ _ _ _ inner tail | .forLoop _ _ _ _ _ _ _ inner _ tail =>
       inner.MatchContexts admitted ∧ tail.MatchContexts admitted
   | .conditional _ _ _ _ _ left right tail =>
@@ -1494,6 +1563,12 @@ theorem Tree.accepted {escaped : Word} {fuel scope statements code}
       simpa only [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
         receipt.selected, ih, bind, Except.bind] using receipt.accepted
   | projectedBitNotted read form statementType _ receipt _ ih =>
+      simpa only [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
+        receipt.callbackSelected, ih, bind, Except.bind] using receipt.accepted
+  | elementAssigned read form statementType _ receipt ih =>
+      simpa [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
+        ih, bind, Except.bind, pure, Except.pure] using receipt.accepted
+  | elementBitNotted read form statementType _ receipt ih =>
       simpa only [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
         receipt.callbackSelected, ih, bind, Except.bind] using receipt.accepted
   | discard read form child generated statementType _ ih =>
@@ -1593,14 +1668,21 @@ theorem Tree.refine_matches {values : SourceCoreCompatibleValues.Context}
               projected.2.2 assigned
             exact ⟨.projectedAssigned read form statementType tail receipt
               (projected.2.2 receipt.binder receipt.description.binding), ready, contexts⟩
-          · exact ⟨.assigning read form statementType tail assigned,
-              ⟨fun eligible => eligible.elim supported projected, ready⟩, contexts⟩
+          · by_cases element : ElementAssignable assignment operator
+            · obtain ⟨profile, key, single⟩ := element
+              obtain ⟨receipt⟩ := AcceptedElementAssignmentReceipt.of_accepted matched profile single assigned
+              exact ⟨.elementAssigned read form statementType tail receipt, ready, contexts⟩
+            · exact ⟨.assigning read form statementType tail assigned,
+                ⟨fun eligible => eligible.elim supported projected, element, ready⟩, contexts⟩
     | assigned read form statementType remaining receipt targetType =>
         obtain ⟨tail, ready, contexts⟩ := ih _ (Nat.lt_succ_self _) remaining
         exact ⟨.assigned read form statementType tail receipt targetType, ready, contexts⟩
     | projectedAssigned read form statementType remaining receipt route =>
         obtain ⟨tail, ready, contexts⟩ := ih _ (Nat.lt_succ_self _) remaining
         exact ⟨.projectedAssigned read form statementType tail receipt route, ready, contexts⟩
+    | elementAssigned read form statementType remaining receipt =>
+        obtain ⟨tail, ready, contexts⟩ := ih _ (Nat.lt_succ_self _) remaining
+        exact ⟨.elementAssigned read form statementType tail receipt, ready, contexts⟩
     | @bitNotting mode escaped fuel scope id rest node stored assignment body code
         read form statementType remaining assigned =>
         obtain ⟨tail, ready, contexts⟩ := ih _ (Nat.lt_succ_self _) remaining
@@ -1620,14 +1702,24 @@ theorem Tree.refine_matches {values : SourceCoreCompatibleValues.Context}
               projected.2.2 unary lowered
             exact ⟨.projectedBitNotted read form statementType tail receipt
               (projected.2.2 receipt.binder receipt.description.binding), ready, contexts⟩
-          · exact ⟨.bitNotting read form statementType tail assigned,
-              ⟨fun eligible => eligible.elim supported projected, ready⟩, contexts⟩
+          · by_cases element : ElementBitNotAssignable assignment
+            · obtain ⟨profile, key, single⟩ := element
+              have lowered := assigned
+              simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
+                unary, remaining.accepted, bind, Except.bind] at lowered
+              obtain ⟨receipt⟩ := AcceptedElementBitNotReceipt.of_accepted unary profile single unary lowered
+              exact ⟨.elementBitNotted read form statementType tail receipt, ready, contexts⟩
+            · exact ⟨.bitNotting read form statementType tail assigned,
+                ⟨fun eligible => eligible.elim supported projected, element, ready⟩, contexts⟩
     | bitNotted read form statementType remaining receipt targetType =>
         obtain ⟨tail, ready, contexts⟩ := ih _ (Nat.lt_succ_self _) remaining
         exact ⟨.bitNotted read form statementType tail receipt targetType, ready, contexts⟩
     | projectedBitNotted read form statementType remaining receipt route =>
         obtain ⟨tail, ready, contexts⟩ := ih _ (Nat.lt_succ_self _) remaining
         exact ⟨.projectedBitNotted read form statementType tail receipt route, ready, contexts⟩
+    | elementBitNotted read form statementType remaining receipt =>
+        obtain ⟨tail, ready, contexts⟩ := ih _ (Nat.lt_succ_self _) remaining
+        exact ⟨.elementBitNotted read form statementType tail receipt, ready, contexts⟩
     | discard read form child generated statementType remaining =>
         obtain ⟨tail, ready, contexts⟩ := ih _ (Nat.lt_succ_self _) remaining
         exact ⟨.discard read form child generated statementType tail, ready, contexts⟩
@@ -1764,6 +1856,10 @@ theorem Tree.frontier {escaped : Word} {fuel scope statements code}
   | assigned _ _ _ _ _ _ ih | projectedAssigned _ _ _ _ _ _ ih | bitNotted _ _ _ _ _ _ ih | projectedBitNotted _ _ _ _ _ _ ih => exact ih openBranch
   | bitNotting read form statementType remaining accepted ih =>
       exact ⟨.assignment _ _ _ _ _ accepted⟩
+  | elementAssigned read form statementType remaining receipt ih =>
+      exact ⟨.assignment _ _ _ _ _ (Tree.elementAssigned read form statementType remaining receipt).accepted⟩
+  | elementBitNotted read form statementType remaining receipt ih =>
+      exact ⟨.assignment _ _ _ _ _ (Tree.elementBitNotted read form statementType remaining receipt).accepted⟩
   | discard _ _ _ _ _ _ ih => exact ih openBranch
   | @valueDiscard actualMode _ _ _ _ _ _ _ _ _ read form notTail child generated statementType remaining ih =>
     cases actualMode with

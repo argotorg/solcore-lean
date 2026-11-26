@@ -1,6 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.AcceptedShapes
 import Solcore.SourceSemantics.CoreLowering.AcceptedNestedCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.SourceExecutionSize
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ElementTargetLifting
 
 /-!
 # Accepted bodies: lifting call-containing Source traces
@@ -822,6 +823,42 @@ theorem statements (unique : NodeOccurrencesUnique scope.source) {child : Expres
         obtain ⟨values, staged, snapshot⟩ := projected_target lift keys (by omega) resolve
         exact .bitNotProjected (lookupStatement?_sound found) form assignable.2.1 staged snapshot write
           (tailIH (by omega) next)
+    · intro context environment before finalContext outcome after _ _ head terminal
+      obtain ⟨_, _, _, _, _, same⟩ := bitNotted_inv unique found form head
+      subst same
+      cases terminal
+  | elementAssigned found form _ single index value _ tailIH =>
+    intro size context environment before after finalContext outcome within
+    apply sequence unique found (fun _ same => by rw [form] at same; cases same)
+    · intro context environment before middleContext nextEnvironment middle finalContext outcome after headSize
+        tailSize headBelow tailBelow head next
+      obtain ⟨_, _, childBelow, executes, rfl, same⟩ := assigned_inv unique found form head
+      cases same
+      cases executes with
+      | intro resolve evaluate write =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+        exact .assignElement (lookupStatement?_sound found) form (CellAwareElementTargetLifting.element_place single)
+          (CellAwareElementTargetLifting.resolved_sized single (fun below trace => lift index (by omega) trace)
+            resolve)
+          (lift value (by omega) evaluate) write (tailIH (by omega) next)
+    · intro context environment before finalContext outcome after _ _ head terminal
+      obtain ⟨_, _, _, _, _, same⟩ := assigned_inv unique found form head
+      subst same
+      cases terminal
+  | elementBitNotted found form _ single index _ tailIH =>
+    intro size context environment before after finalContext outcome within
+    apply sequence unique found (fun _ same => by rw [form] at same; cases same)
+    · intro context environment before middleContext nextEnvironment middle finalContext outcome after headSize
+        tailSize headBelow tailBelow head next
+      obtain ⟨_, _, childBelow, executes, rfl, same⟩ := bitNotted_inv unique found form head
+      cases same
+      cases executes with
+      | intro resolve write =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+        exact .bitNotElement (lookupStatement?_sound found) form (CellAwareElementTargetLifting.element_place single)
+          (CellAwareElementTargetLifting.resolved_sized single (fun below trace => lift index (by omega) trace)
+            resolve)
+          write (tailIH (by omega) next)
     · intro context environment before finalContext outcome after _ _ head terminal
       obtain ⟨_, _, _, _, _, same⟩ := bitNotted_inv unique found form head
       subst same
@@ -3654,6 +3691,88 @@ theorem statements_fault (unique : NodeOccurrencesUnique scope.source) {child : 
         obtain ⟨values, staged, snapshot⟩ :=
           CellAwareInvocationAcceptedSizedLifting.projected_target lift keys (by omega) resolve
         exact .bitNotProjectedOperandFault contains form assignable.2.1 staged snapshot selected invalid
+  | elementAssigned found form _ single index value _ tailIH =>
+    intro size context environment before after finalContext reason within signatures expressible original
+    refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original
+    · intro context environment before middleContext nextEnvironment middle finalContext after headSize
+        tailSize headBelow tailBelow signatures head next
+      obtain ⟨_, _, childBelow, executes, rfl, same⟩ :=
+        CellAwareInvocationAcceptedSizedLifting.assigned_inv unique found form head
+      cases same
+      cases executes with
+      | intro resolve evaluate write =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+        exact .assignElement (lookupStatement?_sound found) form (CellAwareElementTargetLifting.element_place single)
+          (CellAwareElementTargetLifting.resolved_sized single (fun below trace => lift index (by omega) trace)
+            resolve)
+          (lift value (by omega) evaluate) write (tailIH (by omega) signatures expressible next)
+    · intro context environment before after headSize headBelow signatures fault
+      have contains := lookupStatement?_sound found
+      have element := CellAwareElementTargetLifting.element_place single
+      obtain ⟨_, childBelow, fault⟩ := assigned_fault_inv unique found form fault
+      cases fault with
+      | target failed =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+        exact .assignElementTargetFault contains form element
+          (CellAwareElementTargetLifting.fault_sized single (fun below trace => lift index (by omega) trace)
+            (fun below trace => faultLift index (by omega) signatures expressible trace) failed)
+      | rhs resolve failed =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+        exact .assignElementRhsFault contains form element
+          (CellAwareElementTargetLifting.resolved_sized single (fun below trace => lift index (by omega) trace)
+            resolve)
+          (faultLift value (by omega) signatures expressible failed)
+      | operands resolve evaluate currentRead rootType initialValue pathRead invalid =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+        exact .assignElementWriteFault contains form element
+          (CellAwareElementTargetLifting.resolved_sized single (fun below trace => lift index (by omega) trace)
+            resolve)
+          (lift value (by omega) evaluate) (.operands currentRead rootType initialValue pathRead invalid)
+      | panic resolve evaluate currentRead rootType initialValue pathRead panics =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+        exact .assignElementWriteFault contains form element
+          (CellAwareElementTargetLifting.resolved_sized single (fun below trace => lift index (by omega) trace)
+            resolve)
+          (lift value (by omega) evaluate) (.panic currentRead rootType initialValue pathRead panics)
+      | structuralUpdate resolve evaluate currentRead rootType initialValue failed =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+        exact .assignElementWriteFault contains form element
+          (CellAwareElementTargetLifting.resolved_sized single (fun below trace => lift index (by omega) trace)
+            resolve)
+          (lift value (by omega) evaluate) (.structural currentRead rootType initialValue failed)
+  | elementBitNotted found form _ single index _ tailIH =>
+    intro size context environment before after finalContext reason within signatures expressible original
+    refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original
+    · intro context environment before middleContext nextEnvironment middle finalContext after headSize
+        tailSize headBelow tailBelow signatures head next
+      obtain ⟨_, _, childBelow, executes, rfl, same⟩ :=
+        CellAwareInvocationAcceptedSizedLifting.bitNotted_inv unique found form head
+      cases same
+      cases executes with
+      | intro resolve write =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+        exact .bitNotElement (lookupStatement?_sound found) form (CellAwareElementTargetLifting.element_place single)
+          (CellAwareElementTargetLifting.resolved_sized single (fun below trace => lift index (by omega) trace)
+            resolve)
+          write (tailIH (by omega) signatures expressible next)
+    · intro context environment before after headSize headBelow signatures fault
+      have contains := lookupStatement?_sound found
+      have element := CellAwareElementTargetLifting.element_place single
+      obtain ⟨_, childBelow, fault⟩ := bitNotted_fault_inv unique found form fault
+      cases fault with
+      | target failed =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+        exact .bitNotElementTargetFault contains form element
+          (CellAwareElementTargetLifting.fault_sized single (fun below trace => lift index (by omega) trace)
+            (fun below trace => faultLift index (by omega) signatures expressible trace) failed)
+      | uninitialized resolve empty =>
+        exact absurd empty (CellAwareElementTargetLifting.selected_ne_none single resolve.sound)
+      | operand resolve selected invalid =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+        exact .bitNotElementOperandFault contains form element
+          (CellAwareElementTargetLifting.resolved_sized single (fun below trace => lift index (by omega) trace)
+            resolve)
+          selected invalid
   | discarded found form value _ tailIH =>
     intro size context environment before after finalContext reason within signatures expressible original
     refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original

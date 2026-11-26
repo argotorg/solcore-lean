@@ -21,6 +21,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationLoops
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionPrimitives
 import Solcore.SourceSemantics.CoreLowering.Internal.Statements.TypedImperativeFor
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationAssignments
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationElementPreserveFlows
+import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.ElementHeads
 
 /-!
 # Accepted bodies: the statement closure
@@ -1536,9 +1538,9 @@ def LambdaInitializer (semantic : TypedSource) (expression : ExpressionId) : Pro
 /-- Compiler branches whose statement flow is closed below. Function-mode
 fallthrough is admitted only at a Unit result, and a final bare value only at
 the declared result type of its original node. A nonfinal bare value in
-function mode has no Source rule and is outside this closure. Bare and
-projected assignments and bit-not updates are closed when the compiler view is
-the original Source, as for named rows. A match receipt is closed under the
+function mode has no Source rule and is outside this closure. Bare,
+projected and element assignments and bit-not updates are closed when the
+compiler view is the original Source, as for named rows. A match receipt is closed under the
 same view when its compilation context is `admitted`, and a generalized
 declaration when its inputs are `generalized` and its initializer is a direct
 lambda. -/
@@ -1562,6 +1564,8 @@ def Covered (semantic : TypedSource) (expected : TypeSystem.Ty)
   | .projectedAssigned _ _ _ remaining _ _ =>
       source = semantic ∧ Covered semantic expected admitted generalized remaining
   | .projectedBitNotted _ _ _ remaining _ _ =>
+      source = semantic ∧ Covered semantic expected admitted generalized remaining
+  | .elementAssigned _ _ _ remaining _ | .elementBitNotted _ _ _ remaining _ =>
       source = semantic ∧ Covered semantic expected admitted generalized remaining
   | .discard _ _ _ _ _ tail => Covered semantic expected admitted generalized tail
   | .valueDiscard _ _ _ _ _ _ tail => mode = false ∧ Covered semantic expected admitted generalized tail
@@ -1702,6 +1706,7 @@ theorem correct [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
       (functions := functions) bridge index registry invocation faults budget)
     (writes : CellAwareInvocationAcceptedInputs.Writes (receiving := receiving) (functions := functions)
       (protocol := protocol) index invocation faults)
+    (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
     {workspace : Workspace.RawWorkspace} {checkFuel : Nat} {sourceCompiled : SourceCoreCompiler.Compiled}
     (artifact : sourceCompiled.artifact? = some whole)
     (checked : checkProgram workspace checkFuel = .ok sourceCompiled.program)
@@ -2039,6 +2044,77 @@ theorem correct [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
       by
           intro _ typed
           exact tailBounds.2.2 (TypedImperative.Native.execute_continuation typed)⟩
+  | @elementAssigned mode escaped fuel scope id rest node stored assignment operator expression tail code
+      read form statementType remaining receipt tailIH =>
+    intro covered reached control context final facts result signatures typed native
+    obtain ⟨sameSource, tailCovered⟩ := covered
+    have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)).reached read
+    obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
+    rw [form] at formTyped
+    cases formTyped with
+    | assignValue assignmentTyped =>
+    obtain ⟨head, emitted, invalidProjection, _, concrete⟩ := CellAwareInvocationAcceptedElementWrites.element_head
+      index (sameSource.trans sourceEq.symm) unique receipt (sourceEq ▸ assignmentTyped)
+    obtain ⟨_, native⟩ := native
+    have tailNative := CompatibleElementWrites.code_continuation (emitted ▸ native)
+    have tailBounds := tailIH tailCovered (fun other member => reached other (List.mem_cons_of_mem _ member))
+      result signatures restTyped ⟨_, tailNative⟩
+    have found := sourceEq ▸ statementFound
+    have uninitializedReason :
+        ∀ location, faults (.semantic (.uninitializedLocation location)) head.invalidProjection := by
+      intro location
+      rw [invalidProjection, ← (lookupStatement?_sound found).2]
+      exact writes.placeDiagnostics.element (lookupStatement?_sound found).1
+        (by simp only [CompatiblePlaceMissingPreparationCoverage.targets, form, List.mem_singleton]) concrete
+        (by rw [head.single]; rfl) location
+    rw [emitted]
+    exact ⟨preserves_of_valid bridge index producer registry invocation faults administrative
+        fun runtime covers ledger => CellAwareInvocationElementAssignmentFlow.preserves bridge functions producer
+          sourceEq unique found form head writes.observations uninitializedReason budget
+          (expressions fuel context runtime covers ledger).1 tailBounds.1,
+      reflects_of_valid bridge index producer registry invocation faults administrative
+        fun runtime covers ledger => CellAwareInvocationElementAssignmentFlow.reflects bridge functions producer
+          sourceEq unique found form head writes.observations selectedBodies uninitializedReason budget
+          (expressions fuel context runtime covers ledger).2 tailBounds.2.1,
+      by
+          intro _ typed
+          exact tailBounds.2.2 (CompatibleElementWrites.code_continuation typed)⟩
+  | @elementBitNotted mode escaped fuel scope id rest node stored assignment tail code
+      read form statementType remaining receipt tailIH =>
+    intro covered reached control context final facts result signatures typed native
+    obtain ⟨sameSource, tailCovered⟩ := covered
+    have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)).reached read
+    obtain ⟨middle, restFacts, formTyped, restTyped⟩ := head_form sourceUnique typed statementFound
+    rw [form] at formTyped
+    cases formTyped with
+    | assignBitNot assignmentTyped =>
+    obtain ⟨head, emitted, invalidProjection, _, concrete⟩ :=
+      CellAwareInvocationAcceptedElementWrites.element_bitNot_head index (sameSource.trans sourceEq.symm) unique
+        receipt (sourceEq ▸ assignmentTyped)
+    obtain ⟨_, native⟩ := native
+    have tailNative := CompatibleElementWrites.code_continuation (emitted ▸ native)
+    have tailBounds := tailIH tailCovered (fun other member => reached other (List.mem_cons_of_mem _ member))
+      result signatures restTyped ⟨_, tailNative⟩
+    have found := sourceEq ▸ statementFound
+    have uninitializedReason :
+        ∀ location, faults (.semantic (.uninitializedLocation location)) head.invalidProjection := by
+      intro location
+      rw [invalidProjection, ← (lookupStatement?_sound found).2]
+      exact writes.placeDiagnostics.element (lookupStatement?_sound found).1
+        (by simp only [CompatiblePlaceMissingPreparationCoverage.targets, form, List.mem_singleton]) concrete
+        (by rw [head.single]; rfl) location
+    rw [emitted]
+    exact ⟨preserves_of_valid bridge index producer registry invocation faults administrative
+        fun runtime covers ledger => CellAwareInvocationElementBitNotFlow.preserves bridge functions producer
+          sourceEq unique found form head uninitializedReason budget
+          (expressions fuel context runtime covers ledger).1 tailBounds.1,
+      reflects_of_valid bridge index producer registry invocation faults administrative
+        fun runtime covers ledger => CellAwareInvocationElementBitNotFlow.reflects bridge functions producer
+          sourceEq unique found form head uninitializedReason budget
+          (expressions fuel context runtime covers ledger).2 tailBounds.2.1,
+      by
+          intro _ typed
+          exact tailBounds.2.2 (CompatibleElementWrites.code_continuation typed)⟩
   | @discard mode escaped fuel scope id rest node stored expression tail read form child generated statementType remaining tailIH =>
     intro covered reached control context final facts result signatures typed native
     have statementFound := index.statement_read_reached (reached id (List.mem_cons_self ..)).reached read
@@ -2365,6 +2441,7 @@ theorem body_preserves [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
       (functions := functions) bridge index registry invocation faults budget)
     (writes : CellAwareInvocationAcceptedInputs.Writes (receiving := receiving) (functions := functions)
       (protocol := protocol) index invocation faults)
+    (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
     {workspace : Workspace.RawWorkspace} {checkFuel : Nat} {sourceCompiled : SourceCoreCompiler.Compiled}
     (artifact : sourceCompiled.artifact? = some whole)
     (checked : checkProgram workspace checkFuel = .ok sourceCompiled.program)
@@ -2426,7 +2503,8 @@ theorem body_preserves [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
     rw [body.emitted] at native
     exact TypedLexicalWhile.Native.finished_flow native
   have bound := (correct bridge bindings transport index producer registered registry invocation faults
-    administrative budget expressions writes artifact checked sourceEq unique body.tree covered (fun _ member => index.site_root member)
+    administrative budget expressions writes selectedBodies artifact checked sourceEq unique body.tree covered
+    (fun _ member => index.site_root member)
     result signatures sourceTyped flowNative).1
   intro size within
   rw [body.emitted]
@@ -2441,6 +2519,7 @@ theorem body_reflects [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
       (functions := functions) bridge index registry invocation faults budget)
     (writes : CellAwareInvocationAcceptedInputs.Writes (receiving := receiving) (functions := functions)
       (protocol := protocol) index invocation faults)
+    (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
     {workspace : Workspace.RawWorkspace} {checkFuel : Nat} {sourceCompiled : SourceCoreCompiler.Compiled}
     (artifact : sourceCompiled.artifact? = some whole)
     (checked : checkProgram workspace checkFuel = .ok sourceCompiled.program)
@@ -2502,7 +2581,8 @@ theorem body_reflects [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
     rw [body.emitted] at native
     exact TypedLexicalWhile.Native.finished_flow native
   have bound := (correct bridge bindings transport index producer registered registry invocation faults
-    administrative budget expressions writes artifact checked sourceEq unique body.tree covered (fun _ member => index.site_root member)
+    administrative budget expressions writes selectedBodies artifact checked sourceEq unique body.tree covered
+    (fun _ member => index.site_root member)
     result signatures sourceTyped flowNative).2.1
   intro size within
   rw [body.emitted]

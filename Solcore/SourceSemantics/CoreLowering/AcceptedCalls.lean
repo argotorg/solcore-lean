@@ -1889,7 +1889,7 @@ theorem preserves (size : Nat)
     (CellAwareInvocationAcceptedNamedInvocation.writes profile generation record issued assignments receiver
       (protocol := CallableIndexedOwnedPhysicalCanonicalState.protocol headers keys 1) sourceEq
       runtime.graph.nodeOccurrencesUnique)
-    artifact checked sourceEq unique (control := {returnType := header.function.resultType})
+    support.registryBodies artifact checked sourceEq unique (control := {returnType := header.function.resultType})
     (expected := header.function.resultType) rfl rfl
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_signatures (header := header))
     functionTyped projection body covered native (Nat.le_of_lt smaller)
@@ -2028,7 +2028,7 @@ theorem reflects (size : Nat) {bodyScope : Staging.Recursive.Scope}
     (CellAwareInvocationAcceptedNamedInvocation.writes profile generation record issued assignments receiver
       (protocol := CallableIndexedOwnedPhysicalCanonicalState.protocol headers keys 1) sourceEq
       runtime.graph.nodeOccurrencesUnique)
-    artifact checked sourceEq unique (control := {returnType := header.function.resultType})
+    support.registryBodies artifact checked sourceEq unique (control := {returnType := header.function.resultType})
     (expected := header.function.resultType) rfl rfl
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_signatures (header := header))
     functionTyped projection body covered native (Nat.le_of_lt bodyLess)
@@ -2361,7 +2361,7 @@ theorem preserves_selected {scope : SourceCoreLocalCell.Scope} {mapping : Locati
     (CellAwareInvocationAcceptedNamedInvocation.writes profile generation record issued assignments receiver
       (protocol := CallableIndexedOwnedPhysicalCanonicalState.protocol headers keys 1) sourceEq
       runtime.graph.nodeOccurrencesUnique)
-    artifact checked sourceEq unique (control := {returnType := header.function.resultType})
+    support.registryBodies artifact checked sourceEq unique (control := {returnType := header.function.resultType})
     (expected := header.function.resultType) rfl rfl
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_signatures (header := header))
     functionTyped projection body covered native (Nat.le_refl size)
@@ -2519,7 +2519,7 @@ theorem reflects_selected {scope : SourceCoreLocalCell.Scope} {mapping : Locatio
     (CellAwareInvocationAcceptedNamedInvocation.writes profile generation record issued assignments receiver
       (protocol := CallableIndexedOwnedPhysicalCanonicalState.protocol headers keys 1) sourceEq
       runtime.graph.nodeOccurrencesUnique)
-    artifact checked sourceEq unique (control := {returnType := header.function.resultType})
+    support.registryBodies artifact checked sourceEq unique (control := {returnType := header.function.resultType})
     (expected := header.function.resultType) rfl rfl
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_signatures (header := header))
     functionTyped projection body covered native (Nat.le_of_lt bodyLess)

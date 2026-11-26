@@ -3170,6 +3170,12 @@ private theorem assignment_details {policy : SourceCoreLoops.Policy}
       rw [form] at original
       cases original
       exact False.elim (receipt.projected assignable.2.1)
+  | elementAssigned read original _ remaining receipt =>
+      have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans found)
+      cases same
+      rw [form] at original
+      cases original
+      exact absurd (receipt.single.symm.trans assignable.2.1) (List.cons_ne_nil _ _)
   | assigned read original _ remaining receipt targetType =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans found)
       cases same
@@ -3183,6 +3189,7 @@ private theorem assignment_details {policy : SourceCoreLoops.Policy}
   | tailValue read original | valueDiscard read original
   | matching read original | matched read original
   | bitNotting read original | bitNotted read original | projectedBitNotted read original
+  | elementBitNotted read original
   | forLoop read original | forBoundary read original | breaking read original | continuing read original =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans found)
       cases same
@@ -3218,6 +3225,7 @@ private theorem returning_children {policy : SourceCoreLoops.Policy}
   | tailValue read original | valueDiscard read original
   | matching read original | matched read original
   | bitNotting read original | bitNotted read original | projectedBitNotted read original
+  | elementAssigned read original | elementBitNotted read original
   | forLoop read original | forBoundary read original | breaking read original | continuing read original =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans found)
       cases same
@@ -3262,6 +3270,7 @@ private theorem loop_details {policy : SourceCoreLoops.Policy}
   | valueDiscard read form
   | matching read form | matched read form
   | bitNotting read form | bitNotted read form | projectedBitNotted read form
+  | elementAssigned read form | elementBitNotted read form
   | forLoop read form | forBoundary read form | breaking read form | continuing read form =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans shape.loopFound)
       cases same
@@ -3304,6 +3313,7 @@ theorem MethodShape.compiler_details {policy : SourceCoreLoops.Policy}
       | valueDiscard read form
       | matching read form | matched read form
       | bitNotting read form | bitNotted read form | projectedBitNotted read form
+      | elementAssigned read form | elementBitNotted read form
       | forLoop read form | forBoundary read form | breaking read form | continuing read form =>
           have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans shape.flagInitializedFound)
           cases same
@@ -3320,6 +3330,7 @@ theorem MethodShape.compiler_details {policy : SourceCoreLoops.Policy}
   | valueDiscard read form
   | matching read form | matched read form
   | bitNotting read form | bitNotted read form | projectedBitNotted read form
+  | elementAssigned read form | elementBitNotted read form
   | forLoop read form | forBoundary read form | breaking read form | continuing read form =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans shape.initializedFound)
       cases same
@@ -4034,6 +4045,12 @@ private theorem assignment_details_variant {policy : SourceCoreLoops.Policy}
       rw [form] at original
       cases original
       exact False.elim (receipt.projected assignable.2.1)
+  | elementAssigned read original _ remaining receipt =>
+      have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans found)
+      cases same
+      rw [form] at original
+      cases original
+      exact absurd (receipt.single.symm.trans assignable.2.1) (List.cons_ne_nil _ _)
   | assigned read original _ remaining receipt targetType =>
       exact tail remaining ready
   | initialized read original | absent read original | returning read original
@@ -4042,6 +4059,7 @@ private theorem assignment_details_variant {policy : SourceCoreLoops.Policy}
   | tailValue read original | valueDiscard read original
   | matching read original | matched read original
   | bitNotting read original | bitNotted read original | projectedBitNotted read original
+  | elementBitNotted read original
   | forLoop read original | forBoundary read original | breaking read original | continuing read original =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans found)
       cases same
@@ -4081,6 +4099,7 @@ private theorem loop_details_variant {policy : SourceCoreLoops.Policy}
   | valueDiscard read form
   | matching read form | matched read form
   | bitNotting read form | bitNotted read form | projectedBitNotted read form
+  | elementAssigned read form | elementBitNotted read form
   | forLoop read form | forBoundary read form | breaking read form | continuing read form =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans shape.loopFound)
       cases same
@@ -4116,6 +4135,7 @@ theorem SelectedRelayShape.compiler_details {policy : SourceCoreLoops.Policy}
   | valueDiscard read form
   | matching read form | matched read form
   | bitNotting read form | bitNotted read form | projectedBitNotted read form
+  | elementAssigned read form | elementBitNotted read form
   | forLoop read form | forBoundary read form | breaking read form | continuing read form =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans shape.initializedFound)
       cases same

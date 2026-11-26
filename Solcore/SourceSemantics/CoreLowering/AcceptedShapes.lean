@@ -2,6 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.AcceptedStatements
 import Solcore.SourceSemantics.CoreLowering.AcceptedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ExpressionPrimitives
 import Solcore.SourceSemantics.Staging.Erasure
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.ElementTargetLifting
 
 /-!
 # Accepted bodies: shapes and lifted traces
@@ -38,6 +39,7 @@ set_option maxHeartbeats 4000000
 namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedBodyShape
 open Core Frontend SourceInference
 open AcceptedNamedBodyFlow (Tree Assignable ProjectedAssignable BitNotAssignable ProjectedBitNotAssignable)
+open AcceptedNamedBodyFlow (ElementAssignable ElementBitNotAssignable)
 open CellAwareInvocationAcceptedFlow (Covered)
 
 /-- For-header vectors of the supported forms: monomorphic declarations,
@@ -115,6 +117,17 @@ inductive Shape (source : TypedSource) (expected : TypeSystem.Ty) (child : Expre
       {assignment : AssignmentResolution} (found : source.lookupStatement? id = some node)
       (form : node.form = .assignBitNot assignment) (assignable : ProjectedBitNotAssignable source assignment)
       (keys : ∀ projection ∈ assignment.target.projections, ∃ key, projection = .index key ∧ child key)
+      (tail : Shape source expected child mode rest) : Shape source expected child mode (id :: rest)
+  | elementAssigned {mode : Bool} {id : StatementId} {rest : List StatementId} {node : StatementNode}
+      {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {expression key : ExpressionId}
+      (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator expression)
+      (assignable : ElementAssignable assignment operator) (single : assignment.target.projections = [.element key])
+      (index : child key) (value : child expression)
+      (tail : Shape source expected child mode rest) : Shape source expected child mode (id :: rest)
+  | elementBitNotted {mode : Bool} {id : StatementId} {rest : List StatementId} {node : StatementNode}
+      {assignment : AssignmentResolution} {key : ExpressionId} (found : source.lookupStatement? id = some node)
+      (form : node.form = .assignBitNot assignment) (assignable : ElementBitNotAssignable assignment)
+      (single : assignment.target.projections = [.element key]) (index : child key)
       (tail : Shape source expected child mode rest) : Shape source expected child mode (id :: rest)
   | discarded {mode : Bool} {id : StatementId} {rest : List StatementId} {node : StatementNode}
       {expression : ExpressionId} (found : source.lookupStatement? id = some node)
@@ -364,22 +377,40 @@ def shapeWith? (source : TypedSource) (expected : TypeSystem.Ty) (child : Expres
           let ⟨value⟩ ← child? expression
           let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
           pure ⟨.assigned found form assignable value tail⟩
-        | none => do
-          let ⟨assignable⟩ ← projectedAssignable? source assignment operator
-          let ⟨keys⟩ ← indexKeys? child? assignment.target.projections
-          let ⟨value⟩ ← child? expression
-          let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
-          pure ⟨.projectedAssigned found form assignable keys value tail⟩
+        | none =>
+          match single : assignment.target.projections with
+          | [.element key] =>
+            if operatorOk : (operator = .equal ∨ assignment.target.type = .word) ∨
+                FixedCompoundAssignment operator assignment.target.type then do
+              let ⟨index⟩ ← child? key
+              let ⟨value⟩ ← child? expression
+              let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
+              pure ⟨.elementAssigned found form ⟨operatorOk, key, single⟩ single index value tail⟩
+            else none
+          | _ => do
+            let ⟨assignable⟩ ← projectedAssignable? source assignment operator
+            let ⟨keys⟩ ← indexKeys? child? assignment.target.projections
+            let ⟨value⟩ ← child? expression
+            let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
+            pure ⟨.projectedAssigned found form assignable keys value tail⟩
       | .assignBitNot assignment =>
         match bitNotAssignable? source assignment with
         | some ⟨assignable⟩ => do
           let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
           pure ⟨.bitNotted found form assignable tail⟩
-        | none => do
-          let ⟨assignable⟩ ← projectedBitNotAssignable? source assignment
-          let ⟨keys⟩ ← indexKeys? child? assignment.target.projections
-          let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
-          pure ⟨.projectedBitNotted found form assignable keys tail⟩
+        | none =>
+          match single : assignment.target.projections with
+          | [.element key] =>
+            if profile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type then do
+              let ⟨index⟩ ← child? key
+              let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
+              pure ⟨.elementBitNotted found form ⟨profile, key, single⟩ single index tail⟩
+            else none
+          | _ => do
+            let ⟨assignable⟩ ← projectedBitNotAssignable? source assignment
+            let ⟨keys⟩ ← indexKeys? child? assignment.target.projections
+            let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
+            pure ⟨.projectedBitNotted found form assignable keys tail⟩
       | .expression expression true => do
         let ⟨value⟩ ← child? expression
         let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
@@ -464,6 +495,8 @@ private theorem head_expanded {source : TypedSource} {expected : TypeSystem.Ty} 
   | projectedAssigned found form => exact ⟨_, found, by rw [form]; rfl⟩
   | bitNotted found form => exact ⟨_, found, by rw [form]; rfl⟩
   | projectedBitNotted found form => exact ⟨_, found, by rw [form]; rfl⟩
+  | elementAssigned found form => exact ⟨_, found, by rw [form]; rfl⟩
+  | elementBitNotted found form => exact ⟨_, found, by rw [form]; rfl⟩
   | discarded found form => exact ⟨_, found, by rw [form]; rfl⟩
   | block found form => exact ⟨_, found, by rw [form]; rfl⟩
   | conditional found form => exact ⟨_, found, by rw [form]; rfl⟩
@@ -588,6 +621,11 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
       rw [form] at form'
       cases form'
       exact absurd (.inr assignable) ready.1
+    | elementAssigned found form' assignable _ _ _ _ =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      rw [form] at form'
+      cases form'
+      exact absurd assignable ready.2.1
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
@@ -602,6 +640,9 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
     | projectedAssigned found _ _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
       exact ⟨sameSource, ih ready contexts tail⟩
+    | elementAssigned found _ _ _ _ _ tail =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      exact ⟨sameSource, ih ready contexts tail⟩
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
@@ -614,6 +655,9 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
       exact ⟨sameSource, ih ready contexts tail⟩
     | projectedAssigned found _ _ _ _ tail =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      exact ⟨sameSource, ih ready contexts tail⟩
+    | elementAssigned found _ _ _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
       exact ⟨sameSource, ih ready contexts tail⟩
     | _ =>
@@ -634,6 +678,11 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
       rw [form] at form'
       cases form'
       exact absurd (.inr assignable) ready.1
+    | elementBitNotted found form' assignable _ _ _ =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      rw [form] at form'
+      cases form'
+      exact absurd assignable ready.2.1
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
@@ -648,6 +697,9 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
     | projectedBitNotted found _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
       exact ⟨sameSource, ih ready contexts tail⟩
+    | elementBitNotted found _ _ _ _ tail =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      exact ⟨sameSource, ih ready contexts tail⟩
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
@@ -660,6 +712,43 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
       exact ⟨sameSource, ih ready contexts tail⟩
     | projectedBitNotted found _ _ _ tail =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      exact ⟨sameSource, ih ready contexts tail⟩
+    | elementBitNotted found _ _ _ _ tail =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      exact ⟨sameSource, ih ready contexts tail⟩
+    | _ =>
+      exfalso
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
+      clear ih ready contexts
+      simp_all
+  | elementAssigned read form _ _ _ ih =>
+    intro ready contexts shape
+    cases shape with
+    | assigned found _ _ _ tail =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      exact ⟨sameSource, ih ready contexts tail⟩
+    | projectedAssigned found _ _ _ _ tail =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      exact ⟨sameSource, ih ready contexts tail⟩
+    | elementAssigned found _ _ _ _ _ tail =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      exact ⟨sameSource, ih ready contexts tail⟩
+    | _ =>
+      exfalso
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
+      clear ih ready contexts
+      simp_all
+  | elementBitNotted read form _ _ _ ih =>
+    intro ready contexts shape
+    cases shape with
+    | bitNotted found _ _ tail =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      exact ⟨sameSource, ih ready contexts tail⟩
+    | projectedBitNotted found _ _ _ tail =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      exact ⟨sameSource, ih ready contexts tail⟩
+    | elementBitNotted found _ _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
       exact ⟨sameSource, ih ready contexts tail⟩
     | _ =>
@@ -1643,6 +1732,35 @@ theorem statements (unique : NodeOccurrencesUnique scope.source) {mode : Bool} {
       | intro resolve write =>
         obtain ⟨values, staged, snapshot⟩ := projected_target unique keys resolve
         exact .bitNotProjected (lookupStatement?_sound found) form assignable.2.1 staged snapshot write (tailIH next)
+    · intro context environment before finalContext outcome after head terminal
+      obtain ⟨_, _, _, same⟩ := bitNotted_inv unique found form head
+      subst same
+      cases terminal
+  | elementAssigned found form _ single index value _ tailIH =>
+    intro context environment before after finalContext outcome
+    apply sequence unique found (fun _ same => by rw [form] at same; cases same)
+    · intro context environment before middleContext nextEnvironment middle finalContext outcome after head next
+      obtain ⟨_, executes, rfl, same⟩ := assigned_inv unique found form head
+      cases same
+      cases executes with
+      | intro resolve evaluate write =>
+        exact .assignElement (lookupStatement?_sound found) form (CellAwareElementTargetLifting.element_place single)
+          (CellAwareElementTargetLifting.resolved single (expression_value unique index) resolve)
+          (expression_value unique value evaluate) write (tailIH next)
+    · intro context environment before finalContext outcome after head terminal
+      obtain ⟨_, _, _, same⟩ := assigned_inv unique found form head
+      subst same
+      cases terminal
+  | elementBitNotted found form _ single index _ tailIH =>
+    intro context environment before after finalContext outcome
+    apply sequence unique found (fun _ same => by rw [form] at same; cases same)
+    · intro context environment before middleContext nextEnvironment middle finalContext outcome after head next
+      obtain ⟨_, executes, rfl, same⟩ := bitNotted_inv unique found form head
+      cases same
+      cases executes with
+      | intro resolve write =>
+        exact .bitNotElement (lookupStatement?_sound found) form (CellAwareElementTargetLifting.element_place single)
+          (CellAwareElementTargetLifting.resolved single (expression_value unique index) resolve) write (tailIH next)
     · intro context environment before finalContext outcome after head terminal
       obtain ⟨_, _, _, same⟩ := bitNotted_inv unique found form head
       subst same

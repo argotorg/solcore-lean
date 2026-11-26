@@ -926,7 +926,8 @@ theorem body_preserves [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
   CellAwareInvocationAcceptedFlow.body_preserves bridge bindings transport index producer registered registry
     invocation faults administrative budget
     (expressions bridge index registry invocation faults closed budget sourceEq writes.extension reads selectedBodies)
-    writes artifact checked sourceEq unique result depth signatures sourceTyped projection body covered native
+    writes selectedBodies artifact checked sourceEq unique result depth signatures sourceTyped projection body covered
+    native
 
 include bindings transport registered in
 /-- Native completion of the same complete accepted body reconstructs an
@@ -994,7 +995,8 @@ theorem body_reflects [RecursiveStageMeaning.FaultTokens faults] (budget : Nat) 
   CellAwareInvocationAcceptedFlow.body_reflects bridge bindings transport index producer registered registry
     invocation faults administrative budget
     (expressions bridge index registry invocation faults closed budget sourceEq writes.extension reads selectedBodies)
-    writes artifact checked sourceEq unique result depth signatures sourceTyped projection body covered native
+    writes selectedBodies artifact checked sourceEq unique result depth signatures sourceTyped projection body covered
+    native
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedExpressions
 end

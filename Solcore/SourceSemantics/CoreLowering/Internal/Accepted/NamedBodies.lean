@@ -739,6 +739,7 @@ def Tree.formed {mode : Bool} {escaped : Word} {fuel scope statements code}
     (tree : Tree policy source result reasonAt mode escaped fuel scope statements code) : Bool :=
   match tree with
   | .boundary .. | .assigning .. | .bitNotting .. | .forBoundary .. | .matching .. => false
+  | .elementAssigned .. | .elementBitNotted .. => false
   | .nil | .returning .. | .returnUnit .. | .breaking .. | .continuing .. | .tailValue .. => true
   | .initialized _ _ _ _ _ _ _ tail _ | .absent _ _ _ _ tail _ => tail.formed
   | .assigned _ _ _ tail _ _ | .projectedAssigned _ _ _ tail _ _ | .bitNotted _ _ _ tail _ _ | .projectedBitNotted _ _ _ tail _ _ | .discard _ _ _ _ _ tail => tail.formed
@@ -756,6 +757,7 @@ def Tree.complete {mode : Bool} {escaped : Word} {fuel scope statements code}
   match tree with
   | .nil => !mode || decide (expected = .unit)
   | .boundary .. | .assigning .. | .bitNotting .. | .forBoundary .. | .matching .. => false
+  | .elementAssigned .. | .elementBitNotted .. => false
   | .returning .. | .returnUnit .. | .breaking .. | .continuing .. => true
   | @Tree.tailValue _ _ _ _ _ _ _ _ node _ _ _ _ _ _ _ _ => decide (node.type = expected)
   | .initialized _ _ _ _ _ _ _ tail _ | .absent _ _ _ _ tail _ => tail.complete expected
@@ -790,6 +792,7 @@ theorem Tree.complete_formed {mode : Bool} {escaped : Word} {fuel scope statemen
   induction tree with
   | nil | returning | returnUnit | breaking | continuing | tailValue => rfl
   | assigning | bitNotting | boundary | forBoundary | matching => cases complete
+  | elementAssigned | elementBitNotted => cases complete
   | initialized _ _ _ _ _ _ _ _ _ ih | absent _ _ _ _ _ _ ih
   | assigned _ _ _ _ _ _ ih | projectedAssigned _ _ _ _ _ _ ih | bitNotted _ _ _ _ _ _ ih | projectedBitNotted _ _ _ _ _ _ ih | discard _ _ _ _ _ _ ih => exact ih complete
   | valueDiscard read form notTail child generated statementType remaining ih =>
@@ -821,6 +824,7 @@ theorem Tree.closed_complete {mode : Bool} {escaped : Word} {fuel scope statemen
     simp [Tree.complete, closed]
   | returning | returnUnit | breaking | continuing => rfl
   | tailValue | assigning | bitNotting | boundary | forBoundary | matching => cases closed
+  | elementAssigned | elementBitNotted => cases closed
   | initialized _ _ _ _ _ _ _ _ _ ih | absent _ _ _ _ _ _ ih
   | assigned _ _ _ _ _ _ ih | projectedAssigned _ _ _ _ _ _ ih | bitNotted _ _ _ _ _ _ ih | projectedBitNotted _ _ _ _ _ _ ih | discard _ _ _ _ _ _ ih => exact ih closed
   | valueDiscard read form notTail child generated statementType remaining ih =>
@@ -941,6 +945,7 @@ theorem Tree.complete_of_formed {policy : SourceCoreLoops.Policy}
   | nil => cases finish <;> simp_all [Tree.complete]
   | returning | returnUnit | breaking | continuing => rfl
   | assigning | bitNotting | boundary | forBoundary | matching => cases formed
+  | elementAssigned | elementBitNotted => cases formed
   | tailValue read form _ _ _ _ =>
     have atHead := finish_at finish (original_read (readPolicy ▸ read))
     simp only [FinishAt, form, Bool.true_eq_false, false_or] at atHead
@@ -1141,6 +1146,7 @@ theorem Tree.formed_shape {policy : SourceCoreLoops.Policy} {checked : SourceCor
       (initial.closed_shape formed.1.1.1) (after.closed_shape formed.1.2)
       (innerIH formed.1.1.2) (tailIH formed.2)
   | boundary | assigning | bitNotting | forBoundary | matching => cases formed
+  | elementAssigned | elementBitNotted => cases formed
 
 end Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyFlow
 end
@@ -1394,6 +1400,7 @@ theorem Tree.scan_complete {policy : SourceCoreLoops.Policy} {checked : SourceCo
   | breaking read form _ => exact .breaking _ (read_found (readPolicy ▸ read)) form
   | continuing read form _ => exact .continuing _ (read_found (readPolicy ▸ read)) form
   | boundary | assigning | bitNotting | forBoundary | matching => cases closed
+  | elementAssigned | elementBitNotted => cases closed
   | returning read form statementType child generated childType =>
       have found := read_found (readPolicy ▸ read)
       obtain ⟨_, _, _, head, _⟩ := head_tail typed
@@ -1746,6 +1753,7 @@ theorem Tree.at_return {policy : SourceCoreLoops.Policy} {checked : SourceCoreCo
       cases same
       simp_all
   | assigning read original _ _ _ | assigned read original _ _ _ _ | projectedAssigned read original _ _ _ _ | bitNotting read original _ _ _ | bitNotted read original _ _ _ _ | projectedBitNotted read original _ _ _ _ | whileLoop read original _ _ _ _ _ _
+      | elementAssigned read original _ _ _ | elementBitNotted read original _ _ _
       | discard read original _ _ _ _ | valueDiscard read original _ _ _ _ _ | tailValue read original _ _ _ _ | block read original _ _ | conditional read original _ _ _ _ _ _ =>
       have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans found)
       cases same
@@ -2020,6 +2028,7 @@ theorem of_monomorphic {policy : SourceCoreLoops.Policy} {checked : SourceCoreCo
         · exact ih tail (fun next present => monomorphic next (List.mem_cons_of_mem _ present)) binding member
 
   | assigning _ _ _ _ _ ih | assigned _ _ _ _ _ _ ih | projectedAssigned _ _ _ _ _ _ ih | bitNotting _ _ _ _ _ ih | bitNotted _ _ _ _ _ _ ih | projectedBitNotted _ _ _ _ _ _ ih | discard _ _ _ _ _ _ ih
+      | elementAssigned _ _ _ _ _ ih | elementBitNotted _ _ _ _ _ ih
       | matching _ _ _ _ _ ih | valueDiscard _ _ _ _ _ _ _ ih =>
       obtain ⟨_, _, _, _, tail⟩ := head_tail typed
       exact ih tail monomorphic

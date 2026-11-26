@@ -460,6 +460,14 @@ theorem facts_forms {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompa
   | bitNotted read form statementType remaining receipt targetType ih =>
       have found := read_found (readPolicy ▸ read)
       exact ih ready (finish.tail found (by simp [form, stopsHere]))
+  | elementAssigned read form statementType remaining receipt ih =>
+      have original := profile.at (read_found (readPolicy ▸ read))
+      simp only [StatementReady, form] at original
+      exact False.elim (element_not_value receipt original.1)
+  | elementBitNotted read form statementType remaining receipt ih =>
+      have original := profile.at (read_found (readPolicy ▸ read))
+      simp only [StatementReady, form] at original
+      exact False.elim (element_not_unary receipt original.1)
   | discard read form child generated statementType remaining tailIH =>
       have found := read_found (readPolicy ▸ read)
       have original := profile.at found
@@ -847,6 +855,14 @@ private theorem facts_general {policy : SourceCoreLoops.Policy} {checked : Sourc
       have found := read_found (readPolicy ▸ read)
       exact ih ready (fun id member => present id (List.mem_cons_of_mem _ member))
         (finish.tail found (by simp [form, stopsHere]))
+  | elementAssigned read form statementType remaining receipt ih =>
+      have original := (profile.at (present _ List.mem_cons_self) (read_found (readPolicy ▸ read))).1
+      simp only [StatementReady, form] at original
+      exact False.elim (element_not_value receipt original.1)
+  | elementBitNotted read form statementType remaining receipt ih =>
+      have original := (profile.at (present _ List.mem_cons_self) (read_found (readPolicy ▸ read))).1
+      simp only [StatementReady, form] at original
+      exact False.elim (element_not_unary receipt original.1)
   | discard read form child generated statementType remaining tailIH =>
       have found := read_found (readPolicy ▸ read)
       have original := (profile.at (present _ List.mem_cons_self) found).1
