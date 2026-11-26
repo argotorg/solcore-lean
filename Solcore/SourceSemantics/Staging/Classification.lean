@@ -196,6 +196,67 @@ def patternBinders : MatchPatternResolution → List TypedBinder
   | .integerLiteral _ _
   | .boolLiteral _ => []
 
+/-- The number of subpatterns that follow one prefix instruction in its stream. -/
+def instructionChildCount : MatchPatternInstruction → Nat
+  | .constructor _ argumentCount => argumentCount
+  | .tuple elementCount => elementCount
+  | .uint256Word => 1
+  | .wildcard
+  | .integerLiteral _ _
+  | .binder _
+  | .boolLiteral _ => 0
+
+/-- Take `pending` complete subpatterns off the front of a prefix stream: their instructions,
+and the rest. -/
+def takePatternPrefix : Nat → List MatchPatternInstruction →
+    Option (List MatchPatternInstruction × List MatchPatternInstruction)
+  | 0, rest => some ([], rest)
+  | _ + 1, [] => none
+  | pending + 1, instruction :: rest =>
+      (takePatternPrefix (pending + instructionChildCount instruction) rest).map
+        fun taken => (instruction :: taken.1, taken.2)
+
+/-- A prefix stream split into exactly `count` subpatterns. -/
+def splitPatternComponents : Nat → List MatchPatternInstruction →
+    Option (List (List MatchPatternInstruction))
+  | 0, [] => some []
+  | 0, _ :: _ => none
+  | count + 1, instructions =>
+      match takePatternPrefix 1 instructions with
+      | some (component, rest) =>
+          (splitPatternComponents count rest).map (component :: ·)
+      | none => none
+
+/-- A tuple pattern's components, one per written scrutinee, when a match writes `parts` of
+them, two or more. Any other pattern, and any pattern of a match of one scrutinee, has none:
+its binders take the whole scrutinee's stage. -/
+def patternComponents : MatchPatternResolution → Nat →
+    Option (List (List MatchPatternInstruction))
+  | .tuple elements, parts + 2 => splitPatternComponents (parts + 2) elements
+  | _, _ => none
+
+/-- Extend a scope with each component's binders at the stage of the written scrutinee it
+binds. -/
+inductive ComponentBindersGetStages (source : TypedSource) :
+    List (Stage × List MatchPatternInstruction) → StageScope → StageScope → Prop where
+  | nil (scope : StageScope) : ComponentBindersGetStages source [] scope scope
+  | cons
+      {scope middle final : StageScope} {stage : Stage}
+      {component : List MatchPatternInstruction}
+      {components : List (Stage × List MatchPatternInstruction)}
+      (head : BindersGetStage source stage scope
+        (component.flatMap instructionBinders) middle)
+      (tail : ComponentBindersGetStages source components middle final) :
+      ComponentBindersGetStages source ((stage, component) :: components) scope final
+
+/-- A match's written scrutinees are the elements of its scrutinee tuple, or it writes one. -/
+inductive MatchPartsWritten (source : TypedSource) (resolution : MatchResolution) :
+    Prop where
+  | single (noParts : resolution.parts = [])
+  | tuple {node : ExpressionNode}
+      (contains : SourceSemantics.ContainsExpression source resolution.scrutinee node)
+      (form_eq : node.form = .tuple resolution.parts)
+
 /-- All argument occurrences of a direct call are compile-time values. -/
 def AllComptime (stages : List Stage) : Prop :=
   ∀ stage, stage ∈ stages → stage = .comptime
@@ -554,30 +615,36 @@ mutual
     | matchWithoutDefault
         {scope hiddenScope : StageScope} {id : StatementId}
         {node : StatementNode} {resolution : MatchResolution}
-        {scrutineeStage hiddenStage : Stage}
+        {scrutineeStage hiddenStage : Stage} {partStages : List Stage}
         (contains : SourceSemantics.ContainsStatement source id node)
         (form_eq : node.form = .matchWith resolution)
         (default_eq : resolution.defaultBody = none)
         (scrutineeStages :
           HasStage source scope resolution.scrutinee scrutineeStage)
+        (partsWritten : MatchPartsWritten source resolution)
+        (partStagesOf : ExpressionsHaveStages source scope resolution.parts
+          partStages)
         (hiddenBinder : BinderGetsStage source scope
           resolution.hiddenScrutinee scrutineeStage hiddenStage hiddenScope)
-        (caseStages : MatchCasesStage source scope scrutineeStage
+        (caseStages : MatchCasesStage source scope scrutineeStage partStages
           resolution.cases) :
         StatementStages source scope id scope
     | matchWithDefault
         {scope hiddenScope defaultFinal : StageScope} {id : StatementId}
         {node : StatementNode} {resolution : MatchResolution}
         {defaultBody : List StatementId}
-        {scrutineeStage hiddenStage : Stage}
+        {scrutineeStage hiddenStage : Stage} {partStages : List Stage}
         (contains : SourceSemantics.ContainsStatement source id node)
         (form_eq : node.form = .matchWith resolution)
         (default_eq : resolution.defaultBody = some defaultBody)
         (scrutineeStages :
           HasStage source scope resolution.scrutinee scrutineeStage)
+        (partsWritten : MatchPartsWritten source resolution)
+        (partStagesOf : ExpressionsHaveStages source scope resolution.parts
+          partStages)
         (hiddenBinder : BinderGetsStage source scope
           resolution.hiddenScrutinee scrutineeStage hiddenStage hiddenScope)
-        (caseStages : MatchCasesStage source scope scrutineeStage
+        (caseStages : MatchCasesStage source scope scrutineeStage partStages
           resolution.cases)
         (defaultStages :
           StatementsStage source scope defaultBody defaultFinal) :
@@ -672,28 +739,42 @@ mutual
         ForItemsStage source scope (item :: items) final
 
   /-- Classify one match arm after entering every binder retained by its flat
-  prefix pattern. -/
+  prefix pattern. A binder takes the stage of the written scrutinee it binds when the
+  match writes several (`partStages`, one each) and the pattern is a tuple of one
+  component per scrutinee; any other binder takes the whole scrutinee's stage. -/
   inductive MatchCaseStages (source : TypedSource) :
-      StageScope → Stage → TypedMatchCase → Prop where
-    | intro
+      StageScope → Stage → List Stage → TypedMatchCase → Prop where
+    | whole
         {scope armScope finalScope : StageScope} {scrutineeStage : Stage}
-        {matchCase : TypedMatchCase}
+        {partStages : List Stage} {matchCase : TypedMatchCase}
+        (noSplit : patternComponents matchCase.pattern.resolution
+          partStages.length = none)
         (bindersStage : BindersGetStage source scrutineeStage scope
           (patternBinders matchCase.pattern.resolution) armScope)
         (bodyStage : StatementsStage source armScope matchCase.body finalScope) :
-        MatchCaseStages source scope scrutineeStage matchCase
+        MatchCaseStages source scope scrutineeStage partStages matchCase
+    | parts
+        {scope armScope finalScope : StageScope} {scrutineeStage : Stage}
+        {partStages : List Stage} {matchCase : TypedMatchCase}
+        {components : List (List MatchPatternInstruction)}
+        (split : patternComponents matchCase.pattern.resolution
+          partStages.length = some components)
+        (bindersStage : ComponentBindersGetStages source
+          (partStages.zip components) scope armScope)
+        (bodyStage : StatementsStage source armScope matchCase.body finalScope) :
+        MatchCaseStages source scope scrutineeStage partStages matchCase
 
   /-- Classify every explicit match arm in source order. -/
   inductive MatchCasesStage (source : TypedSource) :
-      StageScope → Stage → List TypedMatchCase → Prop where
-    | nil (scope : StageScope) (scrutineeStage : Stage) :
-        MatchCasesStage source scope scrutineeStage []
+      StageScope → Stage → List Stage → List TypedMatchCase → Prop where
+    | nil (scope : StageScope) (scrutineeStage : Stage) (partStages : List Stage) :
+        MatchCasesStage source scope scrutineeStage partStages []
     | cons
-        {scope : StageScope} {scrutineeStage : Stage}
+        {scope : StageScope} {scrutineeStage : Stage} {partStages : List Stage}
         {matchCase : TypedMatchCase} {cases : List TypedMatchCase}
-        (head : MatchCaseStages source scope scrutineeStage matchCase)
-        (tail : MatchCasesStage source scope scrutineeStage cases) :
-        MatchCasesStage source scope scrutineeStage (matchCase :: cases)
+        (head : MatchCaseStages source scope scrutineeStage partStages matchCase)
+        (tail : MatchCasesStage source scope scrutineeStage partStages cases) :
+        MatchCasesStage source scope scrutineeStage partStages (matchCase :: cases)
 
 end
 

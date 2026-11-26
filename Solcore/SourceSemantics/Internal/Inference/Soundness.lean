@@ -6502,6 +6502,7 @@ theorem inferStatementFuel_success_matchWithoutDefault_facts
             defaultBody := none
             requirements := checked.cases.flatMap fun arm =>
               arm.pattern.requirements
+            parts := Detail.matchScrutineeParts statement scrutinee.id checked.state.nodes
           }
         })
       } ∧
@@ -6516,6 +6517,7 @@ theorem inferStatementFuel_success_matchWithoutDefault_facts
           defaultBody := none
           requirements := checked.cases.flatMap fun arm =>
             arm.pattern.requirements
+          parts := Detail.matchScrutineeParts statement scrutinee.id checked.state.nodes
         }
       } := by
   have finish
@@ -6549,6 +6551,7 @@ theorem inferStatementFuel_success_matchWithoutDefault_facts
           cases := checked.cases
           defaultBody := none
           requirements
+          parts := Detail.matchScrutineeParts statement scrutinee.id checked.state.nodes
         }
       })
       pure ({
@@ -6590,6 +6593,7 @@ theorem inferStatementFuel_success_matchWithoutDefault_facts
               defaultBody := none
               requirements := checked.cases.flatMap fun arm =>
                 arm.pattern.requirements
+              parts := Detail.matchScrutineeParts statement scrutinee.id checked.state.nodes
             }
           })
         } ∧
@@ -6604,6 +6608,7 @@ theorem inferStatementFuel_success_matchWithoutDefault_facts
             defaultBody := none
             requirements := checked.cases.flatMap fun arm =>
               arm.pattern.requirements
+            parts := Detail.matchScrutineeParts statement scrutinee.id checked.state.nodes
           }
         } := by
     rcases hiddenAllocation : scrutineeState.allocateHiddenLocal with
@@ -6788,6 +6793,8 @@ theorem inferStatementFuel_success_matchWithDefault_facts
                 defaultBody := some defaultResult.statements
                 requirements := checked.cases.flatMap fun arm =>
                   arm.pattern.requirements
+                parts := Detail.matchScrutineeParts statement scrutinee.id
+                  (defaultResult.state.restoreLexicalScope hiddenState.lexicalScope).nodes
               }
             })
       } ∧
@@ -6802,6 +6809,8 @@ theorem inferStatementFuel_success_matchWithDefault_facts
           defaultBody := some defaultResult.statements
           requirements := checked.cases.flatMap fun arm =>
             arm.pattern.requirements
+          parts := Detail.matchScrutineeParts statement scrutinee.id
+            (defaultResult.state.restoreLexicalScope hiddenState.lexicalScope).nodes
         }
       } := by
   have finish
@@ -6829,6 +6838,7 @@ theorem inferStatementFuel_success_matchWithDefault_facts
         cases := checked.cases
         defaultBody := some defaultResult.statements
         requirements
+        parts := Detail.matchScrutineeParts statement scrutinee.id defaultState.nodes
       }
     })
     pure ({
@@ -6871,6 +6881,8 @@ theorem inferStatementFuel_success_matchWithDefault_facts
                   defaultBody := some defaultResult.statements
                   requirements := checked.cases.flatMap fun arm =>
                     arm.pattern.requirements
+                  parts := Detail.matchScrutineeParts statement scrutinee.id
+                    (defaultResult.state.restoreLexicalScope hiddenState.lexicalScope).nodes
                 }
               })
         } ∧
@@ -6885,6 +6897,8 @@ theorem inferStatementFuel_success_matchWithDefault_facts
             defaultBody := some defaultResult.statements
             requirements := checked.cases.flatMap fun arm =>
               arm.pattern.requirements
+            parts := Detail.matchScrutineeParts statement scrutinee.id
+              (defaultResult.state.restoreLexicalScope hiddenState.lexicalScope).nodes
           }
         } := by
     rcases hiddenAllocation : scrutineeState.allocateHiddenLocal with
@@ -8295,6 +8309,7 @@ theorem matchWithoutDefaultStatementHasType_afterSubstitution
     {expectedReturn : TypeSystem.Ty}
     {scrutinee : InferredExpression} {hiddenScrutinee : Resolved.LocalId}
     {checked : Detail.MatchCasesResult}
+    {parts : List ExpressionId}
     {caseFacts : List BodyFacts} {summary : ControlSummary}
     (contains : ContainsStatement source id {
       id
@@ -8310,6 +8325,7 @@ theorem matchWithoutDefaultStatementHasType_afterSubstitution
         defaultBody := none
         requirements := checked.cases.flatMap fun arm =>
           arm.pattern.requirements
+        parts
       }
     })
     (scrutineeType : ExpressionHasType (source.applySubstitution outer)
@@ -8410,6 +8426,7 @@ theorem matchWithDefaultStatementHasType_afterSubstitution
     {expectedReturn : TypeSystem.Ty}
     {scrutinee : InferredExpression} {hiddenScrutinee : Resolved.LocalId}
     {checked : Detail.MatchCasesResult} {defaultResult : Detail.BlockResult}
+    {parts : List ExpressionId}
     {outerScope : LexicalScope}
     {caseFacts : List BodyFacts} {defaultFacts : BodyFacts}
     {summary : ControlSummary}
@@ -8428,6 +8445,7 @@ theorem matchWithDefaultStatementHasType_afterSubstitution
         defaultBody := some defaultResult.statements
         requirements := checked.cases.flatMap fun arm =>
           arm.pattern.requirements
+        parts
       }
     })
     (scrutineeType : ExpressionHasType (source.applySubstitution outer)

@@ -2178,6 +2178,25 @@ private def statementIsMatch (statement : Syntax.Statement) : Bool :=
   | .matchWith .. => true
   | _ => false
 
+/-- The form of the expression occurrence `id`, when `node` is it. -/
+def expressionFormAt? (id : ExpressionId) : Node → Option ExpressionForm
+  | .expression node => if node.id = id then some node.form else none
+  | .statement _ => none
+
+/-- The scrutinees a match statement writes, when it writes two or more: the elements of the
+tuple occurrence `scrutinee` that inference records for them, as `nodes` holds it. A match of
+one scrutinee, a tuple-valued one among them, has none. -/
+def matchScrutineeParts (statement : Syntax.Statement) (scrutinee : ExpressionId)
+    (nodes : List Node) : List ExpressionId :=
+  match statement.value with
+  | .matchWith scrutinees _ =>
+      if scrutinees.elements.toList.length < 2 then []
+      else
+        match nodes.findSome? (expressionFormAt? scrutinee) with
+        | some (.tuple elements) => elements
+        | _ => []
+  | _ => []
+
 /-- The equation an index of an assignable place unifies: on a memory array, its
 value type is the array's element, as a read's type is; otherwise the base is a
 mapping from the key type to it. -/
@@ -3166,6 +3185,7 @@ mutual
                 cases := checked.cases
                 defaultBody := defaultStatements
                 requirements
+                parts := matchScrutineeParts statement scrutinee.id state.nodes
               }
             })
             pure {

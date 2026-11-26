@@ -679,9 +679,101 @@ theorem registerPatternBinders_sound
             induction middleEnvironment middleState middleValid tailSuccess
           exact ⟨finalValid, .cons headStage tailStage⟩
 
+theorem registerComponentBinders_sound
+    (source : TypedSource)
+    (stages : List Frontend.SourceStageAnalysis.Stage)
+    (components : List (List MatchPatternInstruction))
+    (environment nextEnvironment : Frontend.SourceStageAnalysis.Environment)
+    (state nextState : Traversal)
+    (valid : TraversalValid source state)
+    (registered : registerComponentBinders source.owner stages components
+      environment state = .ok (nextEnvironment, nextState)) :
+    TraversalValid source nextState ∧
+      ComponentBindersGetStages source
+        ((stages.map Frontend.SourceStageAnalysis.Stage.toSemantic).zip components)
+        (toSemanticScope environment) (toSemanticScope nextEnvironment) := by
+  have instructionsEq : bindersInPatternInstruction = Staging.instructionBinders := by
+    funext instruction
+    exact bindersInPatternInstruction_eq instruction
+  induction stages generalizing components environment state with
+  | nil =>
+      simp only [registerComponentBinders] at registered
+      cases registered
+      exact ⟨valid, .nil _⟩
+  | cons stage stages induction =>
+      cases components with
+      | nil =>
+          simp only [registerComponentBinders] at registered
+          cases registered
+          exact ⟨valid, .nil _⟩
+      | cons component components =>
+          have unfoldStep :
+              registerComponentBinders source.owner (stage :: stages)
+                  (component :: components) environment state =
+                registerPatternBinders source.owner stage
+                    (component.flatMap bindersInPatternInstruction) environment state >>=
+                  fun pair => registerComponentBinders source.owner stages components
+                    pair.1 pair.2 := rfl
+          cases headResult : registerPatternBinders source.owner stage
+              (component.flatMap bindersInPatternInstruction) environment state with
+          | error error =>
+              rw [unfoldStep, headResult] at registered
+              cases registered
+          | ok pair =>
+              rcases pair with ⟨middleEnvironment, middleState⟩
+              have tailSuccess : registerComponentBinders source.owner stages components
+                  middleEnvironment middleState = .ok (nextEnvironment, nextState) := by
+                rw [unfoldStep, headResult] at registered
+                exact registered
+              obtain ⟨middleValid, headStage⟩ :=
+                registerPatternBinders_sound source stage
+                  (component.flatMap bindersInPatternInstruction) environment
+                  middleEnvironment state middleState valid headResult
+              obtain ⟨finalValid, tailStages⟩ :=
+                induction components middleEnvironment middleState middleValid tailSuccess
+              refine ⟨finalValid, ?_⟩
+              simp only [List.map_cons, List.zip_cons_cons]
+              exact .cons (by simpa only [instructionsEq] using headStage) tailStages
+
+theorem registerArmBinders_sound
+    (source : TypedSource)
+    (scrutineeStage : Frontend.SourceStageAnalysis.Stage)
+    (partStages : List Frontend.SourceStageAnalysis.Stage)
+    (pattern : MatchPatternResolution)
+    (environment nextEnvironment : Frontend.SourceStageAnalysis.Environment)
+    (state nextState : Traversal)
+    (valid : TraversalValid source state)
+    (registered : registerArmBinders source.owner scrutineeStage partStages pattern
+      environment state = .ok (nextEnvironment, nextState)) :
+    TraversalValid source nextState ∧
+      ((patternComponents pattern partStages.length = none ∧
+          BindersGetStage source scrutineeStage.toSemantic
+            (toSemanticScope environment) (patternBinders pattern)
+            (toSemanticScope nextEnvironment)) ∨
+        ∃ components, patternComponents pattern partStages.length = some components ∧
+          ComponentBindersGetStages source
+            ((partStages.map Frontend.SourceStageAnalysis.Stage.toSemantic).zip components)
+            (toSemanticScope environment) (toSemanticScope nextEnvironment)) := by
+  unfold registerArmBinders at registered
+  cases split : patternComponents pattern partStages.length with
+  | none =>
+      simp only [split] at registered
+      obtain ⟨nextValid, binders⟩ :=
+        registerPatternBinders_sound source scrutineeStage
+          (bindersInPatternResolution pattern) environment nextEnvironment state
+          nextState valid registered
+      exact ⟨nextValid, .inl ⟨rfl, by simpa [bindersInPatternResolution_eq] using binders⟩⟩
+  | some components =>
+      simp only [split] at registered
+      obtain ⟨nextValid, binders⟩ :=
+        registerComponentBinders_sound source partStages components environment
+          nextEnvironment state nextState valid registered
+      exact ⟨nextValid, .inr ⟨components, rfl, binders⟩⟩
+
 theorem analyzeMatchCasesWith_sound
     (source : TypedSource)
     (scrutineeStage : Frontend.SourceStageAnalysis.Stage)
+    (partStages : List Frontend.SourceStageAnalysis.Stage)
     (analyzeStatements : List StatementId →
       Frontend.SourceStageAnalysis.Environment → Traversal →
       Except Frontend.SourceStageAnalysis.Error
@@ -697,30 +789,30 @@ theorem analyzeMatchCasesWith_sound
     (environment : Frontend.SourceStageAnalysis.Environment)
     (state finalState : Traversal)
     (valid : TraversalValid source state)
-    (success : analyzeMatchCasesWith source.owner scrutineeStage
+    (success : analyzeMatchCasesWith source.owner scrutineeStage partStages
       analyzeStatements cases environment state = .ok finalState) :
     TraversalValid source finalState ∧
       MatchCasesStage source (toSemanticScope environment)
-        scrutineeStage.toSemantic cases := by
+        scrutineeStage.toSemantic
+        (partStages.map Frontend.SourceStageAnalysis.Stage.toSemantic) cases := by
   induction cases generalizing state with
   | nil =>
       simp only [analyzeMatchCasesWith] at success
       cases success
-      exact ⟨valid, .nil _ _⟩
+      exact ⟨valid, .nil _ _ _⟩
   | cons arm rest induction =>
-      let binders := bindersInPatternResolution arm.pattern.resolution
       have unfoldStep :
-          analyzeMatchCasesWith source.owner scrutineeStage analyzeStatements
-              (arm :: rest) environment state =
-            registerPatternBinders source.owner scrutineeStage binders
-                environment state >>=
+          analyzeMatchCasesWith source.owner scrutineeStage partStages
+              analyzeStatements (arm :: rest) environment state =
+            registerArmBinders source.owner scrutineeStage partStages
+                arm.pattern.resolution environment state >>=
               fun pair =>
                 analyzeStatements arm.body pair.1 pair.2 >>=
                   fun bodyPair =>
-                    analyzeMatchCasesWith source.owner scrutineeStage
+                    analyzeMatchCasesWith source.owner scrutineeStage partStages
                       analyzeStatements rest environment bodyPair.2 := rfl
-      cases binderResult : registerPatternBinders source.owner scrutineeStage
-          binders environment state with
+      cases binderResult : registerArmBinders source.owner scrutineeStage partStages
+          arm.pattern.resolution environment state with
       | error error =>
           rw [unfoldStep, binderResult] at success
           cases success
@@ -729,12 +821,12 @@ theorem analyzeMatchCasesWith_sound
           rw [unfoldStep, binderResult] at success
           change (analyzeStatements arm.body armEnvironment binderState >>=
               fun bodyPair => analyzeMatchCasesWith source.owner scrutineeStage
-                analyzeStatements rest environment bodyPair.2) =
+                partStages analyzeStatements rest environment bodyPair.2) =
             Except.ok finalState at success
-          have binderSuccess := binderResult
           obtain ⟨binderValid, binderStages⟩ :=
-            registerPatternBinders_sound source scrutineeStage binders
-              environment armEnvironment state binderState valid binderSuccess
+            registerArmBinders_sound source scrutineeStage partStages
+              arm.pattern.resolution environment armEnvironment state binderState
+              valid binderResult
           cases bodyResult : analyzeStatements arm.body armEnvironment
               binderState with
           | error error =>
@@ -743,22 +835,144 @@ theorem analyzeMatchCasesWith_sound
           | ok pair =>
               rcases pair with ⟨bodyEnvironment, bodyState⟩
               rw [bodyResult] at success
-              change analyzeMatchCasesWith source.owner scrutineeStage
+              change analyzeMatchCasesWith source.owner scrutineeStage partStages
                   analyzeStatements rest environment bodyState =
                 Except.ok finalState at success
               obtain ⟨bodyValid, bodyStages⟩ :=
                 analyzeStatementsSound arm.body armEnvironment binderState
                   bodyEnvironment bodyState binderValid bodyResult
-              have tailSuccess : analyzeMatchCasesWith source.owner
-                  scrutineeStage analyzeStatements rest environment bodyState =
-                    .ok finalState := success
               obtain ⟨finalValid, tailStages⟩ :=
-                induction bodyState bodyValid tailSuccess
+                induction bodyState bodyValid success
               refine ⟨finalValid, .cons ?_ tailStages⟩
-              apply MatchCaseStages.intro
-              · simpa [binders, bindersInPatternResolution_eq] using
-                  binderStages
-              · exact bodyStages
+              rcases binderStages with ⟨noSplit, binders⟩ | ⟨components, split, binders⟩
+              · exact .whole (by rw [List.length_map]; exact noSplit) binders bodyStages
+              · exact .parts (by rw [List.length_map]; exact split) binders bodyStages
+
+/-- A match's scrutinee is classified with the stages of the scrutinees it writes. -/
+theorem analyzeMatchScrutineeWith_sound
+    (source : TypedSource) (scope : StageScope) (resolution : MatchResolution)
+    (analyzeExpression : Traversal → ExpressionId →
+      Except Frontend.SourceStageAnalysis.Error
+        (Frontend.SourceStageAnalysis.Stage × Traversal))
+    (expressionSound : ∀ state id stage next,
+      TraversalValid source state →
+      analyzeExpression state id = .ok (stage, next) →
+      TraversalValid source next ∧
+        HasStage source scope id stage.toSemantic)
+    (state finalState : Traversal)
+    (stage : Frontend.SourceStageAnalysis.Stage)
+    (partStages : List Frontend.SourceStageAnalysis.Stage)
+    (valid : TraversalValid source state)
+    (success : analyzeMatchScrutineeWith source resolution analyzeExpression state =
+      .ok (stage, partStages, finalState)) :
+    TraversalValid source finalState ∧
+      HasStage source scope resolution.scrutinee stage.toSemantic ∧
+      MatchPartsWritten source resolution ∧
+      ExpressionsHaveStages source scope resolution.parts
+        (partStages.map Frontend.SourceStageAnalysis.Stage.toSemantic) := by
+  unfold analyzeMatchScrutineeWith at success
+  cases partsEq : resolution.parts with
+  | nil =>
+      simp only [partsEq] at success
+      cases scrutineeResult : analyzeExpression state resolution.scrutinee with
+      | error problem =>
+          rw [scrutineeResult] at success
+          cases success
+      | ok pair =>
+          rcases pair with ⟨scrutineeStage, scrutineeState⟩
+          rw [scrutineeResult] at success
+          obtain ⟨scrutineeValid, scrutineeStages⟩ :=
+            expressionSound state resolution.scrutinee scrutineeStage scrutineeState
+              valid scrutineeResult
+          obtain ⟨rfl, rfl, rfl⟩ := success
+          exact ⟨scrutineeValid, scrutineeStages, .single partsEq, .nil _⟩
+  | cons part parts =>
+      simp only [partsEq] at success
+      cases entered : enterOccurrence state resolution.scrutinee.occurrence with
+      | error problem =>
+          rw [entered] at success
+          cases success
+      | ok enteredState =>
+          rw [entered] at success
+          have enteredValid := enterOccurrence_valid valid entered
+          cases looked : lookupExpression source resolution.scrutinee with
+          | error problem =>
+              rw [looked] at success
+              cases success
+          | ok node =>
+              rw [looked] at success
+              have contains := lookupExpression_sound looked
+              change (if node.form = .tuple (part :: parts) then
+                    (analyzeExpressionListWith analyzeExpression (part :: parts)
+                        enteredState >>= fun pair =>
+                      recordExpressionStage pair.2 resolution.scrutinee
+                          (Frontend.SourceStageAnalysis.Stage.join pair.1) >>=
+                        fun recordedState =>
+                          leaveOccurrence recordedState
+                              resolution.scrutinee.occurrence >>= fun leftState =>
+                            pure (Frontend.SourceStageAnalysis.Stage.join pair.1, pair.1,
+                              leftState))
+                  else
+                    throw (Frontend.SourceStageAnalysis.Error.matchPartsMismatch
+                      resolution.scrutinee)) =
+                .ok (stage, partStages, finalState) at success
+              by_cases form : node.form = .tuple (part :: parts)
+              · rw [if_pos form] at success
+                cases analyzed : analyzeExpressionListWith analyzeExpression
+                    (part :: parts) enteredState with
+                | error problem =>
+                    rw [analyzed] at success
+                    cases success
+                | ok pair =>
+                    rcases pair with ⟨stages, listState⟩
+                    rw [analyzed] at success
+                    obtain ⟨listValid, elementStages⟩ :=
+                      analyzeExpressionListWith_sound source scope analyzeExpression
+                        expressionSound (part :: parts) enteredState listState stages
+                        enteredValid analyzed
+                    change (recordExpressionStage listState resolution.scrutinee
+                        (Frontend.SourceStageAnalysis.Stage.join stages) >>=
+                      fun recordedState =>
+                        leaveOccurrence recordedState
+                            resolution.scrutinee.occurrence >>= fun leftState =>
+                          pure (Frontend.SourceStageAnalysis.Stage.join stages, stages,
+                            leftState)) =
+                      .ok (stage, partStages, finalState) at success
+                    cases recorded : recordExpressionStage listState
+                        resolution.scrutinee
+                        (Frontend.SourceStageAnalysis.Stage.join stages) with
+                    | error problem =>
+                        rw [recorded] at success
+                        cases success
+                    | ok recordedState =>
+                        rw [recorded] at success
+                        have recordedValid := recordExpressionStage_valid listValid recorded
+                        change (leaveOccurrence recordedState
+                            resolution.scrutinee.occurrence >>= fun leftState =>
+                          pure (Frontend.SourceStageAnalysis.Stage.join stages, stages,
+                            leftState)) =
+                          .ok (stage, partStages, finalState) at success
+                        cases left : leaveOccurrence recordedState
+                            resolution.scrutinee.occurrence with
+                        | error problem =>
+                            rw [left] at success
+                            cases success
+                        | ok leftState =>
+                            rw [left] at success
+                            have leftValid := leaveOccurrence_valid recordedValid left
+                            have finished : TraversalValid source leftState ∧
+                                HasStage source scope resolution.scrutinee
+                                  (Frontend.SourceStageAnalysis.Stage.join stages).toSemantic ∧
+                                MatchPartsWritten source resolution ∧
+                                ExpressionsHaveStages source scope (part :: parts)
+                                  (stages.map Frontend.SourceStageAnalysis.Stage.toSemantic) :=
+                              ⟨leftValid,
+                                .tuple contains form elementStages (join_sound stages),
+                                .tuple contains (by rw [partsEq]; exact form), elementStages⟩
+                            obtain ⟨rfl, rfl, rfl⟩ := success
+                            exact finished
+              · rw [if_neg form] at success
+                cases success
 
 theorem analyzeOptionalStatementsWith_sound
     (source : TypedSource)
@@ -1753,20 +1967,21 @@ theorem analyzeStatementFormWith_sound
           exact ⟨finalValid, .block contains form bodyStages⟩
   | matchWith resolution =>
       simp only [analyzeStatementFormWith, form] at success
-      cases scrutineeResult : analyzeExpression environment state
-          resolution.scrutinee with
+      cases scrutineeResult : analyzeMatchScrutineeWith source resolution
+          (analyzeExpression environment) state with
       | error problem =>
           rw [scrutineeResult] at success
           cases success
-      | ok pair =>
-          rcases pair with ⟨scrutineeStage, scrutineeState⟩
+      | ok triple =>
+          rcases triple with ⟨scrutineeStage, partStages, scrutineeState⟩
           rw [scrutineeResult] at success
-          obtain ⟨scrutineeValid, scrutineeStages⟩ :=
-            expressionSound environment state resolution.scrutinee
-              scrutineeStage scrutineeState valid scrutineeResult
+          obtain ⟨scrutineeValid, scrutineeStages, partsWritten, partStagesOf⟩ :=
+            analyzeMatchScrutineeWith_sound source (toSemanticScope environment)
+              resolution (analyzeExpression environment) (expressionSound environment)
+              state scrutineeState scrutineeStage partStages valid scrutineeResult
           change (registerBinder source.owner environment scrutineeState
               resolution.hiddenScrutinee scrutineeStage >>= fun pair =>
-                analyzeMatchCasesWith source.owner scrutineeStage
+                analyzeMatchCasesWith source.owner scrutineeStage partStages
                   (analyzeStatementListWith analyzeStatement)
                   resolution.cases environment pair.2 >>= fun casesState =>
                     analyzeOptionalStatementsWith analyzeStatement
@@ -1785,7 +2000,7 @@ theorem analyzeStatementFormWith_sound
                 registerBinder_sound source environment scrutineeState
                   hiddenState resolution.hiddenScrutinee scrutineeStage
                   hiddenEnvironment scrutineeValid binderResult
-              change (analyzeMatchCasesWith source.owner scrutineeStage
+              change (analyzeMatchCasesWith source.owner scrutineeStage partStages
                   (analyzeStatementListWith analyzeStatement)
                   resolution.cases environment hiddenState >>=
                     fun casesState => analyzeOptionalStatementsWith
@@ -1793,7 +2008,7 @@ theorem analyzeStatementFormWith_sound
                       casesState >>= fun next => .ok (environment, next)) =
                 .ok (finalEnvironment, finalState) at success
               cases casesResult : analyzeMatchCasesWith source.owner
-                  scrutineeStage (analyzeStatementListWith analyzeStatement)
+                  scrutineeStage partStages (analyzeStatementListWith analyzeStatement)
                   resolution.cases environment hiddenState with
               | error problem =>
                   rw [casesResult] at success
@@ -1801,7 +2016,7 @@ theorem analyzeStatementFormWith_sound
               | ok casesState =>
                   rw [casesResult] at success
                   obtain ⟨casesValid, caseStages⟩ :=
-                    analyzeMatchCasesWith_sound source scrutineeStage
+                    analyzeMatchCasesWith_sound source scrutineeStage partStages
                       (analyzeStatementListWith analyzeStatement)
                       (fun ids env state nextEnv nextState valid success =>
                         analyzeStatementListWith_sound source
@@ -1829,13 +2044,13 @@ theorem analyzeStatementFormWith_sound
                           finalState casesValid defaultResult
                       split at defaultStages
                       · exact ⟨finalValid, .matchWithoutDefault contains form
-                          (by assumption) scrutineeStages hiddenBinder
-                          caseStages⟩
+                          (by assumption) scrutineeStages partsWritten partStagesOf
+                          hiddenBinder caseStages⟩
                       · rcases defaultStages with
                           ⟨defaultEnvironment, stages⟩
                         exact ⟨finalValid, .matchWithDefault contains form
-                          (by assumption) scrutineeStages hiddenBinder
-                          caseStages stages⟩
+                          (by assumption) scrutineeStages partsWritten partStagesOf
+                          hiddenBinder caseStages stages⟩
   | forLoop initializer condition post body =>
       simp only [analyzeStatementFormWith, form] at success
       cases initializerResult : analyzeForItemsWith source analyzeExpression

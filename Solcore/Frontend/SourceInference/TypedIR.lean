@@ -276,6 +276,11 @@ structure MatchResolution where
   cases : List TypedMatchCase
   defaultBody : Option (List StatementId)
   requirements : List RequirementId := []
+  /-- The scrutinees as written when the match writes two or more, `match (x, flag)`: the
+  elements of the tuple occurrence `scrutinee` that stands for them. A match of one
+  scrutinee, a tuple-valued one among them, has none. Staging gives a binder of one written
+  scrutinee that scrutinee's stage. -/
+  parts : List ExpressionId := []
   deriving Repr, BEq, DecidableEq
 
 /-- One projection on an assignable source place.  Mapping indexes retain the

@@ -2404,6 +2404,7 @@ private def finishMatch (fuel : Nat) (context : SourceInference.Context)
         cases := checked.cases
         defaultBody := defaultStatements
         requirements := requirements
+        parts := Detail.matchScrutineeParts statement scrutinee.id state.nodes
       }
     })
     pure {

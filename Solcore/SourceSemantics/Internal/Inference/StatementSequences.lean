@@ -393,6 +393,8 @@ theorem inferStatementFuel_success_matchWithDefault_children_provenance
           defaultBody := some defaultResult.statements
           requirements := checked.cases.flatMap fun arm =>
             arm.pattern.requirements
+          parts := Detail.matchScrutineeParts statement scrutinee.id
+            (defaultResult.state.restoreLexicalScope hiddenState.lexicalScope).nodes
         }
       }) roots
   have defaultToParent : TypingSourceExtends

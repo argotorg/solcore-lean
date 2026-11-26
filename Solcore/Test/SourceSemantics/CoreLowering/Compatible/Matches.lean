@@ -787,7 +787,7 @@ private def binder (index : Nat) : TypedBinder :=
 private def pattern (index : Nat) : TypedMatchPattern := {
   source := .group span (.binder span (toString index)), type := .unit, resolution := .binder (binder index) }
 private def arm (index : Nat) : TypedMatchCase := ⟨span, pattern index, []⟩
-private def resolution : MatchResolution := ⟨⟨⟨owner, 1⟩⟩, hidden, [arm 0, arm 1], none, []⟩
+private def resolution : MatchResolution := ⟨⟨⟨owner, 1⟩⟩, hidden, [arm 0, arm 1], none, [], []⟩
 private def node : StatementNode := ⟨site, span, .unit, .matchWith resolution⟩
 private def source : TypedSource := {owner, inputs := [], roots := [.statement site], nodes := [.statement node]}
 private def signatures : ProgramSignatures := ⟨[], [], [], [], [], []⟩
@@ -890,7 +890,8 @@ private def scrutineeId : ExpressionId := ⟨⟨owner, 1⟩⟩
 private def hidden : Resolved.LocalId := ⟨owner, 0⟩
 private def bound : TypedBinder := ⟨⟨owner, 1⟩, "value", .mono .unit, [], false, none⟩
 private def pattern : TypedMatchPattern := {source := .binder span "value", type := .unit, resolution := .binder bound}
-private def resolution : MatchResolution := ⟨scrutineeId, hidden, [⟨span, pattern, []⟩], some [], []⟩
+private def resolution : MatchResolution :=
+  ⟨scrutineeId, hidden, [⟨span, pattern, []⟩], some [], [], []⟩
 private def source : TypedSource := {owner, inputs := [], roots := [.statement site], nodes := [
   .statement ⟨site, span, .unit, .matchWith resolution⟩,
   .expression {id := scrutineeId, span, type := .unit, form := .tuple []}]}
@@ -936,7 +937,7 @@ example {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel c
 example : SourceCoreCompatibleDataMatches.lowerWithReasons compilation expression body 10 source [(hidden, .unit)]
     site resolution .unit reasonAt Word.zero = .error (.duplicateBinding hidden) := by cbv
 
-private def noBranchResolution : MatchResolution := ⟨scrutineeId, hidden, [], none, []⟩
+private def noBranchResolution : MatchResolution := ⟨scrutineeId, hidden, [], none, [], []⟩
 private def noBranchSource : TypedSource := {source with nodes := [
   .statement ⟨site, span, .unit, .matchWith noBranchResolution⟩,
   .expression {id := scrutineeId, span, type := .unit, form := .tuple []}]}

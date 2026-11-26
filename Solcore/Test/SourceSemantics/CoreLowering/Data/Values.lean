@@ -1225,7 +1225,8 @@ private def bound : TypedBinder := ⟨⟨owner, 1⟩, "value", .mono .unit, [], 
 private def pattern : TypedMatchPattern := {
   source := .binder span "value", type := .unit, resolution := .binder bound
 }
-private def resolution : MatchResolution := ⟨scrutineeId, hidden, [⟨span, pattern, []⟩], some [], []⟩
+private def resolution : MatchResolution :=
+  ⟨scrutineeId, hidden, [⟨span, pattern, []⟩], some [], [], []⟩
 private def source : TypedSource := {
   owner, inputs := [], roots := [.statement site]
   nodes := [

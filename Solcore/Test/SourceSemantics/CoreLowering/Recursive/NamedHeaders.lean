@@ -2021,7 +2021,7 @@ private def scrutinee : ExpressionId := ⟨⟨owner, 1⟩⟩
 private def hidden : Resolved.LocalId := ⟨owner, 0⟩
 private def pattern : TypedMatchPattern := {source := .wildcard span span, type := .unit, resolution := .wildcard}
 private def arm : TypedMatchCase := ⟨span, pattern, []⟩
-private def resolution : MatchResolution := ⟨scrutinee, hidden, [arm, arm], some [], []⟩
+private def resolution : MatchResolution := ⟨scrutinee, hidden, [arm, arm], some [], [], []⟩
 private def scrutineeNode : ExpressionNode := {id := scrutinee, span, type := .unit, form := .tuple []}
 private def statementNode : StatementNode := ⟨site, span, .unit, .matchWith resolution⟩
 private def source : TypedSource := {

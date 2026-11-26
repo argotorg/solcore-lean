@@ -116,6 +116,8 @@ inductive Error where
   | conflictingExpressionStage
       (expression : ExpressionId) (first second : Stage)
   | unreachableNode (occurrence : OccurrenceId)
+  /-- A match's written scrutinees are not the elements of its scrutinee tuple. -/
+  | matchPartsMismatch (scrutinee : ExpressionId)
   deriving Repr, DecidableEq
 
 /-- Proof-facing lexical table.  The soundness proof follows the analyzer's
@@ -332,20 +334,70 @@ def analyzePlaceProjectionsWith
       let (_, state) ← analyzeExpression state key
       analyzePlaceProjectionsWith analyzeExpression rest state
 
+/-- Enter each component's binders at the stage of the written scrutinee it binds, in
+order. -/
+def registerComponentBinders (owner : Resolved.DeclarationId) :
+    List Stage → List (List MatchPatternInstruction) → Environment → Traversal →
+      Except Error (Environment × Traversal)
+  | [], _, environment, state => pure (environment, state)
+  | _ :: _, [], environment, state => pure (environment, state)
+  | stage :: stages, component :: components, environment, state => do
+      let (environment, state) ← registerPatternBinders owner stage
+        (component.flatMap bindersInPatternInstruction) environment state
+      registerComponentBinders owner stages components environment state
+
+/-- Enter one arm's binders: at the stage of the written scrutinee each binds, when the
+match writes several and the pattern is a tuple of one component per scrutinee, else at
+the whole scrutinee's stage. -/
+def registerArmBinders (owner : Resolved.DeclarationId) (scrutineeStage : Stage)
+    (partStages : List Stage) (pattern : MatchPatternResolution)
+    (environment : Environment) (state : Traversal) :
+    Except Error (Environment × Traversal) :=
+  match SourceSemantics.Staging.patternComponents pattern partStages.length with
+  | some components =>
+      registerComponentBinders owner partStages components environment state
+  | none =>
+      registerPatternBinders owner scrutineeStage
+        (bindersInPatternResolution pattern) environment state
+
 /-- Source-ordered match-arm traversal, factored out so stage soundness can
 induct on the arm list without changing the classifier's execution. -/
 def analyzeMatchCasesWith (owner : Resolved.DeclarationId)
-    (scrutineeStage : Stage)
+    (scrutineeStage : Stage) (partStages : List Stage)
     (analyzeStatements : List StatementId → Environment → Traversal →
       Except Error (Environment × Traversal)) :
     List TypedMatchCase → Environment → Traversal → Except Error Traversal
   | [], _, state => pure state
   | arm :: arms, environment, state => do
-      let (armEnvironment, state) ← registerPatternBinders owner scrutineeStage
-        (bindersInPatternResolution arm.pattern.resolution) environment state
+      let (armEnvironment, state) ← registerArmBinders owner scrutineeStage
+        partStages arm.pattern.resolution environment state
       let (_, state) ← analyzeStatements arm.body armEnvironment state
-      analyzeMatchCasesWith owner scrutineeStage analyzeStatements arms
+      analyzeMatchCasesWith owner scrutineeStage partStages analyzeStatements arms
         environment state
+
+/-- A match's scrutinee and the stages of the scrutinees it writes. A match of one
+scrutinee classifies it as any expression. A match of several classifies the tuple of
+them as `analyzeExpressionFuel` classifies a tuple, its occurrence entered, its parts
+classified in order and its stage their join, and keeps the parts' stages. -/
+def analyzeMatchScrutineeWith (source : TypedSource) (resolution : MatchResolution)
+    (analyzeExpression : Traversal → ExpressionId → Except Error (Stage × Traversal))
+    (state : Traversal) : Except Error (Stage × List Stage × Traversal) :=
+  match resolution.parts with
+  | [] => do
+      let (stage, state) ← analyzeExpression state resolution.scrutinee
+      pure (stage, [], state)
+  | part :: parts => do
+      let state ← enterOccurrence state resolution.scrutinee.occurrence
+      let node ← lookupExpression source resolution.scrutinee
+      if node.form = .tuple (part :: parts) then
+        let (stages, state) ←
+          analyzeExpressionListWith analyzeExpression (part :: parts) state
+        let state ← recordExpressionStage state resolution.scrutinee
+          (Stage.join stages)
+        let state ← leaveOccurrence state resolution.scrutinee.occurrence
+        pure (Stage.join stages, stages, state)
+      else
+        throw (.matchPartsMismatch resolution.scrutinee)
 
 /-- Analyze an optional branch body while discarding its branch-local scope. -/
 def analyzeOptionalStatementsWith
@@ -546,11 +598,11 @@ def analyzeStatementFormWith (source : TypedSource) (node : StatementNode)
         environment state
       pure (environment, state)
   | .matchWith resolution => do
-      let (scrutineeStage, state) ←
-        analyzeItemExpression state resolution.scrutinee
+      let (scrutineeStage, partStages, state) ←
+        analyzeMatchScrutineeWith source resolution analyzeItemExpression state
       let (_, state) ← registerBinder source.owner environment state
         resolution.hiddenScrutinee scrutineeStage
-      let state ← analyzeMatchCasesWith source.owner scrutineeStage
+      let state ← analyzeMatchCasesWith source.owner scrutineeStage partStages
         (analyzeStatementListWith analyzeStatement) resolution.cases
         environment state
       let state ← analyzeOptionalStatementsWith analyzeStatement

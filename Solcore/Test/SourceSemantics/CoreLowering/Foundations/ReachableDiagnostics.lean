@@ -134,7 +134,7 @@ private def scrutinee : ExpressionId := ⟨⟨owner, 1⟩⟩
 private def hidden : Resolved.LocalId := ⟨owner, 0⟩
 private def pattern : TypedMatchPattern := {source := .wildcard span span, type := .unit, resolution := .wildcard}
 private def arm : TypedMatchCase := ⟨span, pattern, []⟩
-private def resolution : MatchResolution := ⟨scrutinee, hidden, [arm, arm], some [], []⟩
+private def resolution : MatchResolution := ⟨scrutinee, hidden, [arm, arm], some [], [], []⟩
 private def scrutineeNode : ExpressionNode := {id := scrutinee, span, type := .unit, form := .tuple []}
 private def statementNode : StatementNode := ⟨site, span, .unit, .matchWith resolution⟩
 private def source : TypedSource := {
@@ -321,7 +321,7 @@ private def scrutinee : ExpressionId := ⟨⟨owner, 1⟩⟩
 private def hidden : Resolved.LocalId := ⟨owner, 0⟩
 private def pattern : TypedMatchPattern := {source := .wildcard span span, type := .unit, resolution := .wildcard}
 private def arm : TypedMatchCase := ⟨span, pattern, []⟩
-private def resolution : MatchResolution := ⟨scrutinee, hidden, [arm, arm], some [], []⟩
+private def resolution : MatchResolution := ⟨scrutinee, hidden, [arm, arm], some [], [], []⟩
 private def scrutineeNode : ExpressionNode := {id := scrutinee, span, type := .unit, form := .tuple []}
 private def statementNode : StatementNode := ⟨site, span, .unit, .matchWith resolution⟩
 private def source : TypedSource := {
@@ -566,7 +566,7 @@ private def binder (index : Nat) : TypedBinder :=
 private def pattern (index : Nat) : TypedMatchPattern := {
   source := .group span (.binder span (toString index)), type := .unit, resolution := .binder (binder index) }
 private def arm (index : Nat) : TypedMatchCase := ⟨span, pattern index, []⟩
-private def resolution : MatchResolution := ⟨⟨⟨owner, 1⟩⟩, hidden, [arm 0, arm 1], some [], []⟩
+private def resolution : MatchResolution := ⟨⟨⟨owner, 1⟩⟩, hidden, [arm 0, arm 1], some [], [], []⟩
 private def node : StatementNode := ⟨site, span, .unit, .matchWith resolution⟩
 private def source : TypedSource := {owner, inputs := [], roots := [.statement site], nodes := [.statement node]}
 private def signatures : ProgramSignatures := ⟨[], [], [], [], [], []⟩
@@ -765,7 +765,8 @@ private def site : StatementId := ⟨⟨owner, 0⟩⟩
 private def scrutinee : ExpressionId := ⟨⟨owner, 1⟩⟩
 private def hidden : Resolved.LocalId := ⟨owner, 0⟩
 private def pattern : TypedMatchPattern := { source := .wildcard span span, type := .unit, resolution := .wildcard }
-private def resolution : MatchResolution := ⟨scrutinee, hidden, [⟨span, pattern, []⟩], some [], []⟩
+private def resolution : MatchResolution :=
+  ⟨scrutinee, hidden, [⟨span, pattern, []⟩], some [], [], []⟩
 private def node : ExpressionNode := { id := scrutinee, span, type := .unit, form := .tuple [] }
 private def source : TypedSource := {
   owner, inputs := [], roots := [.statement site]
@@ -892,7 +893,8 @@ private def site : StatementId := ⟨⟨owner, 0⟩⟩
 private def scrutinee : ExpressionId := ⟨⟨owner, 1⟩⟩
 private def hidden : Resolved.LocalId := ⟨owner, 0⟩
 private def pattern : TypedMatchPattern := { source := .wildcard span span, type := .unit, resolution := .wildcard }
-private def resolution : MatchResolution := ⟨scrutinee, hidden, [⟨span, pattern, []⟩], some [], []⟩
+private def resolution : MatchResolution :=
+  ⟨scrutinee, hidden, [⟨span, pattern, []⟩], some [], [], []⟩
 private def node : ExpressionNode := { id := scrutinee, span, type := .unit, form := .tuple [] }
 private def source : TypedSource := {
   owner, inputs := [], roots := [.statement site]
@@ -1074,7 +1076,7 @@ private def binder (index : Nat) : TypedBinder :=
 private def pattern (index : Nat) : TypedMatchPattern := {
   source := .group span (.binder span (toString index)), type := .unit, resolution := .binder (binder index) }
 private def arm (index : Nat) : TypedMatchCase := ⟨span, pattern index, []⟩
-private def resolution : MatchResolution := ⟨⟨⟨owner, 1⟩⟩, hidden, [arm 0, arm 1], some [], []⟩
+private def resolution : MatchResolution := ⟨⟨⟨owner, 1⟩⟩, hidden, [arm 0, arm 1], some [], [], []⟩
 private def node : StatementNode := ⟨site, span, .unit, .matchWith resolution⟩
 private def source : TypedSource := {owner, inputs := [], roots := [.statement site], nodes := [.statement node]}
 private def signatures : ProgramSignatures := ⟨[], [], [], [], [], []⟩

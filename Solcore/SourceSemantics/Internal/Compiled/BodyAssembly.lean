@@ -1207,6 +1207,7 @@ theorem matchEntry_for
     {scrutinee : InferredExpression} {scrutineeState hiddenState : State}
     {hiddenScrutinee : Resolved.LocalId} {checked : Detail.MatchCasesResult}
     {defaultBody : Option (List StatementId)}
+    {parts : List ExpressionId}
     (singleHere : ∀ expression, scrutinees.elements.toList = [expression] →
       callProvenance (.expression childFuel inferenceContext expression none
         initial.allocateStatementId.2 scrutinee scrutineeState))
@@ -1229,7 +1230,7 @@ theorem matchEntry_for
     (contains : ContainsStatement (result.state.toTypedSource (bodyRoots selected)) result.id {
       id := result.id, span := statement.span, type := result.type, form := .matchWith {
         scrutinee := scrutinee.id, hiddenScrutinee, cases := checked.cases, defaultBody,
-        requirements := checked.cases.flatMap (·.pattern.requirements) } }) :
+        requirements := checked.cases.flatMap (·.pattern.requirements), parts } }) :
     MatchCasesBoundary selected childFuel inferenceContext arms.value.cases scrutinee.type expectedReturn
       hiddenState hiddenState.lexicalScope checked frames target (.statement result.id) ∧
     ExpressionHasType selected.body.finalized.typedSource target scrutinee.id
@@ -1306,7 +1307,7 @@ theorem matchEntry_for
     ((inferMatchCasesFuel_success_typingSourceExtends casesAccepted hiddenNodes (bodyRoots selected)).trans casesSource)
   have scrutineeReference : (.expression scrutinee.id : NodeId) ∈ (StatementForm.matchWith {
         scrutinee := scrutinee.id, hiddenScrutinee, cases := checked.cases, defaultBody,
-        requirements := checked.cases.flatMap (·.pattern.requirements) }).references := by
+        requirements := checked.cases.flatMap (·.pattern.requirements), parts }).references := by
     simp [StatementForm.references, MatchResolution.references]
   have scrutineePatterns : scrutineeState.integerPatterns ⊆ checked.state.integerPatterns := by
     have rows := Detail.inferMatchCasesFuel_integerPatterns_subset casesAccepted
@@ -1337,7 +1338,7 @@ theorem matchEntry_for
   have reference : ∀ arm ∈ checked.cases, ∀ child ∈ arm.body,
       (.statement child : NodeId) ∈ (StatementForm.matchWith {
         scrutinee := scrutinee.id, hiddenScrutinee, cases := checked.cases, defaultBody,
-        requirements := checked.cases.flatMap (·.pattern.requirements) }).references := by
+        requirements := checked.cases.flatMap (·.pattern.requirements), parts }).references := by
     intro arm present child member
     simp only [StatementForm.references, MatchResolution.references]
     apply List.mem_append_left
@@ -1388,6 +1389,7 @@ theorem matchEntry
     {scrutinee : InferredExpression} {scrutineeState hiddenState : State}
     {hiddenScrutinee : Resolved.LocalId} {checked : Detail.MatchCasesResult}
     {defaultBody : Option (List StatementId)}
+    {parts : List ExpressionId}
     (scrutineeAccepted : inferMatchScrutineesFuel childFuel inferenceContext statement.span
       scrutinees.elements.toList initial.allocateStatementId.2 = .ok (scrutinee, scrutineeState))
     (hiddenAllocation : scrutineeState.allocateHiddenLocal = (hiddenScrutinee, hiddenState))
@@ -1402,7 +1404,7 @@ theorem matchEntry
     (contains : ContainsStatement (result.state.toTypedSource (bodyRoots selected)) result.id {
       id := result.id, span := statement.span, type := result.type, form := .matchWith {
         scrutinee := scrutinee.id, hiddenScrutinee, cases := checked.cases, defaultBody,
-        requirements := checked.cases.flatMap (·.pattern.requirements) } }) :
+        requirements := checked.cases.flatMap (·.pattern.requirements), parts } }) :
     MatchCasesBoundary selected childFuel inferenceContext arms.value.cases scrutinee.type expectedReturn
       hiddenState hiddenState.lexicalScope checked frames target (.statement result.id) ∧
     ExpressionHasType selected.body.finalized.typedSource target scrutinee.id

@@ -2902,7 +2902,7 @@ private def forNode : StatementNode := {
   type := .unit
   form := .forLoop [.expression called.id] boolean.id [.expression word.id] [continuing.id]}
 private def arm : TypedMatchCase := ⟨span, ⟨.wildcard span span, .word, .wildcard, []⟩, [returned.id]⟩
-private def resolution : MatchResolution := ⟨word.id, ⟨owner, 0⟩, [arm], some [returned.id], []⟩
+private def resolution : MatchResolution := ⟨word.id, ⟨owner, 0⟩, [arm], some [returned.id], [], []⟩
 private def matched : StatementNode := {id := sid 16, span, type := .word, form := .matchWith resolution}
 private def body : List StatementId := [discarded.id, whileNode.id, forNode.id, matched.id, returned.id]
 private def cycle : ExpressionNode := {id := eid 98, span, type := .word, form := .group (eid 98)}

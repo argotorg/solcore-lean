@@ -645,6 +645,7 @@ theorem inferStatementFuel_matchWithoutDefault_captureOrigins
       defaultBody := none
       requirements := checked.cases.flatMap fun arm =>
         arm.pattern.requirements
+      parts := Detail.matchScrutineeParts statement scrutinee.id checked.state.nodes
     }
   })
   simpa only [resultEq] using recorded
@@ -688,6 +689,8 @@ theorem inferStatementFuel_matchWithDefault_captureOrigins
             defaultBody := some defaultResult.statements
             requirements := checked.cases.flatMap fun arm =>
               arm.pattern.requirements
+            parts := Detail.matchScrutineeParts statement scrutinee.id
+              (defaultResult.state.restoreLexicalScope hiddenState.lexicalScope).nodes
           }
         })) wholeSource :=
     hiddenOrigins.restoreLexicalScope_recordNode _
