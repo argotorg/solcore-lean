@@ -124,9 +124,38 @@ def conventionalTraitWithArity? (context : Context) (name : String)
   | [candidate] => .ok (some candidate.id)
   | _ => .error (.ambiguousOperatorTrait name (candidates.map (·.id)))
 
+/-- Distinct declarations in their first order. -/
+private def distinctDeclarations (seen : List Resolved.DeclarationId) :
+    List ProgramDeclaration → List ProgramDeclaration
+  | [] => []
+  | declaration :: rest =>
+      if seen.any (fun id => decide (id = declaration.id)) then distinctDeclarations seen rest
+      else declaration :: distinctDeclarations (declaration.id :: seen) rest
+
+/-- The traits a module sees by their declared name: its own trait of that name, else the imported
+ones whose declaration bears it, under whatever name an import gives them, since an import alias
+gives a trait a second name and not a second meaning. -/
+def declaredTraitCandidates (context : Context) (name : String) :
+    Except Error (List ProgramDeclaration) :=
+  match context.environment.localTraitsNamed context.scope.currentModule name with
+  | localCandidates@(_ :: _) => .ok localCandidates
+  | [] =>
+      match buildProgramImports context.environment context.scope.currentModule with
+      | .error errors => .error (.importVisibility errors)
+      | .ok visibility => .ok (distinctDeclarations [] (visibility.traits.filterMap fun imported =>
+          if imported.declaration.name == some name then some imported.declaration else none))
+
+/-- An operator's trait, by its declared name (`declaredTraitCandidates`): `+` means the declared
+`Add` whatever a scope calls it, and a trait imported as `Add` under another declared name is not
+it. -/
 def operatorTrait? (context : Context) (name : String) :
-    Except Error (Option Resolved.DeclarationId) :=
-  conventionalTraitWithArity? context name 1
+    Except Error (Option Resolved.DeclarationId) := do
+  let candidates := (← declaredTraitCandidates context name).filter fun declaration =>
+    declaration.genericParameters.length == 1
+  match candidates with
+  | [] => .ok none
+  | [candidate] => .ok (some candidate.id)
+  | _ => .error (.ambiguousOperatorTrait name (candidates.map (·.id)))
 
 structure CoercionEdge where
   source : Ty

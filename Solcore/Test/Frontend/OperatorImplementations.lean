@@ -12,7 +12,10 @@ the name a scope sees it by, an alias among them (`testRefusedUses`). An impleme
 `Shl` or `Shr` at one of those types is refused where it is declared, as Lean's shifts never take
 it (`testRefusedShifts`). Generic code, which runs the implementation as upstream does, a trait of
 the operator's name without its method, a program's own type and `bool`, where Lean has no
-builtin, refuse nothing (`testAccepted`). Each case is a probe of upstream's pinned checker
+builtin, refuse nothing (`testAccepted`). An operator's trait is the one declared with its name,
+whatever a scope calls it: the declared `Add` imported as `Plus` runs `+` in generic code, and a
+`Plus` imported as `Add` is no `Add`, refused at inference where upstream runs it by name
+(`testDeclaredName`). Each case is a probe of upstream's pinned checker
 (`optrule_probe.py`); an accepted one runs at 9 and 2^256 − 1 and gives upstream's results, but
 for the traits without the method, which upstream refuses (`SC0207`).
 -/
@@ -239,10 +242,31 @@ private def testAccepted : IO Unit := do
     "impl Shl<word, word> { function shift(x: word, y: word) returns (word) { return 5; } }"]
     "return a0 << 2;" [36, maximum - 3]
 
+/-- An operator's trait by its declared name, in generic code (AL02, AL04, AL06 and AL08): an import
+alias gives a trait a second name, not a second meaning. -/
+private def testDeclaredName : IO Unit := do
+  let plus := ("lib.solc", ["export { Plus };",
+    "trait Plus<a> { function add(x: a, y: a) returns (a); }",
+    "impl Plus<word> { function add(x: word, y: word) returns (word) { return x; } }"])
+  let add := ("lib.solc", ["export { Add };", addTrait, addFirst])
+  let twice (trait : String) : String :=
+    s!"function twice<t>(x: t) returns (t) where t: {trait} \{ return x + x; }"
+  expectRefused "Plus imported as Add, in generic code" ["import { Plus as Add } from lib;", twice "Add"]
+    "return twice(a0);" ["inference"] [plus]
+  expectResults "Add imported as Plus, in generic code" ["import { Add as Plus } from lib;", twice "Plus"]
+    "return twice(a0);" [9, maximum] [add]
+  expectRefused "Plus imported as Add, in generic code one import further" ["import { twice } from mid;"]
+    "return twice(a0);" ["inference"]
+    [("mid.solc", ["import { Plus as Add } from lib;", "export { twice };", twice "Add"]), plus]
+  expectResults "Add imported as Plus, in generic code one import further" ["import { twice } from mid;"]
+    "return twice(a0);" [9, maximum]
+    [("mid.solc", ["import { Add as Plus } from lib;", "export { twice };", twice "Plus"]), add]
+
 def run : IO Unit := do
   testRefusedUses
   testRefusedShifts
   testAccepted
+  testDeclaredName
   IO.println "operators beside a program's implementation: the use-site rule GREEN"
 
 end Tests.OperatorImplementations

@@ -3,7 +3,9 @@ import Solcore.Frontend.SourceCompiler
 /-!
 # Selected operator alias tests
 
-Operator aliases of selected calls: the alias checker, its rejections and identity execution.
+An operator's trait is the trait declared with the operator's name, whatever a scope calls it. A
+trait imported as `Add` under another declared name is not `Add`, so `+` at its type is refused at
+inference; the declared `Add` imported as `Plus` is `+`'s trait, and its implementation runs.
 -/
 
 set_option autoImplicit false
@@ -11,24 +13,22 @@ set_option Elab.async false
 namespace Tests.SourceCoreSelectedOperatorAlias
 open Solcore Solcore.Frontend Solcore.Frontend.SourceInference
 
+/-- A provider of `Box`, its `Weird` trait, declared with `add` but not named `Add`, and the
+declared `Add`, both implemented at `Box` by their left operand. -/
 private def provider : String := String.intercalate "\n" [
   "export {*};",
   "enum Box { Only }",
   "trait Weird<T> { function add(left: T, right: T) returns (T); }",
   "impl Weird<Box> { function add(left: Box, right: Box) returns (Box) { return left; }"
-    ++ " }"
+    ++ " }",
+  "trait Add<T> { function add(left: T, right: T) returns (T); }",
+  "impl Add<Box> { function add(left: Box, right: Box) returns (Box) { return left; } }"
 ]
 
-private def consumer : String := String.intercalate "\n" [
-  "import {Box, Weird as Add} from provider;",
-  "function run(value: Box) returns (Box) { return value + value; }",
-  "function identity(value: Box) returns (Box) { return value; }"
-]
-
-private def workspace : Workspace.RawWorkspace := {
+private def workspace (consumer : List String) : Workspace.RawWorkspace := {
   entry := "consumer.solc"
   mainSources := [{path := "provider.solc", content := "pragma solcore;\n" ++ provider},
-    {path := "consumer.solc", content := "pragma solcore;\n" ++ consumer}]
+    {path := "consumer.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" consumer}]
   externalLibraries := []
 }
 
@@ -39,49 +39,19 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
   | .ok value => pure value
   | .error error => throw (IO.userError s!"{label}: {reprStr error}")
 
-/-- Imported operator names retain their original trait identity. The selected
-compiler checks that identity's declared interface before executing the site. -/
-def run : IO Unit := do
-  let program ← get "alias checker" (Frontend.checkProgram workspace 1000)
-  require (program.functions.length == 2 && program.methods.length == 1)
-    "alias checker changed the complete program"
-  let trait ← match program.signatures.traits.find? (·.name == "Weird") with
-    | some trait => pure trait
-    | none => throw (IO.userError "original Weird declaration missing")
-  let caller ← match program.signatures.functions.find? (·.name == "run") with
-    | some caller => pure caller
-    | none => throw (IO.userError "operator caller missing")
-  let checked ← match program.functions.find? (·.declaration == caller.id) with
-    | some checked => pure checked
-    | none => throw (IO.userError "checked operator caller missing")
-  let primary ← match checked.typedBody.nodes.findSome? fun
-      | .expression node => match node.form, node.requirements with
-        | .binary _ .add _, primary :: _ => some primary
-        | _, _ => none
-      | _ => none with
-    | some primary => pure primary
-    | none => throw (IO.userError "original operator primary missing")
-  match checked.solvedRequirements.filter (·.id == primary) with
-  | [solved] =>
-      require (solved.predicate.trait == .declaration trait.id)
-        "checker replaced the original imported trait identity"
-  | _ => throw (IO.userError "operator primary is not uniquely solved")
-  let options : SourceCompiler.Options :=
-    {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 256}
-  match SourceCompiler.compileChecked program [.declaration caller.id] options with
-  | .error (.compilation (.planEvidence (.runtimeBinaryTraitNameMismatch _ _ expected actual))) =>
-      require (expected == "Add" && actual == "Weird")
-        "selected operator rejection changed its exact interface names"
-  | .error error => throw (IO.userError s!"unexpected operator rejection: {reprStr error}")
-  | .ok _ => throw (IO.userError "mismatched selected operator compiled")
-  let identity ← match program.signatures.functions.find? (·.name == "identity") with
-    | some identity => pure identity
-    | none => throw (IO.userError "identity declaration missing")
-  let compiled ← get "unrelated identity compilation"
-    (SourceCompiler.compileChecked program [.declaration identity.id] options)
+private def options : SourceCompiler.Options :=
+  {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 256}
+
+/-- The function named `name` compiled alone and run at `Box.Only`, which it must return. -/
+private def runsToOnly (program : CheckedProgram) (name : String) : IO Unit := do
+  let function ← match program.signatures.functions.find? (·.name == name) with
+    | some function => pure function
+    | none => throw (IO.userError s!"{name} declaration missing")
+  let compiled ← get s!"{name} compilation"
+    (SourceCompiler.compileChecked program [.declaration function.id] options)
   let key ← match compiled.keys with
     | [key] => pure key
-    | _ => throw (IO.userError "identity root changed")
+    | _ => throw (IO.userError s!"{name} root changed")
   let box ← match program.signatures.dataTypes.find? (·.name == "Box") with
     | some box => pure box
     | none => throw (IO.userError "Box declaration missing")
@@ -91,15 +61,56 @@ def run : IO Unit := do
   let bootstrap ← artifact.bootstrap
   let session ← match bootstrap.resume 300000 with
     | .ready session => pure session
-    | .error error => throw (IO.userError s!"identity bootstrap: {reprStr error}")
-    | .outOfFuel _ => throw (IO.userError "identity bootstrap exhausted")
-  let outcome ← get "identity execution"
+    | .error error => throw (IO.userError s!"{name} bootstrap: {reprStr error}")
+    | .outOfFuel _ => throw (IO.userError s!"{name} bootstrap exhausted")
+  let outcome ← get s!"{name} execution"
     (← session.run key [value]
       {inputValidationFuel := 1024, executionFuel := 300000, outputValidationFuel := 1024})
   match outcome with
   | .succeeded completion =>
-      require (completion.value == value) "identity changed the original constructor value"
-  | _ => throw (IO.userError "unrelated identity did not execute")
-  IO.println "SELECTED_OPERATOR_ALIAS_PASS checker=Weird rejected=Add/Weird identity=Box.Only"
+      require (completion.value == value) s!"{name} changed the original constructor value"
+  | _ => throw (IO.userError s!"{name} did not execute")
+
+def run : IO Unit := do
+  -- `Weird` imported as `Add` is not the declared `Add`, so `+` at `Box` has no trait.
+  match Frontend.checkProgram (workspace ["import {Box, Weird as Add} from provider;",
+      "function run(value: Box) returns (Box) { return value + value; }"]) 1000 with
+  | .error errors =>
+      require (errors.any fun error => match error with
+        | .inference { error := .operatorNotSupported "Add" _, .. } => true
+        | _ => false) s!"an aliased Weird was not refused as Add: {reprStr errors}"
+  | .ok _ => throw (IO.userError "an aliased Weird was taken as Add")
+  -- An unrelated function beside the alias still runs.
+  let aliased ← get "alias beside an unrelated function" (Frontend.checkProgram (workspace
+    ["import {Box, Weird as Add} from provider;",
+      "function identity(value: Box) returns (Box) { return value; }"]) 1000)
+  runsToOnly aliased "identity"
+  -- The declared `Add` imported as `Plus` is `+`'s trait, and its implementation runs.
+  let renamed ← get "Add imported as Plus" (Frontend.checkProgram (workspace
+    ["import {Box, Add as Plus} from provider;",
+      "function run(value: Box) returns (Box) { return value + value; }"]) 1000)
+  let trait ← match renamed.signatures.traits.find? (·.name == "Add") with
+    | some trait => pure trait
+    | none => throw (IO.userError "the declared Add is missing")
+  let caller ← match renamed.signatures.functions.find? (·.name == "run") with
+    | some caller => pure caller
+    | none => throw (IO.userError "operator caller missing")
+  let checked ← match renamed.functions.find? (·.declaration == caller.id) with
+    | some checked => pure checked
+    | none => throw (IO.userError "checked operator caller missing")
+  let primary ← match checked.typedBody.nodes.findSome? fun
+      | .expression node => match node.form, node.requirements with
+        | .binary _ .add _, primary :: _ => some primary
+        | _, _ => none
+      | _ => none with
+    | some primary => pure primary
+    | none => throw (IO.userError "the operator's primary requirement is missing")
+  match checked.solvedRequirements.filter (·.id == primary) with
+  | [solved] =>
+      require (solved.predicate.trait == .declaration trait.id)
+        "the operator's requirement is not the declared Add"
+  | _ => throw (IO.userError "the operator's primary requirement is not uniquely solved")
+  runsToOnly renamed "run"
+  IO.println "SELECTED_OPERATOR_ALIAS_PASS Weird-as-Add refused, identity=Box.Only, Add-as-Plus runs"
 
 end Tests.SourceCoreSelectedOperatorAlias
