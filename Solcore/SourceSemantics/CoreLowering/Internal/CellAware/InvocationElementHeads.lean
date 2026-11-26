@@ -184,7 +184,6 @@ theorem preserves_outOfBounds [RecursiveStageMeaning.FaultTokens faults] (budget
     (read : Dynamic.Heap.Reads before location cell)
     (initialValue : Dynamic.RootInitialValue cell (some (.arrayRef element arrayLocation)))
     (keyTyped : ExpressionHasType invocation.source context head.key head.keyNode.type)
-    (kind : ArrayIndexType head.keyNode.type)
     {indexSize : Nat} {position : Word} {after : Dynamic.Heap} {arrayCell : Dynamic.Cell}
     {elements : List Dynamic.Value}
     (indexed : Staging.Recursive.Size.Expression program stages indexSize invocation context environment before
@@ -214,7 +213,8 @@ theorem preserves_outOfBounds [RecursiveStageMeaning.FaultTokens faults] (budget
       initial admitted authority physical owner ownerFrame indexed
   cases resultRep with
   | value indexPayload =>
-    obtain ⟨word, same, rfl, _⟩ := CompatiblePayload.index_word_fields kind indexPayload
+    rw [head.keyType] at indexPayload
+    obtain ⟨word, same, rfl⟩ := CompatibleExpressionPrimitives.word_fields indexPayload
     cases same
     have arrayPayload := (payloadModel compiled.compatible.checked registry functions).extend represented maps worlds
     obtain ⟨measured, small⟩ := CellAwareArrayReads.length_preserve finalHeaps (.array arrayRead stored) arrayPayload
@@ -252,7 +252,6 @@ theorem preserves_plain_rhs_fault (budget : Nat)
     (read : Dynamic.Heap.Reads before location cell)
     (initialValue : Dynamic.RootInitialValue cell (some (.arrayRef element arrayLocation)))
     (keyTyped : ExpressionHasType invocation.source context head.key head.keyNode.type)
-    (kind : ArrayIndexType head.keyNode.type)
     {indexSize : Nat} {position : Word} {middle : Dynamic.Heap} {arrayCell : Dynamic.Cell}
     {elements : List Dynamic.Value} {selected : Dynamic.Value}
     (indexed : Staging.Recursive.Size.Expression program stages indexSize invocation context environment before
@@ -287,7 +286,8 @@ theorem preserves_plain_rhs_fault (budget : Nat)
       initial admitted authority physical owner ownerFrame indexed
   cases indexRep with
   | value indexPayload =>
-    obtain ⟨word, same, rfl, _⟩ := CompatiblePayload.index_word_fields kind indexPayload
+    rw [head.keyType] at indexPayload
+    obtain ⟨word, same, rfl⟩ := CompatibleExpressionPrimitives.word_fields indexPayload
     cases same
     have arrayPayload := (payloadModel compiled.compatible.checked registry functions).extend represented indexMaps
       indexWorlds
