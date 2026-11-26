@@ -407,6 +407,7 @@ private theorem recover_expression_form (original : ExpressionForm)
   | elementRef base index => rfl
   | memrefLoad reference => rfl
   | memrefStore reference value => rfl
+  | methodCall trait method arguments => rfl
 
 private theorem recover_place (original : PlaceResolution)
     (leftLocal rightLocal : Substitution)

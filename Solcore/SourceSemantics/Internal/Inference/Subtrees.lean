@@ -325,6 +325,7 @@ local macro "transport_rooted" "(" recursor:term "," before:term ","
     (fun _ reference refs => .memrefLoad (reference (by rooted_live(refs))))
     (fun _ _ reference stored refs =>
       .memrefStore (reference (by rooted_live(refs))) (stored (by rooted_live(refs))))
+    (fun profile evidence _ args refs => .methodCall profile evidence (args (by rooted_live(refs))))
     (fun context _ => .nil context)
     (fun _ _ head tail refs => .cons (head (by rooted_live(refs))) (tail (by rooted_live(refs))))
     (fun type _ => .nil type)

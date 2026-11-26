@@ -907,6 +907,30 @@ def mapRange (outer inner : TypeSystem.ParameterSubstitution) :
     TypeSystem.ParameterSubstitution :=
   inner.map fun entry => (entry.1, outer.apply entry.2)
 
+/-- Mapping the range of parameters zipped with values maps the values. -/
+theorem mapRange_zip (outer : TypeSystem.ParameterSubstitution)
+    (parameters : List TypeParameterId) (values : List Ty) :
+    mapRange outer (parameters.zip values) =
+      parameters.zip (values.map outer.apply) := by
+  induction parameters generalizing values with
+  | nil => simp [mapRange]
+  | cons parameter rest ih =>
+      cases values with
+      | nil => simp [mapRange]
+      | cons value tail =>
+          have tailEq := ih tail
+          simp only [mapRange] at tailEq ⊢
+          simp [tailEq]
+
+/-- Distinct parameters zipped with at least as many values cover exactly
+those parameters. -/
+theorem exact_zip {parameters : List TypeParameterId} {values : List Ty}
+    (nodup : parameters.Nodup) (length : parameters.length ≤ values.length) :
+    SourceSemantics.ParameterSubstitution.Exact (parameters.zip values) parameters := by
+  constructor
+  · exact nodup
+  · rw [SourceSemantics.ParameterSubstitution.domain, List.map_fst_zip length]
+
 theorem lookup?_eq_none_of_not_mem_domain
     {substitution : TypeSystem.ParameterSubstitution}
     {parameter : TypeParameterId}
@@ -3749,6 +3773,70 @@ theorem OperatorProfileInstantiates.applyParameters
             returnTypes.map substitution.apply
           rw [← returnCompose, returnTypesEq])
 
+/-- A rigid substitution maps a method profile's instantiation, its types and
+its predicates, as it maps an operator's (`OperatorProfileInstantiates.applyParameters`). -/
+theorem MethodProfileInstantiates.applyParameters
+    {substitution : ParameterSubstitution} {context : Context}
+    {trait : Resolved.DeclarationId} {methodName : String} {subject : Ty}
+    {traitArguments parameterTypes returnTypes : List Ty}
+    {predicates : List ProgramPredicate}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (profile : MethodProfileInstantiates context trait methodName subject
+      traitArguments parameterTypes returnTypes predicates) :
+    MethodProfileInstantiates (applyContext substitution context) trait methodName
+      (substitution.apply subject) (traitArguments.map substitution.apply)
+      (parameterTypes.map substitution.apply)
+      (returnTypes.map substitution.apply)
+      (predicates.map (ProgramPredicate.applyParameters substitution)) := by
+  cases profile with
+  | @intro signature method signatureMem traitEq parametersLength methodUnique
+      parameterTypesEq returnTypesEq =>
+      have signatureWellFormed := catalog.traits_semantic signature signatureMem
+      have methodFiltered : method ∈
+          signature.methods.filter
+            (fun candidate => candidate.name == methodName) := by
+        rw [methodUnique]
+        simp
+      have methodMem : method ∈ signature.methods :=
+        (List.mem_filter.mp methodFiltered).1
+      have methodWellFormed := signatureWellFormed.methods method methodMem
+      have innerExact : SourceSemantics.ParameterSubstitution.Exact
+          (signature.parameters.zip (subject :: traitArguments))
+          signature.parameters :=
+        ParameterSubstitution.exact_zip signatureWellFormed.parameters_nodup
+          (by simp [parametersLength])
+      have parameterCompose :=
+        StructuralSubstitution.TypesWellFormed.applyParameters_compose
+          substitution _ innerExact methodWellFormed.parameter_types
+      have returnCompose :=
+        StructuralSubstitution.TypesWellFormed.applyParameters_compose
+          substitution _ innerExact methodWellFormed.return_types
+      have predicateCompose :=
+        StructuralSubstitution.PredicatesWellFormed.applyParameters_compose
+          substitution _ innerExact methodWellFormed.predicates
+      have rangeEq : ParameterSubstitution.mapRange substitution
+            (signature.parameters.zip (subject :: traitArguments)) =
+          signature.parameters.zip
+            (substitution.apply subject :: traitArguments.map substitution.apply) :=
+        ParameterSubstitution.mapRange_zip substitution _ _
+      change MethodProfileInstantiates (applyContext substitution context) trait
+        methodName (substitution.apply subject)
+        (traitArguments.map substitution.apply)
+        (parameterTypes.map substitution.apply)
+        (returnTypes.map substitution.apply)
+        ({ trait := .declaration trait
+           subject := substitution.apply subject
+           arguments := traitArguments.map substitution.apply } ::
+          (method.wherePredicates.map
+            (ProgramPredicate.applyParameters
+              (signature.parameters.zip (subject :: traitArguments)))).map
+              (ProgramPredicate.applyParameters substitution))
+      rw [predicateCompose, rangeEq]
+      exact .intro (by simpa [applyContext] using signatureMem) traitEq
+        (by simpa using parametersLength) methodUnique
+        (by rw [← rangeEq, ← parameterCompose, parameterTypesEq])
+        (by rw [← rangeEq, ← returnCompose, returnTypesEq])
+
 theorem UnaryOperatorHasType.applyParameters
     {substitution : ParameterSubstitution} {context : Context}
     {operator : Syntax.UnaryOp} {operand result : Ty}
@@ -5519,6 +5607,14 @@ theorem StatementsHaveType.applyParameters
   · intro context reference value element referenceTypeProof valueTypeProof referenceInduction
       valueInduction catalog contextValid
     exact .memrefStore (referenceInduction catalog contextValid) (valueInduction catalog contextValid)
+  · intro context trait method arguments subject traitArguments parameterTypes returnTypes
+      predicates requirements profile evidence argumentsType argumentsInduction catalog
+      contextValid
+    rw [StructuralSubstitution.apply_productMany]
+    exact .methodCall
+      (StructuralSubstitution.MethodProfileInstantiates.applyParameters catalog profile)
+      (StructuralSubstitution.RequirementSequenceProves.applyParameters contextValid evidence)
+      (argumentsInduction catalog contextValid)
   · intro context catalog contextValid
     exact .nil _
   · intro context expression expressions type types head tail headInduction
@@ -7574,6 +7670,21 @@ def mapRange (outer : TypeSystem.Substitution)
     (inner : TypeSystem.ParameterSubstitution) :
     TypeSystem.ParameterSubstitution :=
   inner.map fun entry => (entry.1, outer.apply entry.2)
+
+/-- Mapping the range of parameters zipped with values maps the values. -/
+theorem mapRange_zip (outer : TypeSystem.Substitution)
+    (parameters : List TypeParameterId) (values : List Ty) :
+    mapRange outer (parameters.zip values) =
+      parameters.zip (values.map outer.apply) := by
+  induction parameters generalizing values with
+  | nil => simp [mapRange]
+  | cons parameter rest ih =>
+      cases values with
+      | nil => simp [mapRange]
+      | cons value tail =>
+          have tailEq := ih tail
+          simp only [mapRange] at tailEq ⊢
+          simp [tailEq]
 
 /-- Flexible range mapping preserves exact rigid-parameter coverage. -/
 theorem Exact.mapRange
@@ -11869,6 +11980,90 @@ theorem OperatorProfileInstantiates.applySubstitution
             returnTypes.map substitution.apply
           rw [← returnCompose, returnTypesEq])
 
+/-- A flexible substitution maps a method profile's instantiation, its types
+and its predicates, as it maps an operator's
+(`OperatorProfileInstantiates.applySubstitution`). -/
+theorem MethodProfileInstantiates.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId}
+    {source target : Context} {trait : Resolved.DeclarationId} {methodName : String}
+    {subject : Ty} {traitArguments parameterTypes returnTypes : List Ty}
+    {predicates : List ProgramPredicate}
+    (catalog : SignatureCatalogWellFormed source.signatures)
+    (contextValid :
+      ContextSubstitutionValid substitution closedVariables source target)
+    (profile : MethodProfileInstantiates source trait methodName subject
+      traitArguments parameterTypes returnTypes predicates) :
+    MethodProfileInstantiates target trait methodName (substitution.apply subject)
+      (traitArguments.map substitution.apply)
+      (parameterTypes.map substitution.apply)
+      (returnTypes.map substitution.apply)
+      (predicates.map
+        (TypedTraitResolution.applySubstitution substitution)) := by
+  cases profile with
+  | @intro signature method signatureMem traitEq parametersLength methodUnique
+      parameterTypesEq returnTypesEq =>
+      have signatureWellFormed := catalog.traits_semantic signature signatureMem
+      have methodFiltered : method ∈
+          signature.methods.filter
+            (fun candidate => candidate.name == methodName) := by
+        rw [methodUnique]
+        simp
+      have methodMem : method ∈ signature.methods :=
+        (List.mem_filter.mp methodFiltered).1
+      have methodWellFormed := signatureWellFormed.methods method methodMem
+      have innerExact : SourceSemantics.ParameterSubstitution.Exact
+          (signature.parameters.zip (subject :: traitArguments))
+          signature.parameters :=
+        StructuralSubstitution.ParameterSubstitution.exact_zip
+          signatureWellFormed.parameters_nodup (by simp [parametersLength])
+      have parameterCompose :=
+        TypesWellScoped.applyFlexible_composeParameters
+          (context := signatureContext source.signatures signature.id
+            signature.parameters
+            (signature.wherePredicates ++ method.wherePredicates))
+          substitution _ innerExact
+          (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+            methodWellFormed.parameter_types)
+      have returnCompose :=
+        TypesWellScoped.applyFlexible_composeParameters
+          (context := signatureContext source.signatures signature.id
+            signature.parameters
+            (signature.wherePredicates ++ method.wherePredicates))
+          substitution _ innerExact
+          (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+            methodWellFormed.return_types)
+      have predicateCompose :=
+        PredicatesWellFormed.applyFlexible_composeParameters
+          (context := signatureContext source.signatures signature.id
+            signature.parameters
+            (signature.wherePredicates ++ method.wherePredicates))
+          substitution _ innerExact
+          methodWellFormed.predicates
+      have rangeEq : ParameterSubstitution.mapRange substitution
+            (signature.parameters.zip (subject :: traitArguments)) =
+          signature.parameters.zip
+            (substitution.apply subject :: traitArguments.map substitution.apply) :=
+        ParameterSubstitution.mapRange_zip substitution _ _
+      change MethodProfileInstantiates target trait methodName
+        (substitution.apply subject) (traitArguments.map substitution.apply)
+        (parameterTypes.map substitution.apply)
+        (returnTypes.map substitution.apply)
+        ({ trait := .declaration trait
+           subject := substitution.apply subject
+           arguments := traitArguments.map substitution.apply } ::
+          (method.wherePredicates.map
+            (ProgramPredicate.applyParameters
+              (signature.parameters.zip (subject :: traitArguments)))).map
+              (TypedTraitResolution.applySubstitution substitution))
+      rw [predicateCompose, rangeEq]
+      exact .intro
+        (by
+          rw [← contextValid.closes.target_eq]
+          exact signatureMem)
+        traitEq (by simpa using parametersLength) methodUnique
+        (by rw [← rangeEq, ← parameterCompose, parameterTypesEq])
+        (by rw [← rangeEq, ← returnCompose, returnTypesEq])
+
 /-- Flexible substitution preserves unary primitive and trait-dispatched
 operator typing. -/
 theorem UnaryOperatorHasType.applySubstitution
@@ -13033,6 +13228,14 @@ theorem StatementsHaveType.applySubstitution
       valueInduction targetContext catalog contextValid
     exact .memrefStore (referenceInduction targetContext catalog contextValid)
       (valueInduction targetContext catalog contextValid)
+  · intro context trait method arguments subject traitArguments parameterTypes returnTypes
+      predicates requirements profile evidence argumentsType argumentsInduction targetContext
+      catalog contextValid
+    rw [apply_productMany]
+    exact .methodCall
+      (MethodProfileInstantiates.applySubstitution catalog contextValid profile)
+      (RequirementSequenceProves.applySubstitution contextValid evidence)
+      (argumentsInduction targetContext catalog contextValid)
   · intro context targetContext catalog contextValid
     exact .nil _
   · intro context expression expressions type types head tail headInduction

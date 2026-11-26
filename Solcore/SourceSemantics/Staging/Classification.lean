@@ -512,6 +512,17 @@ mutual
         (referenceStages : HasStage source scope reference referenceStage)
         (valueStages : HasStage source scope value valueStage) :
         HasStage source scope id .deferred
+    /-- A trait's method called by its name runs at run time, its arguments
+    staged in order, as an ordinary direct call does. -/
+    | methodCall
+        {scope : StageScope} {id : ExpressionId} {node : ExpressionNode}
+        {trait : Resolved.DeclarationId} {method : String}
+        {arguments : List ExpressionId} {argumentStages : List Stage}
+        (contains : SourceSemantics.ContainsExpression source id node)
+        (form_eq : node.form = .methodCall trait method arguments)
+        (argumentsStage :
+          ExpressionsHaveStages source scope arguments argumentStages) :
+        HasStage source scope id .deferred
 
   /-- Pointwise expression classification in source order. -/
   inductive ExpressionsHaveStages (source : TypedSource) :

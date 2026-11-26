@@ -405,6 +405,12 @@ inductive ExpressionForm where
   /-- `CanStore.store(r, v)`: the element a memref refers to takes `v`'s value,
   and the store is `()`. -/
   | memrefStore (reference value : ExpressionId)
+  /-- `T.m(args)`, or a bare `m(args)` that names a trait's method: the method
+  `method` of the trait `trait` at its arguments. The node's requirements are
+  the trait's at one instantiation of its parameters, then the method's `where`
+  predicates', as an operator's node's are. -/
+  | methodCall (trait : Resolved.DeclarationId) (method : String)
+      (arguments : List ExpressionId)
   deriving Repr, BEq, DecidableEq
 
 /-- One typed expression occurrence.  `requirements` contains every obligation
@@ -538,6 +544,7 @@ def references : ExpressionForm → List NodeId
   | .elementRef base key => [NodeId.expression base, NodeId.expression key]
   | .memrefLoad target => [NodeId.expression target]
   | .memrefStore target stored => [NodeId.expression target, NodeId.expression stored]
+  | .methodCall _ _ arguments => arguments.map NodeId.expression
 
 end ExpressionForm
 
@@ -774,6 +781,7 @@ def applySubstitution (substitution : Substitution) : ExpressionForm → Express
     | .elementRef base key => .elementRef base key
     | .memrefLoad target => .memrefLoad target
     | .memrefStore target stored => .memrefStore target stored
+    | .methodCall trait method arguments => .methodCall trait method arguments
 
 end ExpressionForm
 
@@ -1076,7 +1084,7 @@ def definedLocalIds : ExpressionForm → List Resolved.LocalId
       .unary .. | .binary .. | .conditional .. | .call .. | .constructor .. |
       .member .. | .proxy _ | .index .. | .newArray .. | .arrayLength _ | .arrayIndex .. |
       .arrayLiteral .. | .arraySlice .. | .toArray .. | .elementRef .. | .memrefLoad _ |
-      .memrefStore .. => []
+      .memrefStore .. | .methodCall .. => []
 
 end ExpressionForm
 

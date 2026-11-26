@@ -68,6 +68,9 @@ inductive UnsupportedExpression where
   | memrefLoad
   /-- A store through a memref, which has no Core representation yet. -/
   | memrefStore
+  /-- A trait's method called by its name, which has no Core representation
+  yet. -/
+  | methodCall
   deriving Repr, BEq, DecidableEq
 
 /-- Statement forms outside the tail-normal executable profile. -/
@@ -1930,6 +1933,8 @@ private def lowerExpressionNodeWith {error : Type} (lift : Error → error)
               (.unsupportedExpression .memrefLoad)
           | .memrefStore _ _ => failWith lift (.occurrence id.occurrence)
               (.unsupportedExpression .memrefStore)
+          | .methodCall _ _ _ => failWith lift (.occurrence id.occurrence)
+              (.unsupportedExpression .methodCall)
 
 /-- Decide whether a compile-time-classified expression is closed relative to
 the staged values currently known while building a reusable runtime draft.
@@ -3129,6 +3134,7 @@ private def evaluateStagedValueNodeWith {error : Type}
           | .elementRef _ _ => failWith lift site (.unsupportedExpression .elementRef)
           | .memrefLoad _ => failWith lift site (.unsupportedExpression .memrefLoad)
           | .memrefStore _ _ => failWith lift site (.unsupportedExpression .memrefStore)
+          | .methodCall _ _ _ => failWith lift site (.unsupportedExpression .methodCall)
           | .integerLiteral _ _ =>
               failWith lift site .stagedValueStatementNotClosed
 

@@ -1538,6 +1538,7 @@ local macro "transport_static" "(" recursor:term "," before:term "," after:term 
     (fun _ _ first second h => by
       simp only [ExpressionForm.references, within_cons, within_nil, and_true] at h
       exact .memrefStore (first h.1) (second h.2))
+    (fun profile evidence _ ih h => .methodCall profile evidence (ih h))
     (fun _ _ => .nil _)
     (fun _ _ head tail h => by
       simp only [List.map_cons, within_cons] at h
@@ -1897,6 +1898,7 @@ private def typingChildren : ExpressionForm → List ExpressionId
   | .elementRef base key => [base, key]
   | .memrefLoad reference => [reference]
   | .memrefStore reference stored => [reference, stored]
+  | .methodCall _ _ arguments => arguments
   | _ => []
 
 private theorem atomic_free {form : ExpressionForm} (atomic : CompatibleExpressionLiterals.Atomic form) :
@@ -2010,6 +2012,10 @@ private theorem step {id : ExpressionId} {node : ExpressionNode}
       intro children _
       exact .memrefStore (children _ (by simp [typingChildren]) _ _ reference)
         (children _ (by simp [typingChildren]) _ _ stored)
+    | methodCall profile evidence typed =>
+      intro children _
+      exact .methodCall profile evidence
+        (types (by simpa only [typingChildren] using children) typed)
 
 
 include edited avoids unique in

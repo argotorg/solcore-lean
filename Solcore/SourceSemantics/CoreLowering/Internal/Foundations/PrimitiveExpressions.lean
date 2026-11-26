@@ -979,7 +979,7 @@ theorem tree_of_lowerExpression
                                 .pair (same ▸ metadata) form leftTree rightTree⟩
               | literal | reference | integerLiteral | lambda | call | constructor | member | proxy | index
               | newArray | arrayLength | arrayIndex | arrayLiteral | arraySlice | toArray | elementRef
-          | memrefLoad | memrefStore =>
+          | memrefLoad | memrefStore | methodCall =>
                   have controlAccepted : SourceCoreControl.lowerExpressionWithReasons (fuel + 1)
                       source scope id reasonAt = .ok lowered := by
                     simpa only [SourceCoreControl.lowerExpressionWithReasons, read, form, bind, Except.bind]

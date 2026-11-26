@@ -3082,6 +3082,26 @@ def CallableApplicationPreserves
     ValueHasType context after result resultType /\
       HeapWellTyped context after /\ HeapTypesExtend before after
 
+/-- Local preservation interface for a trait's method called by its name: the
+method its primary requirement selects, run on arguments of its profile's
+parameter types, gives a value of the product of the profile's result types. -/
+def MethodCallExecutionPreserves
+    (program : Program) (context : Context) (evidence : EvidenceEnvironment) :
+    Prop :=
+  forall before after trait method subject traitArguments parameterTypes
+      returnTypes predicates requirements traitName bodyInstance calleeEvidence
+      arguments result,
+    HeapWellTyped context before ->
+    ValuesHaveTypes context before arguments parameterTypes ->
+    MethodProfileInstantiates context trait method subject traitArguments
+      parameterTypes returnTypes predicates ->
+    RequirementSequenceProves context requirements predicates ->
+    OperatorMethodSelected program context evidence traitName method requirements
+      bodyInstance calleeEvidence ->
+    BodyInvokes program bodyInstance calleeEvidence before arguments result after ->
+    ValueHasType context after result (Ty.productMany returnTypes) /\
+      HeapWellTyped context after /\ HeapTypesExtend before after
+
 private theorem ordinaryRequirementLayout_eq
     {context : Context} {rawType finalType : Ty}
     {requirements owned staticOwned : List RequirementId}
@@ -3291,6 +3311,7 @@ theorem preservesWith
     (step_preserves : CoercionStepExecutionPreserves program context evidence)
     (callable_preserves :
       CallableApplicationPreserves program context evidence)
+    (method_preserves : MethodCallExecutionPreserves program context evidence)
     (evidence_covers : evidence.Covers context)
     (environment_agrees :
       EnvironmentAgrees before context.locals environment)
@@ -3657,6 +3678,18 @@ theorem preservesWith
             (reference_typed.mono value_extension).arrayRef_of_memref.arrayElementWrite
               after_typed read current replace stored_typed write,
             (reference_extension.trans value_extension).trans (HeapTypesExtend.of_write write)⟩
+  | methodCall profile proves arguments_type =>
+      cases evaluation with
+      | methodCall layout arguments_evaluate selected invokes =>
+          have owned_eq := ordinaryRequirementLayout_eq requirements_valid layout
+          subst owned_eq
+          rcases arguments_evaluate.preserves expression_preserves evidence_covers
+              environment_agrees before_typed arguments_type with
+            ⟨arguments_typed, arguments_heap_typed, arguments_extension⟩
+          rcases method_preserves _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ arguments_heap_typed
+              arguments_typed profile proves selected invokes with
+            ⟨result_typed, after_typed, call_extension⟩
+          exact ⟨result_typed, after_typed, arguments_extension.trans call_extension⟩
 
 end ExpressionFormEvaluates
 

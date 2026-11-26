@@ -251,6 +251,7 @@ def applyExpressionForm (substitution : ParameterSubstitution) :
   | .elementRef base index => .elementRef base index
   | .memrefLoad reference => .memrefLoad reference
   | .memrefStore reference value => .memrefStore reference value
+  | .methodCall trait method arguments => .methodCall trait method arguments
 
 def applyPlaceResolution (substitution : ParameterSubstitution)
     (place : PlaceResolution) : PlaceResolution := {
@@ -490,7 +491,8 @@ private def expressionFormTypes : ExpressionForm → List Ty
   | .arraySlice _ _ _
   | .elementRef _ _
   | .memrefLoad _
-  | .memrefStore _ _ => []
+  | .memrefStore _ _
+  | .methodCall _ _ _ => []
 
 private def forItemTypes : ForItemForm → List Ty
   | .letDecl selectedBinder _ => [selectedBinder.scheme.body]
@@ -904,6 +906,7 @@ private def expressionChildTasks (variables : List TypeVarId)
   | .toArray _ inner
   | .memrefLoad inner => expressionTasks variables [inner]
   | .tuple elements => expressionTasks variables elements
+  | .methodCall _ _ arguments => expressionTasks variables arguments
   | .arrayLiteral _ elements => expressionTasks variables elements
   | .arraySlice base start stop =>
       expressionTasks variables (base :: (start.toList ++ stop.toList))

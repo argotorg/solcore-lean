@@ -167,6 +167,51 @@ inductive OperatorMethodSelected (program : Program) (context : Context)
       OperatorMethodSelected program context callerEvidence traitName methodName
         (primary :: methodRequirements) bodyInstance calleeEvidence
 
+/-- Under typing, the method that a call's primary requirement selects belongs
+to the call's trait, whatever name the selection gives that trait: the primary
+requirement proves the profile's primary predicate, which names the trait, and
+the selection's goal is that requirement's predicate. This is why a trait's
+method called by its name (`ExpressionFormEvaluates.methodCall`) leaves the
+selection's trait name free. -/
+theorem OperatorMethodSelected.trait_of_methodProfile
+    {program : Program} {context : Context}
+    {callerEvidence calleeEvidence : EvidenceEnvironment}
+    {traitName methodName : String} {trait : Resolved.DeclarationId}
+    {subject : TypeSystem.Ty}
+    {traitArguments parameterTypes returnTypes : List TypeSystem.Ty}
+    {predicates : List ProgramPredicate}
+    {requirements : List RequirementId} {bodyInstance : BodyInstance}
+    (ledger : RequirementIdsUnique context)
+    (profile : MethodProfileInstantiates context trait methodName subject
+      traitArguments parameterTypes returnTypes predicates)
+    (requirementsProve : RequirementSequenceProves context requirements
+      predicates)
+    (selected : OperatorMethodSelected program context callerEvidence traitName
+      methodName requirements bodyInstance calleeEvidence) :
+    ∃ signature, signature ∈ program.signatures.traits ∧ signature.id = trait ∧
+      signature.name = traitName := by
+  cases profile
+  cases selected with
+  | @intro primary methodRequirements goal closedEvidence implementation method
+      selectedTrait definition substitution _ methodEvidence _ selects
+      closedShape implementationMem selectedTraitMem selectedTraitName
+      goalTrait headDetermined methodMem methodNameEq methodOwner
+      methodRequirementsProduce instantiates calleeAssembled calleeCovers =>
+    have dynamicPrimary : RequirementProves context primary goal := by
+      cases selects with
+      | intro produces _ => exact produces.requirement_valid
+    have primaryGoalEq : goal = {
+        trait := .declaration trait
+        subject := subject
+        arguments := traitArguments
+      } :=
+      ledger.proves_predicate_eq dynamicPrimary requirementsProve.head
+    have traitRefEq :=
+      (congrArg (fun predicate : ProgramPredicate => predicate.trait)
+        primaryGoalEq).symm.trans goalTrait
+    injection traitRefEq with idEq
+    exact ⟨selectedTrait, selectedTraitMem, idEq.symm, selectedTraitName⟩
+
 /-- Statement-only root extraction. -/
 inductive StatementRoots : List NodeId → List StatementId → Prop where
   | nil : StatementRoots [] []
@@ -982,6 +1027,25 @@ mutual
         (write : Heap.Writes after location (some (.arrayObject element updated)) final) :
         ExpressionFormEvaluates program context evidence source environment before
           (.memrefStore reference value) requirements coercions .unit final
+    /-- A trait's method called by its name evaluates its arguments left to
+    right, as a direct call's are, then runs the implementation method its
+    primary requirement selects on their values, as an operator's method is run
+    (`BinaryOperationApplies.method`). The selection's trait name is left free:
+    the primary requirement's goal names the trait, and under typing it is the
+    call's own (`OperatorMethodSelected.trait_of_methodProfile`). -/
+    | methodCall
+        {context evidence source environment before argumentsHeap after trait method
+          arguments requirements coercions owned argumentValues traitName bodyInstance
+          calleeEvidence result}
+        (layout : OrdinaryRequirementLayout requirements coercions owned)
+        (arguments_evaluate : ExpressionsEvaluate program context evidence source
+          environment before arguments argumentValues argumentsHeap)
+        (selected : OperatorMethodSelected program context evidence traitName method
+          owned bodyInstance calleeEvidence)
+        (invokes : BodyInvokes program bodyInstance calleeEvidence argumentsHeap
+          argumentValues result after) :
+        ExpressionFormEvaluates program context evidence source environment before
+          (.methodCall trait method arguments) requirements coercions result after
 
   /-- Left-to-right evaluation of an expression vector. -/
   inductive ExpressionsEvaluate (program : Program) :
@@ -1982,6 +2046,8 @@ mutual
         ((reference_evaluates.initialization_extends).trans
           value_evaluates.initialization_extends).trans
           (HeapInitializationExtend.of_write write)
+    | .methodCall _ arguments_evaluate _ invokes =>
+        (arguments_evaluate.initialization_extends).trans invokes.initialization_extends
 
   theorem ExpressionsEvaluate.initialization_extends {program : Program}
       {context : Context}

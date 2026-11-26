@@ -1804,6 +1804,154 @@ theorem OperatorMethodSelected.coercionCertificateOfProfile
         rw [mappedReturnTypesEq]
         rfl
 
+/-- A method profile and the dynamically selected method name the same catalog
+method, for a trait of any number of parameters: the method body certificate
+has the profile's exact input types, and its result is the product of the
+profile's result types. `certificateOfProfile` is this bridge for an operator's
+trait of one parameter. -/
+theorem OperatorMethodSelected.methodCertificateOfProfile
+    {program : Program} {context : Context}
+    {callerEvidence calleeEvidence : EvidenceEnvironment}
+    {traitName methodName : String} {trait : Resolved.DeclarationId}
+    {subject : Ty} {traitArguments parameterTypes returnTypes : List Ty}
+    {predicates : List ProgramPredicate}
+    {requirements : List RequirementId} {bodyInstance : BodyInstance}
+    (programWellFormed : ProgramWellFormed program)
+    (signatures_eq : context.signatures = program.signatures)
+    (ledger : RequirementIdsUnique context)
+    (profile : MethodProfileInstantiates context trait methodName subject
+      traitArguments parameterTypes returnTypes predicates)
+    (requirementsProve : RequirementSequenceProves context requirements
+      predicates)
+    (selected : OperatorMethodSelected program context callerEvidence traitName
+      methodName requirements bodyInstance calleeEvidence) :
+    ∃ lexicalContext facts,
+      BodyInstanceTypingCertificate program bodyInstance parameterTypes
+          lexicalContext facts ∧
+        bodyInstance.resultType = Ty.productMany returnTypes := by
+  cases profile with
+  | @intro profileTrait profileMethod profileTraitMem traitEq parametersLength
+      methodUnique parameterTypesEq returnTypesEq =>
+    subst traitEq
+    cases selected with
+    | @intro primary methodRequirements goal closedEvidence implementation method
+        selectedTrait definition substitution _ methodEvidence _ selects
+        closedShape implementationMem selectedTraitMem selectedTraitName
+        goalTrait headDetermined methodMem methodNameEq methodOwner
+        methodRequirementsProduce instantiates calleeAssembled calleeCovers =>
+      have dynamicPrimary : RequirementProves context primary goal := by
+        cases selects with
+        | intro produces _ => exact produces.requirement_valid
+      have primaryGoalEq : goal = {
+          trait := .declaration profileTrait.id
+          subject := subject
+          arguments := traitArguments
+        } :=
+        ledger.proves_predicate_eq dynamicPrimary requirementsProve.head
+      have profileTraitMem' : profileTrait ∈ program.signatures.traits := by
+        rw [← signatures_eq]
+        exact profileTraitMem
+      have selectedTraitIdEq : selectedTrait.id = profileTrait.id := by
+        have traitRefEq :=
+          (congrArg (fun predicate : ProgramPredicate => predicate.trait)
+            primaryGoalEq).symm.trans goalTrait
+        injection traitRefEq with profileIdEq
+        exact profileIdEq.symm
+      have selectedTraitEq : selectedTrait = profileTrait :=
+        StructuralSubstitution.eq_of_mem_of_mapped_nodup
+          programWellFormed.signatures.trait_ids selectedTraitMem profileTraitMem'
+          selectedTraitIdEq
+      subst selectedTrait
+      obtain ⟨headKeys, headExact, headEq⟩ := headDetermined
+      have instantiatedHeadEq :
+          ProgramPredicate.applyParameters substitution implementation.head = {
+            trait := .declaration profileTrait.id
+            subject := subject
+            arguments := traitArguments
+          } := headEq.trans primaryGoalEq
+      have headSubjectEq : substitution.apply implementation.head.subject =
+          subject := by
+        have := congrArg (fun predicate : ProgramPredicate => predicate.subject)
+          instantiatedHeadEq
+        simpa [ProgramPredicate.applyParameters] using this
+      have headArgumentsEq :
+          implementation.head.arguments.map substitution.apply = traitArguments := by
+        have := congrArg (fun predicate : ProgramPredicate => predicate.arguments)
+          instantiatedHeadEq
+        simpa [ProgramPredicate.applyParameters] using this
+      have implementationWellFormed :=
+        programWellFormed.signatures.implementations_semantic implementation
+          implementationMem
+      have methodWellFormed := implementationWellFormed.methods method methodMem
+      obtain ⟨catalogTrait, catalogMethod, catalogTraitMem, headTraitEq,
+          catalogMethodMem, catalogMethodIdEq, catalogMethodName,
+          implementationParameterTypesEq, implementationReturnTypesEq,
+          parameterComptimeEq, returnComptimeEq,
+          implementationPredicatesEq⟩ := methodWellFormed.trait_method
+      have catalogMethodWellFormed :=
+        (programWellFormed.signatures.traits_semantic catalogTrait
+          catalogTraitMem).methods catalogMethod catalogMethodMem
+      have catalogTraitIdEq : catalogTrait.id = profileTrait.id := by
+        calc
+          catalogTrait.id = catalogMethod.id.trait :=
+            catalogMethodWellFormed.owner.symm
+          _ = method.traitMethod.trait :=
+            congrArg (fun id => id.trait) catalogMethodIdEq
+          _ = profileTrait.id := methodOwner
+      have catalogTraitEq : catalogTrait = profileTrait :=
+        StructuralSubstitution.eq_of_mem_of_mapped_nodup
+          programWellFormed.signatures.trait_ids catalogTraitMem profileTraitMem'
+          catalogTraitIdEq
+      subst catalogTrait
+      have catalogMethodNameEq : catalogMethod.name = methodName := by
+        rw [catalogMethodName, methodNameEq]
+      have catalogMethodFiltered : catalogMethod ∈
+          profileTrait.methods.filter
+            (fun candidate => candidate.name == methodName) :=
+        List.mem_filter.mpr ⟨catalogMethodMem, by simp [catalogMethodNameEq]⟩
+      rw [methodUnique] at catalogMethodFiltered
+      have catalogMethodEq : catalogMethod = profileMethod := by
+        simpa using catalogMethodFiltered
+      subst catalogMethod
+      have profileTraitWellFormed :=
+        programWellFormed.signatures.traits_semantic profileTrait profileTraitMem'
+      have profileMethodWellFormed :=
+        profileTraitWellFormed.methods profileMethod catalogMethodMem
+      have headSubstitutionExact :
+          SourceSemantics.ParameterSubstitution.Exact
+            (profileTrait.parameters.zip
+              (implementation.head.subject :: implementation.head.arguments))
+            profileTrait.parameters :=
+        StructuralSubstitution.ParameterSubstitution.exact_zip
+          profileTraitWellFormed.parameters_nodup (by
+            have lengthEq := congrArg List.length headArgumentsEq
+            simp only [List.length_map] at lengthEq
+            simp [parametersLength, lengthEq])
+      have rangeEq :
+          StructuralSubstitution.ParameterSubstitution.mapRange substitution
+              (profileTrait.parameters.zip
+                (implementation.head.subject :: implementation.head.arguments)) =
+            profileTrait.parameters.zip (subject :: traitArguments) := by
+        rw [StructuralSubstitution.ParameterSubstitution.mapRange_zip]
+        simp [headSubjectEq, headArgumentsEq]
+      have parameterCompose :=
+        StructuralSubstitution.TypesWellFormed.applyParameters_compose
+          substitution _ headSubstitutionExact profileMethodWellFormed.parameter_types
+      have returnCompose :=
+        StructuralSubstitution.TypesWellFormed.applyParameters_compose
+          substitution _ headSubstitutionExact profileMethodWellFormed.return_types
+      obtain ⟨actualInputs, lexicalContext, facts, certificate⟩ :=
+        instantiates.certificate programWellFormed
+      have actualInputsEq : actualInputs = parameterTypes := by
+        rw [certificate.input_types_eq, implementationParameterTypesEq,
+          parameterCompose, rangeEq]
+        exact parameterTypesEq
+      subst actualInputs
+      refine ⟨lexicalContext, facts,
+        certificate.toBodyInstanceTypingCertificate, ?_⟩
+      rw [certificate.result_type_eq, StructuralSubstitution.apply_productMany,
+        implementationReturnTypesEq, returnCompose, rangeEq, returnTypesEq]
+
 end Solcore.SourceSemantics.Dynamic
 end
 

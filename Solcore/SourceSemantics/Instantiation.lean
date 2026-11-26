@@ -761,6 +761,7 @@ def applyExpressionForm (substitution : ParameterSubstitution) :
   | .elementRef base index => .elementRef base index
   | .memrefLoad reference => .memrefLoad reference
   | .memrefStore reference value => .memrefStore reference value
+  | .methodCall trait method arguments => .methodCall trait method arguments
 
 def applyPlaceResolution (substitution : ParameterSubstitution)
     (place : PlaceResolution) : PlaceResolution := {

@@ -757,6 +757,24 @@ mutual
         (value_type : ExpressionHasType source context value element) :
         ExpressionFormHasRawType source context (.memrefStore reference value) TypeSystem.Ty.unit
           (.ordinary [])
+    /-- A trait's method called by its name: at one instantiation of the trait's
+    parameters (`MethodProfileInstantiates`), the arguments have the method's
+    parameter types and the call the product of its result types, and the
+    node's own requirements prove the trait at that instantiation, then the
+    method's `where` predicates, as an operator's prove its trait's
+    (`BinaryOperatorHasType.trait`). -/
+    | methodCall
+        {context : Context} {trait : Resolved.DeclarationId} {method : String}
+        {arguments : List ExpressionId} {subject : TypeSystem.Ty}
+        {traitArguments parameterTypes returnTypes : List TypeSystem.Ty}
+        {predicates : List ProgramPredicate} {requirements : List RequirementId}
+        (profile : MethodProfileInstantiates context trait method subject
+          traitArguments parameterTypes returnTypes predicates)
+        (evidence : RequirementSequenceProves context requirements predicates)
+        (arguments_type : ExpressionsHaveTypes source context arguments
+          parameterTypes) :
+        ExpressionFormHasRawType source context (.methodCall trait method arguments)
+          (TypeSystem.Ty.productMany returnTypes) (.ordinary requirements)
 
   /-- Pointwise expression typing in source order. -/
   inductive ExpressionsHaveTypes (source : TypedSource) :
@@ -1423,6 +1441,8 @@ local macro "weaken_source_static" "(" recursor:term "," before:term ","
     (fun _ referenceInduction => .memrefLoad referenceInduction)
     (fun _ _ referenceInduction valueInduction =>
       .memrefStore referenceInduction valueInduction)
+    (fun profile evidence _ argumentsInduction =>
+      .methodCall profile evidence argumentsInduction)
     (fun _ => .nil _)
     (fun head tail headInduction tailInduction =>
       .cons headInduction tailInduction)

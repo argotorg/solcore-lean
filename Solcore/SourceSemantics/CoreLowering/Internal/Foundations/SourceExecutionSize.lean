@@ -484,6 +484,21 @@ mutual
         ExpressionFormEvaluates program (stepSize [size_reference_evaluates, size_value_evaluates])
           context evidence source environment before (.memrefStore reference value) requirements
           coercions .unit final
+    | methodCall
+        {size_arguments_evaluate size_invokes : Nat}
+        {context evidence source environment before argumentsHeap after trait method
+          arguments requirements coercions owned argumentValues traitName bodyInstance
+          calleeEvidence result}
+        (layout : OrdinaryRequirementLayout requirements coercions owned)
+        (arguments_evaluate : ExpressionsEvaluate program size_arguments_evaluate context
+          evidence source environment before arguments argumentValues argumentsHeap)
+        (selected : OperatorMethodSelected program context evidence traitName method
+          owned bodyInstance calleeEvidence)
+        (invokes : BodyInvokes program size_invokes bodyInstance calleeEvidence
+          argumentsHeap argumentValues result after) :
+        ExpressionFormEvaluates program (stepSize [size_arguments_evaluate, size_invokes])
+          context evidence source environment before (.methodCall trait method arguments)
+          requirements coercions result after
 
   inductive ExpressionsEvaluate (program : Program) : Nat →
       Context → EvidenceEnvironment → TypedSource → Dynamic.Environment →
@@ -1353,6 +1368,9 @@ theorem ExpressionFormEvaluates.sound {program : Program} {size : Nat} {a0 : Con
   | .memrefStore layout reference_evaluates value_evaluates read current replace write =>
     exact .memrefStore layout (ExpressionEvaluates.sound reference_evaluates)
       (ExpressionEvaluates.sound value_evaluates) read current replace write
+  | .methodCall layout arguments_evaluate selected invokes =>
+    exact .methodCall layout (ExpressionsEvaluate.sound arguments_evaluate) selected
+      (BodyInvokes.sound invokes)
 termination_by structural trace
 
 theorem ExpressionsEvaluate.sound {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : List Value} {a7 : Heap}
@@ -1707,6 +1725,11 @@ theorem ExpressionFormEvaluates.has_size {program : Program} {a0 : Context} {a1 
       ExpressionEvaluates.has_size reference_evaluates
     obtain ⟨size_value_evaluates, value_evaluates⟩ := ExpressionEvaluates.has_size value_evaluates
     exact ⟨_, .memrefStore layout reference_evaluates value_evaluates read current replace write⟩
+  | .methodCall layout arguments_evaluate selected invokes =>
+    obtain ⟨size_arguments_evaluate, arguments_evaluate⟩ :=
+      ExpressionsEvaluate.has_size arguments_evaluate
+    obtain ⟨size_invokes, invokes⟩ := BodyInvokes.has_size invokes
+    exact ⟨_, .methodCall layout arguments_evaluate selected invokes⟩
 termination_by structural trace
 
 theorem ExpressionsEvaluate.has_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : List Value} {a7 : Heap}
@@ -2109,6 +2132,9 @@ theorem ExpressionFormEvaluates.children_below {program : Program} {size : Nat} 
     exact ⟨[size_reference_evaluates], rfl, fun _ member => child_lt_stepSize member⟩
   | @memrefStore size_reference_evaluates size_value_evaluates _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_reference_evaluates, size_value_evaluates], rfl,
+      fun _ member => child_lt_stepSize member⟩
+  | @methodCall size_arguments_evaluate size_invokes _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+    exact ⟨[size_arguments_evaluate, size_invokes], rfl,
       fun _ member => child_lt_stepSize member⟩
 
 theorem ExpressionsEvaluate.positive {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : List Value} {a7 : Heap}
@@ -3220,6 +3246,42 @@ mutual
         ExpressionFormFaults program (stepSize [size_reference_evaluates, size_fault]) context
           evidence source environment before (.memrefStore reference value) requirements
           coercions reason after
+    | methodCallArguments
+        {size_fault : Nat}
+        {context evidence source environment before after trait method arguments
+          requirements coercions owned reason}
+        (layout : OrdinaryRequirementLayout requirements coercions owned)
+        (fault : ExpressionsFault program size_fault context evidence source environment
+          before arguments reason after) :
+        ExpressionFormFaults program (stepSize [size_fault]) context evidence source
+          environment before (.methodCall trait method arguments) requirements coercions
+          reason after
+    | methodCallRequirement
+        {size_arguments_evaluate : Nat}
+        {context evidence source environment before after trait method arguments
+          requirements coercions owned argumentValues failed}
+        (layout : OrdinaryRequirementLayout requirements coercions owned)
+        (arguments_evaluate : ExpressionsEvaluate program size_arguments_evaluate context
+          evidence source environment before arguments argumentValues after)
+        (fault : RequirementListFaults context evidence owned failed) :
+        ExpressionFormFaults program (stepSize [size_arguments_evaluate]) context evidence
+          source environment before (.methodCall trait method arguments) requirements
+          coercions (.unsatisfiedRequirement failed) after
+    | methodCallBody
+        {size_arguments_evaluate size_fault : Nat}
+        {context evidence source environment before argumentsHeap after trait method
+          arguments requirements coercions owned argumentValues traitName bodyInstance
+          calleeEvidence reason}
+        (layout : OrdinaryRequirementLayout requirements coercions owned)
+        (arguments_evaluate : ExpressionsEvaluate program size_arguments_evaluate context
+          evidence source environment before arguments argumentValues argumentsHeap)
+        (selected : OperatorMethodSelected program context evidence traitName method
+          owned bodyInstance calleeEvidence)
+        (fault : BodyFaults program size_fault bodyInstance calleeEvidence argumentsHeap
+          argumentValues reason after) :
+        ExpressionFormFaults program (stepSize [size_arguments_evaluate, size_fault])
+          context evidence source environment before (.methodCall trait method arguments)
+          requirements coercions reason after
 
   inductive ExpressionsFault (program : Program) : Nat →
       Context → EvidenceEnvironment → TypedSource → Dynamic.Environment →
@@ -4365,6 +4427,13 @@ theorem ExpressionFormFaults.sound {program : Program} {size : Nat} {a0 : Contex
   | .memrefStoreValue layout reference_evaluates fault =>
     exact .memrefStoreValue layout (ExpressionEvaluates.sound reference_evaluates)
       (ExpressionFaults.sound fault)
+  | .methodCallArguments layout fault =>
+    exact .methodCallArguments layout (ExpressionsFault.sound fault)
+  | .methodCallRequirement layout arguments_evaluate fault =>
+    exact .methodCallRequirement layout (ExpressionsEvaluate.sound arguments_evaluate) fault
+  | .methodCallBody layout arguments_evaluate selected fault =>
+    exact .methodCallBody layout (ExpressionsEvaluate.sound arguments_evaluate) selected
+      (BodyFaults.sound fault)
 termination_by structural trace
 
 theorem ExpressionsFault.sound {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : SemanticFault} {a7 : Heap}
@@ -4882,6 +4951,18 @@ theorem ExpressionFormFaults.has_size {program : Program} {a0 : Context} {a1 : E
       ExpressionEvaluates.has_size reference_evaluates
     obtain ⟨size_fault, fault⟩ := ExpressionFaults.has_size fault
     exact ⟨_, .memrefStoreValue layout reference_evaluates fault⟩
+  | .methodCallArguments layout fault =>
+    obtain ⟨size_fault, fault⟩ := ExpressionsFault.has_size fault
+    exact ⟨_, .methodCallArguments layout fault⟩
+  | .methodCallRequirement layout arguments_evaluate fault =>
+    obtain ⟨size_arguments_evaluate, arguments_evaluate⟩ :=
+      ExpressionsEvaluate.has_size arguments_evaluate
+    exact ⟨_, .methodCallRequirement layout arguments_evaluate fault⟩
+  | .methodCallBody layout arguments_evaluate selected fault =>
+    obtain ⟨size_arguments_evaluate, arguments_evaluate⟩ :=
+      ExpressionsEvaluate.has_size arguments_evaluate
+    obtain ⟨size_fault, fault⟩ := BodyFaults.has_size fault
+    exact ⟨_, .methodCallBody layout arguments_evaluate selected fault⟩
 termination_by structural trace
 
 theorem ExpressionsFault.has_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : SemanticFault} {a7 : Heap}
@@ -5429,6 +5510,12 @@ theorem ExpressionFormFaults.children_below {program : Program} {size : Nat} {a0
     exact ⟨[size_fault], rfl, fun _ member => child_lt_stepSize member⟩
   | @memrefStoreValue size_reference_evaluates size_fault _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_reference_evaluates, size_fault], rfl, fun _ member => child_lt_stepSize member⟩
+  | @methodCallArguments size_fault _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+    exact ⟨[size_fault], rfl, fun _ member => child_lt_stepSize member⟩
+  | @methodCallRequirement size_arguments_evaluate _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+    exact ⟨[size_arguments_evaluate], rfl, fun _ member => child_lt_stepSize member⟩
+  | @methodCallBody size_arguments_evaluate size_fault _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+    exact ⟨[size_arguments_evaluate, size_fault], rfl, fun _ member => child_lt_stepSize member⟩
 
 theorem ExpressionsFault.positive {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : SemanticFault} {a7 : Heap}
     (trace : ExpressionsFault program size a0 a1 a2 a3 a4 a5 a6 a7) : 0 < size := by

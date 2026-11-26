@@ -1208,7 +1208,7 @@ theorem tree_of_functions_at_runtime_with_children
             cases accepted
       | literal | integerLiteral | reference | lambda | proxy | newArray | arrayLength
       | arrayIndex | arrayLiteral | arraySlice | toArray | elementRef
-          | memrefLoad | memrefStore =>
+          | memrefLoad | memrefStore | methodCall =>
         simp [runtimeCompositionForm, compositionForm, form] at composition
 
 /-- The existing Tree is extracted by the actual compiler's fuel induction.

@@ -1009,7 +1009,7 @@ theorem tree_of_lowerExpression
                                         .pair metadata form leftTree rightTree⟩
           | integerLiteral | unary | binary | conditional | lambda | call | constructor | member | proxy | index
           | newArray | arrayLength | arrayIndex | arrayLiteral | arraySlice | toArray | elementRef
-          | memrefLoad | memrefStore =>
+          | memrefLoad | memrefStore | methodCall =>
               simp [form] at accepted
 
 theorem lowerExpression_hasType
@@ -1583,7 +1583,7 @@ theorem tree_of_lowerExpression
                         .pair (same ▸ metadata) form leftTree rightTree⟩
       | literal | reference | integerLiteral | unary | binary | lambda | call | constructor | member | proxy | index
       | newArray | arrayLength | arrayIndex | arrayLiteral | arraySlice | toArray | elementRef
-          | memrefLoad | memrefStore =>
+          | memrefLoad | memrefStore | methodCall =>
           simp only [form] at accepted
           exact tree_of_basicLeaf unique found
             (by intro inner impossible; rw [form] at impossible; cases impossible)

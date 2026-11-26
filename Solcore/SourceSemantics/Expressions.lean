@@ -541,6 +541,42 @@ inductive OperatorProfileInstantiates
           method.wherePredicates.map
             (ProgramPredicate.applyParameters [(parameter, operand)]))
 
+/-- A trait's uniquely named method at one instantiation of all of the trait's
+parameters, `subject` the first's and `arguments` the rest's: the method's
+instantiated parameter and result types, and the declaration-ordered primary
+and method predicates. It is `OperatorProfileInstantiates` for a trait of any
+number of parameters, named by its declaration. -/
+inductive MethodProfileInstantiates
+    (context : Context) (trait : Resolved.DeclarationId) (methodName : String)
+    (subject : TypeSystem.Ty) (arguments : List TypeSystem.Ty)
+    (parameterTypes returnTypes : List TypeSystem.Ty) :
+    List ProgramPredicate → Prop where
+  | intro
+      {signature : ProgramTraitSignature}
+      {method : ProgramTraitMethodSignature}
+      (signature_mem : signature ∈ context.signatures.traits)
+      (trait_eq : signature.id = trait)
+      (parameters_length : signature.parameters.length = arguments.length + 1)
+      (method_unique :
+        signature.methods.filter (fun candidate => candidate.name == methodName) =
+          [method])
+      (parameter_types_eq :
+        method.parameterTypes.map
+          (TypeSystem.ParameterSubstitution.apply
+            (signature.parameters.zip (subject :: arguments))) =
+            parameterTypes)
+      (return_types_eq :
+        method.returnTypes.map
+          (TypeSystem.ParameterSubstitution.apply
+            (signature.parameters.zip (subject :: arguments))) =
+            returnTypes) :
+      MethodProfileInstantiates context trait methodName subject arguments
+        parameterTypes returnTypes
+        ({ trait := .declaration trait, subject, arguments } ::
+          method.wherePredicates.map
+            (ProgramPredicate.applyParameters
+              (signature.parameters.zip (subject :: arguments))))
+
 /-- Complete unary source-operator typing, including exact evidence IDs. -/
 inductive UnaryOperatorHasType (context : Context) :
     Syntax.UnaryOp → TypeSystem.Ty → TypeSystem.Ty →

@@ -1752,6 +1752,22 @@ theorem analyzeExpressionFormWith_sound
                 expressionSound middleState value indexStage nextState
                   middleValid indexResult
               exact ⟨finalValid, .memrefStore contains form baseStages indexStages⟩
+  | methodCall trait method arguments =>
+      simp only [analyzeExpressionFormWith, form] at success
+      cases analyzed : analyzeExpressionListWith analyzeExpression arguments
+          state with
+      | error problem =>
+          rw [analyzed] at success
+          cases success
+      | ok pair =>
+          rcases pair with ⟨stages, nextState⟩
+          rw [analyzed] at success
+          obtain ⟨rfl, rfl⟩ := success
+          obtain ⟨finalValid, argumentStages⟩ :=
+            analyzeExpressionListWith_sound source
+              (toSemanticScope environment) analyzeExpression expressionSound
+              arguments state nextState stages valid analyzed
+          exact ⟨finalValid, .methodCall contains form argumentStages⟩
 
 theorem analyzeStatementFormWith_sound
     (source : TypedSource) (id : StatementId) (node : StatementNode)

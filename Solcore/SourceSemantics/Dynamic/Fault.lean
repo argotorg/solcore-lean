@@ -1789,6 +1789,47 @@ mutual
           middle value reason after) :
         ExpressionFormFaults program context evidence source environment before
           (.memrefStore reference value) requirements coercions reason after
+    /-- A trait's method called by its name faults with its first faulting
+    argument, as a direct call does. -/
+    | methodCallArguments
+        {context evidence source environment before after trait method arguments
+          requirements coercions owned reason}
+        (layout : OrdinaryRequirementLayout requirements coercions owned)
+        (fault : ExpressionsFault program context evidence source environment
+          before arguments reason after) :
+        ExpressionFormFaults program context evidence source environment before
+          (.methodCall trait method arguments) requirements coercions reason after
+    /-- Its arguments evaluated, it faults with the first of its own
+    requirements that closes to no evidence, as an operator's method does
+    (`BinaryOperationFaults.requirement`). -/
+    | methodCallRequirement
+        {context evidence source environment before after trait method arguments
+          requirements coercions owned argumentValues failed}
+        (layout : OrdinaryRequirementLayout requirements coercions owned)
+        (arguments_evaluate : ExpressionsEvaluate program context evidence source
+          environment before arguments argumentValues after)
+        (fault : RequirementListFaults context evidence owned failed) :
+        ExpressionFormFaults program context evidence source environment before
+          (.methodCall trait method arguments) requirements coercions
+          (.unsatisfiedRequirement failed) after
+    /-- Its arguments evaluated, it faults with the selected method's body's
+    fault, as an operator's method does (`BinaryOperationFaults.method`). The
+    selection's trait name is left free, as in `ExpressionFormEvaluates.methodCall`:
+    under typing the trait is the call's own
+    (`OperatorMethodSelected.trait_of_methodProfile`). -/
+    | methodCallBody
+        {context evidence source environment before argumentsHeap after trait method
+          arguments requirements coercions owned argumentValues traitName bodyInstance
+          calleeEvidence reason}
+        (layout : OrdinaryRequirementLayout requirements coercions owned)
+        (arguments_evaluate : ExpressionsEvaluate program context evidence source
+          environment before arguments argumentValues argumentsHeap)
+        (selected : OperatorMethodSelected program context evidence traitName method
+          owned bodyInstance calleeEvidence)
+        (fault : BodyFaults program bodyInstance calleeEvidence argumentsHeap
+          argumentValues reason after) :
+        ExpressionFormFaults program context evidence source environment before
+          (.methodCall trait method arguments) requirements coercions reason after
 
   /-- First fault in a left-to-right expression vector. -/
   inductive ExpressionsFault (program : Program) :

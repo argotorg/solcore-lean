@@ -890,6 +890,39 @@ mutual
               (reference_typed.mono value_extension).arrayRef_of_memref.arrayElementWrite
                 after_typed read current replace stored_typed write,
               (reference_extension.trans value_extension).trans (HeapTypesExtend.of_write write)⟩
+    | .methodCall layout arguments_evaluate selected invokes => by
+        cases typing with
+        | methodCall profile requirements_prove arguments_type =>
+            have owned_eq := ordinaryRequirementLayout_eq requirements_valid layout
+            subst owned_eq
+            rcases preserveExpressionsRec program_well_formed runtime
+                evidence_covers environment_agrees before_typed arguments_type
+                arguments_evaluate with
+              ⟨arguments_typed, arguments_heap_typed, arguments_extension⟩
+            obtain ⟨lexicalContext, facts, certificate, result_eq⟩ :=
+              selected.methodCertificateOfProfile program_well_formed
+                runtime.signatures runtime.requirements.idsUnique profile
+                  requirements_prove
+            have signatures_eq :=
+              certificate.signatures_eq.trans runtime.signatures.symm
+            have body_heap_typed := arguments_heap_typed.transportClosed signatures_eq
+              runtime.closed certificate.type_parameters_empty
+              runtime.variables_closed certificate.residual_type_variables_open
+            have body_arguments_typed := arguments_typed.transportClosed signatures_eq
+              runtime.closed certificate.type_parameters_empty
+              runtime.variables_closed certificate.residual_type_variables_open
+            have invocation := preserveBodyRec program_well_formed
+              certificate (selected_covers selected) body_heap_typed
+              body_arguments_typed invokes
+            have result_at_caller := invocation.result_typed.transportClosed
+              signatures_eq.symm certificate.type_parameters_empty runtime.closed
+              certificate.type_variables_empty runtime.residual_variables_open
+            have heap_at_caller := invocation.heap_typed.transportClosed
+              signatures_eq.symm certificate.type_parameters_empty runtime.closed
+              certificate.type_variables_empty runtime.residual_variables_open
+            rw [result_eq] at result_at_caller
+            exact ⟨result_at_caller, heap_at_caller,
+              arguments_extension.trans invocation.heap_extends⟩
     termination_by structural evaluation
 
   private theorem preserveExpressionsRec
