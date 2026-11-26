@@ -5026,6 +5026,7 @@ theorem accepted_call_returning (selected : SelectedInventory whole row) {called
     ((SelectedCompilationPhysicalProgramSupport.stages fixture.recipe.compiled).source bodySelected)
     ((SelectedCompilationPhysicalProgramSupport.stages fixture.recipe.compiled).evidence bodySelected)
     selected.packet.header.unique (whole.callees calls wellFormed admitted) (calls.header_shape selected.packet)
+    (fun _ => CellAwareInvocationAcceptedStoredFunctions.Heap.empty.push fun _ same => by cases same; exact .word word)
     sourceTrace
   obtain ⟨_capture, _value, _finalStore, _finalMap, _finalWorld, requiredExecution, requiredOutput, _result, output⟩ :=
     CellAwarePublicAcceptedCallForward.first_value_selected callableProfile initial.issued prepared
@@ -5245,6 +5246,7 @@ theorem accepted_failure (selected : SelectedInventory whole row) {called : Decl
     ((SelectedCompilationPhysicalProgramSupport.stages fixture.recipe.compiled).evidence bodySelected)
     selected.packet.header.unique (selected.source_eq ▸ plain) (whole.callees calls wellFormed admitted)
     calleesPlain (calls.header_shape selected.packet) (header_signatures selected.packet.header) expressible
+    (fun _ => CellAwareInvocationAcceptedStoredFunctions.Heap.empty.push fun _ same => by cases same; exact .word word)
     sourceFault
   obtain ⟨_capture, _value, _finalStore, _finalMap, _finalWorld, requiredExecution, token, _result, represented,
       output⟩ :=
